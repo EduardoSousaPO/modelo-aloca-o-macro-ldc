@@ -28,9 +28,11 @@ série conferidos na fonte + linha em `docs/wiki/log.md`).
 - Documentação completa: escopo → pesquisa → PRD → SPEC/Anti-SPEC → contratos → TODO (40 features) → PLAN.
 - Contratos de dados escritos em `packages/shared/schemas/` (6 módulos pandera/pydantic + catálogo de 132
   séries). **Zero código de pipeline** em `apps/pipeline/` e `apps/analysis/`.
-- `data/raw/` tem amostras da pesquisa (ANBIMA IMA, Tesouro Direto, Curva Zero, `ms.txt`);
-  `data/processed/` e `data/canonical/` estão **vazios**.
-- 6 ADRs em status **Proposta**; 12 substituições de fonte registradas como **provisórias** em
+- `data/raw/` tem as amostras da pesquisa (ANBIMA IMA, Tesouro Direto) **e** a janela arquivada pelo
+  job F-009 (`anbima-ms/`, `anbima-ettj/`, um manifest por arquivo); `data/processed/` e
+  `data/canonical/` estão **vazios**. Nada de `data/` vai para o git.
+- **7 ADRs** (ADR-001..006 em **Proposta**; **ADR-007 Aceita** — Supabase descartado na v1);
+  12 substituições de fonte registradas como **provisórias** em
   [`docs/plans/DECISIONS_LOG.md`](docs/plans/DECISIONS_LOG.md).
 - CI: N1 (lint + unit) configurado em `.github/workflows/ci.yml`; N2/N3 comentados até existirem testes.
 - **8 decisões de Edu/Alexandre bloqueiam o início** — ver abaixo.
@@ -79,7 +81,7 @@ docs/contracts/CONTRACTS.md     ← espelho legível dos schemas
 docs/plans/                     ← PLAN.md · DECISIONS_LOG.md · skills-manifest.md ·
                                   risk-classification.md · infra-ops.md · prompts-cheatsheet.md ·
                                   checklists/ · feature-contracts/ · _templates/
-docs/decisions/adr/             ← ADR-001..006 (todos em Proposta)
+docs/decisions/adr/             ← ADR-001..006 (em Proposta) + ADR-007 (Aceita)
 docs/wiki/                      ← index · log · overview · architecture + modules/ features/
                                   runbooks/ context/   (memória sintetizada entre sessões)
 ```
@@ -99,7 +101,7 @@ ele não existe.
 | 5 | [`docs/contracts/CONTRACTS.md`](docs/contracts/CONTRACTS.md) | espelho legível de [`packages/shared/schemas/`](packages/shared/schemas/) |
 | 6 | [`TODO.md`](TODO.md) | estado vivo: 40 features classificadas A/B/C/D + Feature Contract inline |
 | 7 | [`docs/plans/PLAN.md`](docs/plans/PLAN.md) | ondas de execução até 2026-10-14 + dependências + lista de corte |
-| 8 | [`docs/decisions/adr/`](docs/decisions/adr/) | decisões arquiteturais (ADR-001..006) |
+| 8 | [`docs/decisions/adr/`](docs/decisions/adr/) | decisões arquiteturais (ADR-001..006 em Proposta; ADR-007 Aceita) |
 | 9 | [`docs/plans/DECISIONS_LOG.md`](docs/plans/DECISIONS_LOG.md) | substituições de fonte e decisões operacionais |
 | 10 | [`docs/wiki/index.md`](docs/wiki/index.md) | memória sintetizada — **primeira leitura de qualquer agente** |
 
@@ -124,10 +126,15 @@ e-mail de escopo → teste falhando sobre fixture gravada → implementar → CI
 matriz de validação e **evidência de dados** (linhas, min/max de data, % de nulos, 3 valores conferidos na
 fonte; classe C: diff numérico vs. a versão anterior do canônico) → merge → `TODO.md` + `docs/wiki/log.md`.
 
-## Decisões pendentes (bloqueiam a implementação)
+## Decisões pendentes (gate de publicação)
 
-8 decisões de **Edu/Alexandre** travam o início — detalhe, recomendação e features afetadas em
+8 decisões de **Edu/Alexandre** — detalhe, recomendação e features afetadas em
 **[`TODO.md §4`](TODO.md)**. Responder "aceito a recomendação" destrava e muda os ADRs para Aceito.
+
+> **Estado em 2026-10-10 (noite):** o Edu autorizou **desenvolver** as ondas sobre os padrões provisórios
+> destas 8 decisões e do ADR-006 (aceite formal pendente); as 8 seguem abertas e o único gate que
+> permanece duro é a **publicação** — nenhum número vai ao Comitê sem **ADR-001 aceito** (`AGENTS.md §14`).
+> Nesta data também: repo GitHub conectado (`main`) e **Supabase descartado na v1** (ADR-007, Aceita).
 
 | # | Decisão | ADR |
 |---|---|---|

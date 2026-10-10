@@ -60,6 +60,44 @@ S-09, S-10, S-11, S-12**) são operacionais e podem ser aceitas por e-mail, sem 
   disfarçado, `auto_adjust` mudou de default), então F-007/F-011 mantêm a chamada direta ao `chart/v8`
   com UA de browser como fallback e passam `auto_adjust` explicitamente — ref: `skills-manifest §4` /
   F-007, F-011
+- [2026-10-10] [repo] **Repositório remoto no GitHub conectado** — motivo: o Edu criou
+  `https://github.com/EduardoSousaPO/modelo-aloca-o-macro-ldc.git` e o orquestrador fez o push da
+  **`main`** (até então o repo era só local, 7+ commits) — impacto: histórico passa a ter backup fora da
+  máquina e o CI do GitHub Actions (N1) passa a rodar de fato; **nada muda nas regras de dado**: `data/`
+  segue fora do git e nenhum `.parquet`/`.duckdb`/`.env` pode ser commitado (`CLAUDE.md §6`, RNF-009) —
+  ref: `README.md`, `.github/workflows/ci.yml`
+- [2026-10-10] [arquitetura] **Supabase descartado na v1 — DECIDIDO pelo Edu** — motivo: o Edu perguntou
+  se o projeto precisa de banco; avaliação do orquestrador foi **não na v1** — pipeline local, usuário
+  único, sem web/auth/deploy (PRD §4.4), volume pequeno (~130 séries, 83 trimestres) e ADR-006 já define
+  Parquet por camada + DuckDB derivado; Supabase adicionaria **credencial** (classe D por `AGENTS.md §2`,
+  contra RNF-006), dependência de rede, custo, migration e um risco novo (dado errado persistido
+  remotamente) sem benefício para 14/10 — impacto: persistência segue integralmente o ADR-006; o
+  compartilhamento com o Alexandre continua pelo **pacote de entrega** (XLSX/Parquet/figuras, F-031,
+  classe D). Reavaliar na fase 2 **só** com dashboard multiusuário, atualização automática consumida por
+  terceiros ou histórico de vintages consultável por terceiros — e então como classe D, com ADR próprio,
+  **nunca** substituindo o Parquet como fonte reconstruível — ref: **ADR-007** (Aceita), ADR-006 (alt. D)
+- [2026-10-10] [processo] **Edu autorizou seguir as ondas com os padrões provisórios** — motivo: pedido
+  explícito de abrir a Onda 0 e seguir as demais em loop com subagentes Opus, em vez de esperar as 8
+  decisões (D1, D3, D5, D6, D12, L1, L2, L4) — impacto: **desenvolvimento liberado** sobre as
+  recomendações já registradas neste log e no ADR-006; as 8 decisões **seguem abertas** e podem ser
+  viradas pelo Edu a qualquer momento (quem virar paga a reconstrução, classe C); o gate de
+  **publicação** permanece **duro**: nenhum número vai ao Comitê/Alexandre sem **ADR-001 aceito**
+  (`AGENTS.md §14` passo 2, CA-090) — em `Proposta` o veredito é `BLOQUEADO — ESPECIFICAÇÃO NÃO
+  CONGELADA` — ref: `TODO.md §4`, `docs/plans/PLAN.md §6`, `AGENTS.md §14`
+- [2026-10-10] [parsing] **Dois normalizadores de número, não um** — motivo: o Feature Contract de F-001
+  pedia "normalizador único de número pt-BR", mas as fontes se dividem em dois mundos incompatíveis:
+  vírgula decimal com ponto de milhar (B3 `"38.484,84"`, ANBIMA, Tesouro, Curva Zero) e ponto decimal
+  (JSON do SGS `"0.82"`, Yahoo, MSCI). Um normalizador "esperto" teria de adivinhar se `"6.930"` é
+  `6,93` ou `6930` — e `6.930` é justamente um vértice da Curva Zero em dias — impacto:
+  `apps.pipeline.common.parsing` exporta `para_float_ptbr` **e** `para_float_ponto_decimal`, cada um
+  **levantando** na convenção do outro em vez de errar a escala por 1000x em silêncio; cada extrator
+  declara qual usa — ref: F-001, `docs/wiki/context/F-001.md §3`, CA-035
+- [2026-10-10] [repo] **`uv.lock` versionado no git** — motivo: reprodutibilidade do ambiente (RNF de
+  reprodutibilidade); o pacote do Comitê tem de poder ser refeito com as **mesmas** versões de pandas,
+  pandera e openpyxl, e `uv sync` sem lock resolve de novo a cada máquina e a cada dia — impacto:
+  `uv.lock` entra no repo e **não** vai para o `.gitignore`; bump de dependência vira diff revisável, e
+  divergência entre lock e `pyproject` é falha de CI em vez de surpresa de execução — ref:
+  `pyproject.toml`, `.gitignore`, RNF-009, CA-121
 - [2026-10-10] [fontes] **Playwright é diagnóstico, nunca fonte de pipeline** — motivo: as páginas da B3 e
   do ANBIMA Data são shells Angular (~2 KB, só `<app-root>`) — impacto: scraping de HTML não funciona; o
   caminho é sempre a API. Virar fonte → pausa + ADR — ref: `skills-manifest §1` cap. 15, RO-7

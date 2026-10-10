@@ -44,6 +44,30 @@ Uma linha por evento. Frase curta com data ISO, tipo, contexto, link com fonte (
 
 > Entradas mais novas no topo.
 
+- [2026-10-10] [IMPLEMENTADO (QA pendente)] **F-001 — infra de extração** em `apps/pipeline/common/`
+  (`http`, `parsing`, `io_layers`, `logging_setup`, `errors`): `ClienteHTTP` com UA de browser, retry com
+  backoff, guarda de HTTP 200-com-erro, validador de shape de JSON array, anti-truncamento, fatiamento de
+  janela e **primitiva de cache condicional** (ETag/Last-Modified → 304); dois normalizadores de número
+  (`para_float_ptbr` × `para_float_ponto_decimal`), `para_data` com formato declarado, `detectar_formato`
+  por magic bytes, encoding explícito por fonte (com lint de AST que quebra o CI em `open`/`read_csv` sem
+  `encoding=`); camadas de `data/` com nome determinístico, `sha256`, manifesto e
+  `gravar_processado_parquet` validado por pandera. **108 testes unitários verdes, nenhuma chamada de
+  rede** (CI N1 no repo: 161 passed, 1 deselected, 1 xfailed). Contrato ajustado: `extract/` →
+  `common/`. **Não** implementada a flag `--record` do `conftest.py` (decisão aberta). Aguardando
+  veredito de QA — ref: F-001, `TODO.md §1`, `docs/wiki/context/F-001.md`, `docs/plans/qa/ONDA-0-QA.md`
+- [2026-10-10] [IMPLEMENTADO (QA pendente)] **F-009 — job diário de arquivamento ANBIMA** em
+  `apps/pipeline/jobs/anbima_daily.py` (CLI `--date` / `--backfill` / `--fonte`): arquiva
+  `ms_AAMMDD.txt` e `cz_AAMMDD.csv` (POST `CZ-down.asp`, `saida=csv`) em `data/raw/anbima-ms/` e
+  `data/raw/anbima-ettj/` com manifest sidecar, idempotente, recusando corpo inválido (HTML com HTTP 200,
+  eco de outro dia útil, truncamento) e tratando ausência como sucesso. **Rodado ao vivo**: 41 arquivos de
+  dados + 41 manifests, toda a janela disponível; bordas medidas — `ms` desde **2026-09-11** (404 antes),
+  Curva Zero desde **2026-09-14** (200 com 0 bytes antes). 29 testes unitários sobre fixtures reais + 1
+  live `@pytest.mark.network`; runbook `runbooks/job-diario-anbima.md`. Pendente: tarefa agendada
+  (`schtasks`, é do Edu) e migração para `apps.pipeline.common` (`# TODO(F-001)`). Aguardando veredito de
+  QA — ref: F-009, `TODO.md §1`, `docs/wiki/context/F-009.md`, `docs/plans/qa/ONDA-0-QA.md`
+
+2026-10-10 | DECISÃO | repo GitHub conectado (main); Supabase descartado na v1 (ADR-007); ondas autorizadas com padrões provisórios, publicação segue gated por ADR-001
+
 - [2026-10-10] [HOUSEKEEPING] **CI N1 verde antes de código** (P0-1/P0-2 da auditoria): `[tool.ruff] exclude` passou a cobrir `.claude` (96 erros de skill vendorizada), `data`, `venv` e `*.md` (ruff >= 0.14 formata snippets Python dentro de Markdown e reformataria `docs/research/`, que é imutável); `ignore = ["PD901"]` removido (regra extinta no ruff, emitia warning no CI); `ruff format` aplicado em `regimes.py`, `series_catalog_data.py`, `macro_quarterly.py` e `asset_returns_quarterly.py`; `[tool.pytest.ini_options] pythonpath = ["."]` + `tests/conftest.py` resolvem o import `packages.shared.schemas`; `bypass-selection = true` do hatchling trocado por `packages = ["packages"]` (o wheel instalava um pacote vazio). `ruff check .` e `ruff format --check .` verdes; `pytest tests/unit` sai **0** (antes: exit 5, `no tests ran`) — ref: `pyproject.toml`, `docs/plans/AUDITORIA-HARNESS.md §F-7`
 - [2026-10-10] [HOUSEKEEPING] `tests/unit/test_schemas_smoke.py` (10 testes) e `tests/unit/test_canonical_guards.py` (9) criados: catálogo carrega com 132 entradas e `series_id` únicos, nenhuma entrada `ok` com identificador `a_confirmar`, nenhuma série FRED usável no pacote mínimo, schemas do canônico importam, backfill sintético rejeitado por trimestre e piso de `n_features`. Os que dependem de `pandera` (não instalada nesta máquina) usam `importorskip`; validados num env isolado `uv run --no-project --with pandera`: **23 passed, 1 xfailed**. `tests/fixtures/` criado com `README.md` de convenção (`<fonte>/<serie>__<data>.ext`, fixture de erro obrigatória, ≤ 200 KB) — ref: `tests/`
 - [2026-10-10] [DECISION] **CA-120 reescrito** (E-1 da auditoria, classe C): `macro_quarterly` é wide — a linha é um trimestre, não um valor —, então `source`/`series_id`/`vintage`/`collected_at` por linha não respondiam "de onde veio este número?". A exigência de rastreabilidade **não** mudou; mudou onde é cumprida: nova tabela companheira `macro_quarterly_provenance` (long, PK `(quarter, column)`, com `series_id`, `source`, `vintage`, `collected_at`, `lag_adjusted`, `fonte_versao` + checks `vintage_nao_posterior_a_coleta` e `lag_adjusted_homogeneo`), materializada por F-015 junto com a tabela wide. `SPEC.md §13` passa a mapear RF-047 → F-013 **e** F-015 — ref: `docs/specs/SPEC.md` CA-120, `docs/contracts/CONTRACTS.md §3.1`, `packages/shared/schemas/macro_quarterly.py`, `TODO.md` F-015

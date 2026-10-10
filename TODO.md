@@ -57,13 +57,18 @@ qualquer mudança na camada canônica — ver `AGENTS.md §2`.
 
 > Máximo 2 itens simultâneos. Se tiver mais, você está dispersando.
 
-### [ ] F-009 — Job diário de arquivamento ANBIMA (`Msec_txt.txt` + Curva Zero) — **URGENTE, HOJE**
+### [~] F-009 — Job diário de arquivamento ANBIMA (`ms_AAMMDD.txt` + Curva Zero) — **implementada — aguardando QA (`docs/plans/qa/ONDA-0-QA.md`)**
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `data/anbima-arquivamento`
 - **Cobre:** RF-010 · e-mail: **A5, A6**
 - **CAs da SPEC:** CA-027, CA-028, CA-029
 - **Por que é a primeira:** a janela é **rolante (~20 dias úteis)**. Cada dia sem o job é um dia de série
   proprietária **perdido para sempre** (riscos L6/R3). Não depende de nenhuma decisão humana.
+- **Estado (2026-10-10):** **implementada — aguardando QA**. Veredito do subagente de QA em
+  `docs/plans/qa/ONDA-0-QA.md`; só depois disto o orquestrador move o item para §3. Rodada ao vivo:
+  41 arquivos de dados + 41 manifests arquivados, idempotência e ausência confirmadas na fonte.
+  Pendências que **não** bloqueiam o QA: criar a tarefa agendada (é do Edu, `schtasks` no runbook §3)
+  e migrar a camada HTTP para `apps.pipeline.common` (ver §6).
 
 **DoR específica** — [x] URLs e formatos confirmados (`ms{AAMMDD}.txt`, POST `CZ-down.asp`);
 [x] `ausencia_e_caso_normal = True` previsto no `ExtractorConfig`; [x] sem bloqueio.
@@ -73,9 +78,14 @@ qualquer mudança na camada canônica — ver `AGENTS.md §2`.
 **Excluído:** uso dessas séries no canônico (a curva histórica vem do Tesouro — ADR-004);
 agendador do sistema (o Edu dispara; não há cron no projeto).
 
-**Arquivos:** `apps/pipeline/extract/anbima_diario.py`, `tests/unit/test_anbima_diario.py`,
-`tests/fixtures/anbima/ms261008.txt`, `tests/fixtures/anbima/cz.csv`,
-`docs/wiki/runbooks/arquivamento-diario-anbima.md`.
+**Arquivos (reais, como implementado):** `apps/pipeline/jobs/anbima_daily.py`,
+`tests/unit/test_anbima_daily.py`, `tests/fixtures/anbima-ms/` (`ms__2026-10-09.txt`,
+`ms__erro_html.txt`), `tests/fixtures/anbima-ettj/` (`cz__2026-10-09.csv`, `cz__2026-10-08.csv`,
+`cz__vazio.csv`, `cz__saida_xls_e_html.html`), `docs/wiki/runbooks/job-diario-anbima.md`.
+**Comando:** `python -m apps.pipeline.jobs.anbima_daily --date AAAA-MM-DD --backfill N`
+(também `--fonte ms|cz`; sem argumento = dia de hoje, as duas fontes).
+**Saída:** `data/raw/anbima-ms/ms_AAMMDD.txt` e `data/raw/anbima-ettj/cz_AAMMDD.csv`, cada um com
+manifest `.manifest.json` ao lado.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -88,7 +98,7 @@ agendador do sistema (o Edu dispara; não há cron no projeto).
 
 ---
 
-### [ ] F-001 — Infra de extração (cliente HTTP, parsing e guardas)
+### [~] F-001 — Infra de extração (cliente HTTP, parsing e guardas) — **implementada — aguardando QA (`docs/plans/qa/ONDA-0-QA.md`)**
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `feat/infra-extracao`
 - **Cobre:** RF-049 (e é pré-requisito dos riscos R1, R2, R4, R10-R13 da pesquisa) · e-mail: base de A/B/C
@@ -97,15 +107,36 @@ agendador do sistema (o Edu dispara; não há cron no projeto).
 **DoR específica** — [x] fontes e pegadinhas levantadas em `docs/research/fontes-de-dados.md`;
 [x] `ExtractorConfig` já existe em `packages/shared/schemas/series_catalog.py`; [x] sem bloqueio humano.
 
+- **Estado (2026-10-10):** **implementada — aguardando QA**. Veredito do subagente de QA em
+  `docs/plans/qa/ONDA-0-QA.md`; só depois disto o orquestrador move o item para §3. 108 testes
+  unitários da infra verdes, nenhuma chamada de rede. Decisão aberta remanescente: `--record` em
+  `tests/conftest.py` (ver §6 e `docs/wiki/context/F-001.md §7`).
+
 **Escopo incluído:** cliente HTTP com **User-Agent de browser** em toda requisição, retry com backoff,
 timeout; **validador de shape** (corpo é JSON array? tem chave `error`/`erro`? começa com `<`?);
-**normalizador único de número pt-BR** (`"38.484,84"` → `38484.84`); leitor com **encoding explícito**
+**normalizadores de número** — na implementação viraram **dois**, `para_float_ptbr` (`"38.484,84"` → `38484.84`) e `para_float_ponto_decimal`, cada um levantando na convenção do outro (`DECISIONS_LOG §2`); leitor com **encoding explícito**
 por fonte; checagem de **magic bytes** (`PK` = XLSX, `<` = HTML); helper de fatiamento de janela
-(≤ 10 anos); gravação em `data/raw/<fonte>/` e `data/processed/`.
-**Excluído:** cache condicional por ETag (→ F-030); qualquer extrator concreto.
+(≤ 10 anos); gravação em `data/raw/<fonte>/` e `data/processed/`; **primitiva de cache condicional**
+(`validadores_condicionais(alvo)` lendo ETag/Last-Modified do manifesto + `etag=`/`last_modified=` no
+`ClienteHTTP.get` + `RespostaBruta.nao_modificada` para o 304) — necessária para o arquivo de 14,6 MB
+do Tesouro (R21).
+**Excluído:** a **política** de cache por fonte, isto é, quem revalida, com que frequência e o que
+fazer com o 304 (→ F-030; aqui entra só a primitiva); qualquer extrator concreto.
 
-**Arquivos:** `apps/pipeline/extract/http.py`, `.../parsing.py`, `.../io_layers.py`,
-`tests/unit/test_http.py`, `tests/unit/test_parsing.py`.
+**Arquivos (reais, como implementado):** `apps/pipeline/common/__init__.py`, `.../http.py`,
+`.../parsing.py`, `.../io_layers.py`, `.../logging_setup.py`, `.../errors.py`,
+`tests/unit/test_common_http.py`, `tests/unit/test_common_parsing.py`,
+`tests/unit/test_common_io_layers.py`, `tests/unit/test_common_errors.py`,
+`tests/fixtures/common/` (+ `README.md` de procedência); `pyproject.toml` ganhou `"apps"` em
+`[tool.hatch.build.targets.wheel] packages`.
+
+> **Ajuste do Feature Contract — renomeação `extract/` → `common/` (2026-10-10).** O contrato original
+> dizia `apps/pipeline/extract/{http,parsing,io_layers}.py`. A implementação ficou em
+> `apps/pipeline/common/` porque: (i) é o caminho que o briefing da Onda 0 e o `# TODO(F-001)` já
+> gravado em `apps/pipeline/jobs/anbima_daily.py` assumem; (ii) deixa `apps/pipeline/extract/` livre
+> para os **extratores concretos** de F-002…F-008, sem misturar infra compartilhada com fonte; e
+> (iii) o nome diz o que o pacote é — infra comum, não um extrator. O import passa a ser
+> `from apps.pipeline.common import X`. Nenhum CA muda. Ver `docs/wiki/context/F-001.md §7`.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -1116,9 +1147,31 @@ trimestre anterior. Sem dashboard hospedado (fora de escopo). CI N1.
 
 ## 4. Bloqueios
 
-> **8 decisões de Edu/Alexandre bloqueiam o início da implementação.** Origem: `docs/product/PRD.md §13.2`
+### Estado em 2026-10-10 (noite) — execução autorizada, publicação ainda travada
+
+O **Edu autorizou abrir a Onda 0 e seguir as demais ondas em loop**, desenvolvendo sobre os **padrões
+provisórios** das 8 decisões abaixo (D1, D3, D5, D6, D12, L1, L2, L4) e do **ADR-006** — em vez de esperar.
+O que isso muda e o que **não** muda:
+
+- **Desenvolver: liberado.** As features podem ser implementadas adotando a recomendação registrada em
+  cada item e no `DECISIONS_LOG.md`. Para o **ADR-006** (armazenamento Parquet+DuckDB e convenção de
+  retorno/alinhamento): **desenvolvimento liberado em caráter provisório; aceite formal pendente** — a
+  DoR de F-013/F-014/F-015/F-017/F-029 deixa de nascer `BLOQUEADO` por esse item.
+- **As 8 decisões seguem abertas.** Nenhuma foi respondida; o Edu pode virar qualquer uma a qualquer
+  momento. Virada em item que já tem código = **classe C** (reconstrução completa de `data/canonical/` +
+  diff numérico). Cada feature afetada carrega a decisão como **item de DoR declarado**, não resolvido.
+- **O único gate que permanece duro é a PUBLICAÇÃO.** Nenhum número vai ao Comitê/Alexandre sem
+  **ADR-001 aceito** (`AGENTS.md §14` passo 2 · CA-090). Em `Proposta`, o veredito é
+  `BLOQUEADO — ESPECIFICAÇÃO NÃO CONGELADA`, e isso vale também para "só esse número no WhatsApp":
+  **não existe classe A/B para publicação.**
+- Registro datado em `docs/plans/DECISIONS_LOG.md §2`. Também nesta data: repositório remoto GitHub
+  conectado (`main`) e **Supabase descartado na v1** → **ADR-007 (Aceita)**.
+
+> **8 decisões de Edu/Alexandre seguem abertas** (bloqueavam o início da implementação — ver o estado de
+> 2026-10-10 acima). Origem: `docs/product/PRD.md §13.2`
 > (PRD gerado em modo autônomo em 2026-10-10 — nenhuma dessas respostas veio de humano). Enquanto não
-> respondidas, as features de regime e os extratores do caminho crítico não têm Definition of Ready completa.
+> respondidas, as features de regime e os extratores do caminho crítico carregam a decisão como **item de
+> DoR declarado** e nada que derive delas é **publicável**.
 > Cada item traz a **recomendação da pesquisa** — responder "aceito a recomendação" já destrava.
 
 - [ ] **D1 — Qual lente de regime é a oficial do Comitê?** (V1 / V2 / V3 / as três). Define o que o notebook
@@ -1189,6 +1242,16 @@ implementadas com o padrão provisório, mas **não publicadas** sem ADR aceito.
 - Abertura setorial do PIB (SIDRA `c11255`) cruzada com os índices setoriais da B3.
 - Cupom cambial (DDI/FRC) como proxy de risco-país market-implied (exige `pyield` / Python 3.12).
 - Juro real ex-ante a partir da inflação implícita própria (breakeven de F-016) em vez do Focus.
+- **Dívida técnica — migrar F-009 para `apps.pipeline.common`:** o job `apps/pipeline/jobs/anbima_daily.py`
+  tem camada HTTP e normalizador de número próprios (`_sessao`/`baixar`/`detectar_corpo_suspeito`/
+  `_para_float_br`), anteriores a F-001; o `# TODO(F-001)` já está no módulo. Trocar por `ClienteHTTP` +
+  `detectar_formato`/`exigir_formato` + `para_float_ptbr`. **Os testes de parse não devem mudar** — se
+  mudarem, a migração regrediu (`docs/wiki/context/F-001.md §6.2`, `context/F-009.md §6.2`).
+- **Decisão aberta — `--record` em `tests/conftest.py`:** `tests/fixtures/README.md` atribuía a flag a
+  F-001, mas `conftest.py` é arquivo compartilhado da onda e não estava na lista de arquivos de F-001;
+  ficou **não implementada**. Opções: feature A própria, ou `pytest_addoption` acrescentado pelo
+  orquestrador. Nada depende disso para gravar fixture (hoje é script de sessão) —
+  ver `docs/wiki/context/F-001.md §7`.
 
 ---
 

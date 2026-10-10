@@ -46,7 +46,7 @@ ativo · 4. [`AGENTS.md`](../../AGENTS.md) — papéis, A/B/C/D, autonomia/pausa
 | Plano de execução (ondas) | [`plans/PLAN.md`](../plans/PLAN.md) | — |
 | Risco A/B/C/D | [`plans/risk-classification.md`](../plans/risk-classification.md) | — |
 | Capacidades, ambiente e conectividade medidos | [`plans/skills-manifest.md`](../plans/skills-manifest.md) | `runbooks/fonte-fora-do-ar.md` |
-| Decisões arquiteturais | [`decisions/adr/`](../decisions/adr/) — **ADR-001..006, todos em Proposta** | `architecture.md` §5 |
+| Decisões arquiteturais | [`decisions/adr/`](../decisions/adr/) — **7 ADRs: ADR-001..006 em Proposta, ADR-007 Aceita** | `architecture.md` §5 |
 | Decisão operacional / **troca de fonte** | [`plans/DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md) — 12 substituições provisórias | linha em `log.md` |
 | Prompts do dia a dia | [`plans/prompts-cheatsheet.md`](../plans/prompts-cheatsheet.md) | — |
 | Rollback / operação | [`plans/infra-ops.md`](../plans/infra-ops.md) | `runbooks/reconstruir-dataset.md` §6 |

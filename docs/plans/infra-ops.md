@@ -183,21 +183,58 @@ ls -la data/raw/anbima-ettj/ | tail -5
 
 ### 2.4 Se o job falhar — runbook
 
-> Runbook completo em `docs/wiki/runbooks/arquivamento-diario-anbima.md`. Resumo operacional:
+> Runbook completo em [`docs/wiki/runbooks/job-diario-anbima.md`](../wiki/runbooks/job-diario-anbima.md).
+> Job: `apps/pipeline/jobs/anbima_daily.py`. Resumo operacional:
 
 | Sintoma | Causa provável | Ação |
 |---|---|---|
-| **Nenhum arquivo do dia** e o job não rodou | máquina desligada, tarefa desabilitada, usuário sem sessão | rode **à mão hoje mesmo** (`python -m pipeline.extract.anbima_diario --data hoje`); o dia ainda está na janela de 20 d.u. |
+| **Nenhum arquivo do dia** e o job não rodou | máquina desligada, tarefa desabilitada, usuário sem sessão | rode **à mão hoje mesmo**: `python -m apps.pipeline.jobs.anbima_daily --backfill 3` (ou `--date AAAA-MM-DD` para um dia específico); o dia ainda está na janela de 20 d.u. |
 | Arquivo com **0 bytes** ou HTTP 404 | feriado, dia sem publicação, publicação atrasada | normal: registre a ausência; **tente de novo no fim da tarde**; não preencha nada |
 | Resposta é **HTML** onde se esperava planilha | `saida=xls` do CZ sempre devolve HTML; ou página de erro | parser escolhe pelo **magic byte**; se virou página de erro, repita mais tarde |
 | **HTTP 200 com corpo de erro** | fonte instável / bloqueio por User-Agent | confirme UA de browser; repita com backoff; não grave corpo inválido |
 | Falhou **1 a 3 dias** | janela de ~20 d.u. ainda cobre | rode em **modo recuperação**, dia a dia, do mais antigo ao mais novo, e confira os tamanhos |
 | Falhou **> 20 dias úteis** | **dado perdido definitivamente** | registre `[DATA-LOSS]` em `docs/wiki/log.md` com o intervalo exato; declare a lacuna na **página de limitações**; **não** interpole, **não** reconstrua, **não** emende com outra fonte sem registro em `DECISIONS_LOG.md`. A curva histórica do pacote mínimo vem do **Tesouro Direto** (ADR-004), então a perda **não** bloqueia a entrega de 2026-10-14 — bloqueia a série proprietária futura |
-| Fonte mudou de URL/formato | ANBIMA alterou o endpoint | `/triage-bugs` se houver outros sintomas; senão `/fast-fix` classe B; atualize `docs/wiki/modules/anbima.md` e a fixture |
+| Fonte mudou de URL/formato | ANBIMA alterou o endpoint | `/triage-bugs` se houver outros sintomas; senão `/fast-fix` classe B; atualize `FONTE_MS`/`FONTE_CZ` em `apps/pipeline/jobs/anbima_daily.py`, `docs/wiki/modules/anbima.md` e a fixture |
 
 **Regra de ouro da operação:** falha de arquivamento se resolve **no mesmo dia**. Uma linha em
 `wiki/log.md` por falha, sempre — a lacuna tem de ser visível depois, quando alguém perguntar por que a
 série tem buraco.
+
+### 2.5 Agendamento (comando recomendado — executa o Edu, uma vez)
+
+Dias úteis às **19:30** com `--backfill 3`: a ANBIMA fecha as indicativas no fim da tarde e tem atraso
+declarado de apuração, e o `--backfill 3` faz uma falha de ontem ou de um fim de semana se consertar
+sozinha no dia seguinte. Uma linha, sem admin, rodando como o usuário logado:
+
+```bat
+schtasks /Create /TN "LDC\ANBIMA job diario" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 19:30 /RL LIMITED /F /TR "cmd /c cd /d C:\Users\edusp\Projetos_App_Desktop\estrategia-macro-ldc-dados && .venv\Scripts\python.exe -m apps.pipeline.jobs.anbima_daily --backfill 3 >> data\raw\anbima-daily-job-stdout.log 2>&1"
+```
+
+Verificar / disparar agora / remover:
+
+```bat
+schtasks /Query  /TN "LDC\ANBIMA job diario" /V /FO LIST
+schtasks /Run    /TN "LDC\ANBIMA job diario"
+schtasks /Delete /TN "LDC\ANBIMA job diario" /F
+```
+
+No `/Query`, olhe `Status`, `Last Run Time`, **`Last Result`** (`0` = ok) e `Next Run Time`; o `/Run` é o
+teste de fumaça da instalação. O `cd /d` é obrigatório (o `-m` resolve o pacote a partir da raiz do repo
+e `data/raw/` é relativo a ela). Sem `.venv`, troque `.venv\Scripts\python.exe` por `python`. Para
+rodar com a máquina ligada e **ninguém logado**: shell como administrador + `/RU SYSTEM /RL HIGHEST`.
+Detalhes e variações: [`runbooks/job-diario-anbima.md`](../wiki/runbooks/job-diario-anbima.md) §3.
+
+### 2.6 Bordas da janela — **medidas** em 2026-10-10
+
+| Fonte | Mais antigo com dado | Fora da borda, a fonte responde | Dias arquivados |
+|---|---|---|---|
+| `ms_AAMMDD.txt` | **2026-09-11** | HTTP **404** (09/09 e 10/09) | 21 |
+| Curva Zero (`cz_AAMMDD.csv`) | **2026-09-14** | HTTP **200 com 0 bytes** (11/09 e antes) | 20 |
+
+Mais novo nas duas: 2026-10-09. A borda **anda todo dia útil** — o que hoje é 11/09, amanhã é 14/09.
+Confere com a varredura da pesquisa (§A4.2 e §A5.2). Consequência operacional: `--backfill` acima de
+**40** é recusado (exit 2), porque fora da janela o dado **não existe** na fonte — `--backfill` não é
+backfill de histórico (Anti-SPEC §10.1.3).
 
 ---
 

@@ -7,15 +7,22 @@
 ## Convenção de nome
 
 ```
-tests/fixtures/<fonte>/<serie>__<data>.json      # ou .csv / .txt / .xlsx
-tests/fixtures/<fonte>/<serie>__erro.json        # fixture de erro (obrigatória por extrator)
+tests/fixtures/<fonte>/<serie>__<data>.json      # ou .csv / .txt / .xlsx / .html
+tests/fixtures/<fonte>/<serie>__erro*.json       # fixture de erro (obrigatória por extrator)
 ```
 
-- `<fonte>` em minúsculas, igual ao enum `Fonte` do catálogo: `sgs`, `sidra`, `olinda`, `anbima_s3`,
-  `anbima_web`, `tesouro`, `b3`, `teva`, `yahoo`, `msci`, `fred`, `ipeadata`.
-- `<serie>` é o `identificador` na fonte, não o nome bonito: `433`, `t1737_v2266`, `IMAB`, `IFIX`,
-  `^GSPC`, `892400_NETR`.
+- `<fonte>` é o **slug da pasta correspondente em `data/raw/`**, não o enum `Fonte` do catálogo:
+  hífen, minúsculas, **um diretório de fixture por pasta de `data/raw/`** — assim a fixture fica a um
+  `ls` de distância do dado real que ela imita. Em uso hoje: `anbima-ms`, `anbima-ettj` e `common`
+  (fixtures da infra de F-001, que não pertencem a uma fonte só). Na Onda 1: `anbima-ima`, `sgs`,
+  `sidra`, `tesouro-direto`, `b3`, `yahoo`, `msci`, `focus`, `fred`, `teva`.
+- `<serie>` é o `identificador` na fonte, não o nome bonito: `433`, `t1737_v2266`, `imab`, `ifix`,
+  `ms`, `cz`, `^GSPC`, `892400_NETR`.
 - `<data>` é a data de **coleta** em ISO (`2026-10-10`) — a mesma que vai para `collected_at`.
+- O separador é **`__`** (dois underscores). O sufixo de erro é **`__erro*`** — qualquer nome que comece
+  por `__erro` conta como fixture de caminho de erro (`__erro.json`, `__erro_html.txt`); variantes de
+  borda seguem o mesmo padrão descritivo (`__vazio.csv`, `__saida_xls_e_html.html`,
+  `__janela-truncada.xlsx`).
 
 **A fixture de erro não é opcional.** O modo de falha dominante das fontes deste projeto é erro com
 HTTP 200 (R1 da pesquisa: o SGS devolve HTML de erro com status 200; a B3 devolve payload vazio).
@@ -34,15 +41,20 @@ lixo silenciosamente.
 
 ## Como gravar
 
-A gravação é feita pelo próprio teste de rede, com a flag `--record`:
+A flag `--record` **ainda não está implementada** — não entrou em F-001 porque `tests/conftest.py` é
+arquivo compartilhado da onda; é decisão aberta, registrada em `TODO.md §6` e
+`docs/wiki/context/F-001.md §7`.
+
+Até ela existir, a fixture é gravada por **script de sessão**: um trecho avulso que faz a chamada real
+uma vez, grava o corpo cru com o nome da convenção e **não** fica no repo. O que fica é a
+**procedência** — cada diretório de fonte tem um `README.md` dizendo, por fixture, a URL/payload exato,
+a data e a hora da coleta e o que ela prova (`tests/fixtures/common/README.md` é o modelo). Fixture sem
+procedência registrada é fixture que ninguém consegue regravar quando a fonte mudar.
 
 ```bash
-pytest tests/contract/test_<fonte>.py -m network --record    # grava/atualiza a fixture
 pytest tests/unit tests/contract -m "not network"            # usa a fixture gravada (o que o CI roda)
+pytest tests/contract/test_<fonte>.py -m network             # confere a fixture contra a fonte viva (local)
 ```
-
-O extrator que criar a primeira fixture de uma fonte implementa também a opção `--record` em
-`conftest.py` (`pytest_addoption`) — ainda **não existe**: é parte de F-001 (infra de extração).
 
 ## Versionamento
 

@@ -245,6 +245,7 @@ Ordem de corte (primeiro a cair está no topo). Tudo que cai vira item do pacote
 | ADR-004 | L4 (curva via Tesouro Direto) | **Proposta** | fonte de F-016 (classe D se o Feed for contratado) |
 | ADR-005 | L1 + L2 + D12 (janelas próprias, Teva) | **Proposta** | universo de F-006, F-012, F-017 |
 | ADR-006 | armazenamento + convenção de retorno/alinhamento | **Proposta** | base de F-013, F-014, F-017 — **validar antes da Onda 2** |
+| ADR-007 | Supabase descartado na v1 (persistência segue o ADR-006) | **Aceita** (Edu, 2026-10-10) | nada — **fecha** o debate de banco; o compartilhamento com o Alexandre segue pelo pacote F-031 |
 
 ---
 

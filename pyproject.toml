@@ -35,9 +35,10 @@ build-backend = "hatchling.build"
 # `packages/shared/schemas/` JÁ é pacote de verdade (tem `__init__.py` e imports absolutos
 # `from packages.shared.schemas import ...`), então o wheel precisa embarcá-lo: sem isto,
 # `pip install -e .` instala um pacote vazio e o import quebra no CI.
-# `apps/` ainda não tem código (só `.gitkeep`) — acrescente "apps" a esta lista na feature que
-# criar `apps/pipeline/` (F-001), junto com os `__init__.py` correspondentes.
-packages = ["packages"]
+# `apps/` entrou na lista em F-001, que criou `apps/pipeline/common/` (infra de extração) com
+# `__init__.py` em `apps/` e `apps/pipeline/`. Os extratores e jobs importam
+# `from apps.pipeline.common import ...`, então o wheel precisa embarcar `apps` também.
+packages = ["packages", "apps"]
 
 # ─────────────────────────────────────────────
 # ruff — lint + format (substitui ESLint/Prettier deste harness)
