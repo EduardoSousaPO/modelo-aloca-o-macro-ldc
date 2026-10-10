@@ -45,7 +45,7 @@ marcadas `‖` podem rodar **em paralelo** (subagentes Opus independentes, arqui
 | **F-032** `DECISIONS_LOG` inicial com as substituições já conhecidas | A | 20 min, destrava a comunicação ao Alexandre e fecha RF-052 |
 
 **Critério de saída:** `pytest tests/unit` verde; `data/raw/anbima-ms/` e `data/raw/anbima-ettj/` com o
-arquivo do dia; `DECISIONS_LOG.md` com 8 substituições registradas.
+arquivo do dia; `DECISIONS_LOG.md` com **12** substituições registradas (S-01..S-12 — F-032 já concluída).
 
 ---
 
@@ -216,7 +216,7 @@ Ordem de corte (primeiro a cair está no topo). Tudo que cai vira item do pacote
 | 2 | **F-011** (FRED / contexto externo) | sem `UST10_BRL`, VIX e Fed Funds | `should`; fallback Yahoo já mapeado |
 | 3 | **F-020** (V2 ciclo Selic) | perde o corte secundário | `should`; V1 + V3 bastam para o Comitê |
 | 4 | **F-010** (Focus) | perde `juro_real_exante` e as surpresas | **a V1 do pacote mínimo não depende do Focus**; a V3 roda com 5 features |
-| 5 | **F-016** (curva) | V3 roda com **5 features**, declarado (CA-086) | mitigação já prevista na SPEC |
+| 5 | **F-016** (curva) | V3 roda com **5 features**, declarado (CA-086) | mitigação já prevista na SPEC. Cortes 4 e 5 **juntos** → 4 features; com G-02 (`ipca_meta`) ainda aberto → 3. `RegimeNeighborsSchema.n_features` aceita de 3 a 6 e obriga a declarar qual é |
 | 6 | **F-024/F-025** (ranking e timeline) | fica só o heatmap | a timeline é o sanity check — cortar só em último caso |
 | 7 | **F-026** (internacional) | item **C1** do e-mail sem resposta quantitativa | corte doloroso: é metade do pedido original |
 | **nunca** | **F-013..F-019, F-022, F-023, F-028, F-031** | — | núcleo do compromisso: canônico, V1, heatmap, limitações, entrega |

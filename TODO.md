@@ -186,7 +186,7 @@ divergência explicada + reconstrução completa de `data/canonical/`.
 (fica em F-030 como teste de contrato opcional).
 
 **Arquivos:** `apps/pipeline/extract/anbima_s3.py`, `tests/contract/test_anbima_s3.py`,
-`tests/fixtures/anbima_s3/*.xlsx`, `docs/wiki/modules/anbima.md`.
+`tests/unit/test_anbima_s3.py`, `tests/fixtures/anbima_s3/*.xlsx`, `docs/wiki/modules/anbima.md`.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -491,7 +491,7 @@ coluna de origem obrigatória; DuckDB derivado (opcional, regenerável).
 | linha sem `source`/`series_id` → `SchemaError` | contract negativo | CA-057 |
 | série trimestral não pode ser gravada fora da freq nativa | unit negativo | CA-058 |
 | catálogo valida: 0 identificador vazio; `a_confirmar` ⇒ status | contract | CA-053, CA-054 |
-| toda linha canônica resolve para URL do catálogo | integration | CA-055, CA-120 |
+| procedência de toda linha longa (`source`/`series_id`/`vintage`/`collected_at`) resolve para a URL do catálogo | integration | CA-055, CA-120 |
 | lacuna sem substituto → `BLOQUEADO — FONTE INDISPONÍVEL` | unit negativo | CA-076 |
 
 **Anti-SPEC específica:** §10.1.1, §10.1.2, §10.4.24 (sem coluna ad hoc), §10.4.28 (nativa, não trimestral).
@@ -534,7 +534,7 @@ de ordem.
 
 - **Risco:** **C** · **CI alvo:** N2 · **Branch:** `feat/macro-quarterly`
 - **Cobre:** RF-021 · e-mail: **A1-A7**
-- **CAs da SPEC:** CA-059, CA-060, CA-061 (+ CA-007, CA-044)
+- **CAs da SPEC:** CA-059, CA-060, CA-061, **CA-120** (+ CA-007, CA-044)
 - **Depende de:** F-003, F-004, F-010, F-013, F-014, F-016
 
 **DoR específica** — [x] schema `MacroQuarterlySchema` pronto; [x] todas as colunas com série de origem
@@ -542,7 +542,9 @@ mapeada no catálogo; [ ] colunas que dependem de gap aberto (`ipca_meta` → G-
 `termos_troca_yoy` → proxy IC-Br) entram **nulas e declaradas**, nunca estimadas.
 
 **Escopo incluído:** montagem das ~40 colunas; `ibcbr_gap` (desvio da média móvel de 20 trimestres);
-`ipca_12m_delta`; `selic_meta_delta`; `juro_real_exante`; `is_estimated` para `2026Q3`; `fonte_versao`.
+`ipca_12m_delta`; `selic_meta_delta`; `juro_real_exante`; `is_estimated` para `2026Q3`; `fonte_versao`;
+**materialização da tabela companheira `macro_quarterly_provenance`** (PK `(quarter, column)`), que é
+como CA-120 é cumprido numa tabela wide (`CONTRACTS.md §3.1`).
 **Excluído:** classificação de regime (→ F-019); materialização `asof` (→ F-018).
 
 **Arquivos:** `apps/pipeline/transform/macro_quarterly.py`, `tests/contract/test_macro_quarterly.py`,
@@ -554,6 +556,7 @@ mapeada no catálogo; [ ] colunas que dependem de gap aberto (`ipca_meta` → G-
 | `2026Q3` com `is_estimated=True`, demais `False` | unit | CA-060 |
 | coluna sem cobertura → `NULL`, nunca interpolada | unit negativo | CA-061 |
 | `ibcbr_gap` existe nos 83 trimestres ou marca `is_estimated` | unit | CA-007 |
+| toda célula não nula de coluna rastreável tem linha em `macro_quarterly_provenance` (anti-join vazio) | contract | CA-120 |
 
 **Anti-SPEC específica:** §10.1.1, §10.4.24.
 **Extra de classe C:** diff numérico + reconstrução + revisão independente.

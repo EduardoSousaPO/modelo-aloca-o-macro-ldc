@@ -103,6 +103,19 @@ class StatusSerie(StrEnum):
 
 IDENTIFICADOR_A_CONFIRMAR = "a_confirmar"
 
+# Limiar da métrica de cobertura do PRD §7: "séries com `data_inicio <= 2006-01-31`
+# dividido pelo total pedido".
+# O schema segue o PRD: o 2006-01-02 que estava aqui media outra coisa (1º dia útil de 2006) e fazia
+# a métrica divergir do documento que a define.
+LIMIAR_COBERTURA_2006 = date(2006, 1, 31)
+
+# Fonte que existe, responde e tem identificador confirmado, mas **não é alcançável nesta máquina**:
+# `docs/plans/skills-manifest.md §3` mediu bloqueio na camada de aplicação (ReadTimeout + RST,
+# 3/3 tentativas) em `fred.stlouisfed.org` e `api.stlouisfed.org`, e conclui que "nenhum requisito
+# pode depender do FRED nesta máquina". `status = ok` descreve o identificador; o pacote mínimo é
+# outra pergunta — ver `usavel_no_pacote_minimo`.
+FONTES_BLOQUEADAS_NO_PACOTE_MINIMO: frozenset[Fonte] = frozenset({Fonte.FRED})
+
 
 class SeriesCatalogEntry(BaseModel):
     """Uma linha do `series_catalog`: o que é a série, de onde vem e como virar trimestral."""
@@ -174,14 +187,28 @@ class SeriesCatalogEntry(BaseModel):
 
     @property
     def cobre_2006(self) -> bool | None:
-        """True se a série cobre 1T2006. None quando o início não foi medido na pesquisa."""
+        """True se a série cobre 1T2006: `data_inicio <= LIMIAR_COBERTURA_2006` (PRD §7).
+
+        `None` quando o início não foi medido na pesquisa — e `None` **não é** `False`: é "não
+        medido". Quem calcula a métrica de cobertura precisa decidir o que fazer com esses casos em
+        vez de contá-los como falha silenciosa.
+        """
         if self.data_inicio is None:
             return None
-        return self.data_inicio <= date(2006, 1, 2)
+        return self.data_inicio <= LIMIAR_COBERTURA_2006
 
     @property
     def usavel_no_pacote_minimo(self) -> bool:
-        """Só entra no caminho crítico de 2026-10-14 o que está `ok` e não é pago."""
+        """Entra no caminho crítico de 2026-10-14? `ok` **e** fonte alcançável nesta máquina.
+
+        `status = ok` responde "o identificador é real e a série serve"; esta propriedade responde
+        "dá para extrair até o Comitê". São perguntas diferentes: as 13 séries FRED têm
+        identificador confirmado (`docs/research/fontes-de-dados.md §C10`) e continuam `ok`, mas o
+        FRED está bloqueado nesta máquina (`skills-manifest.md §3`), então **não** contam no pacote
+        mínimo — o plano B é Yahoo/MSCI/PTAX (S-09 no `DECISIONS_LOG.md`).
+        """
+        if self.fonte in FONTES_BLOQUEADAS_NO_PACOTE_MINIMO:
+            return False
         return self.status is StatusSerie.OK
 
 
@@ -293,4 +320,5 @@ def resumo_catalogo(catalogo: tuple[SeriesCatalogEntry, ...]) -> dict[str, int]:
         resumo[status.value] = sum(1 for e in catalogo if e.status is status)
     resumo["cobre_2006"] = sum(1 for e in catalogo if e.cobre_2006 is True)
     resumo["inicio_nao_medido"] = sum(1 for e in catalogo if e.data_inicio is None)
+    resumo["usavel_no_pacote_minimo"] = sum(1 for e in catalogo if e.usavel_no_pacote_minimo)
     return resumo

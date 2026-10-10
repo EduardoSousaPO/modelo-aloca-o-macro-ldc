@@ -4,7 +4,7 @@
 > (`pandera` para DataFrame, `pydantic` para catálogo e config de extrator). Este arquivo descreve —
 > nunca duplica a definição e nunca a contradiz.
 >
-> **Versão:** 1.0 — **Data:** 2026-10-10 — **Referência:** `docs/specs/SPEC.md` v1.0 (RF-019..RF-032),
+> **Versão:** 1.1 (2026-10-10, correções P0/P1 da auditoria do harness) — **Referência:** `docs/specs/SPEC.md` v1.0 (RF-019..RF-032),
 > `docs/research/metodologia-regimes-macro.md §6`.
 >
 > **Regra absoluta:** se o agente precisa de um tipo/coluna que ainda não existe, ele **cria primeiro
@@ -22,7 +22,8 @@ packages/shared/schemas/
 ├── series_catalog.py           ← SeriesCatalogEntry, ExtractorConfig,
 │                                  SeriesCatalogSchema, enums, load_catalog()       (pydantic+pandera)
 ├── series_catalog_data.py      ← O CATÁLOGO COMO DADO — 132 séries
-├── macro_quarterly.py          ← MacroQuarterlySchema                              (pandera)
+├── macro_quarterly.py          ← MacroQuarterlySchema,
+│                                  MacroQuarterlyProvenanceSchema                   (pandera)
 ├── asset_returns_quarterly.py  ← AssetReturnsQuarterlySchema,
 │                                  RegimeAssetMetricsSchema                         (pandera)
 └── regimes.py                  ← RegimesSchema, RegimeNeighborsSchema, enums       (pandera)
@@ -34,7 +35,7 @@ Fronteiras onde a validação é **obrigatória** (`wiki/architecture.md §4`):
 |---|---|
 | saída de cada extrator → `data/processed/` | `ProcessedSeriesSchema` |
 | `data/processed/` → `data/canonical/` | `RawSeriesSchema` + schema da tabela destino |
-| entrada e saída de `data/canonical/` | `MacroQuarterlySchema`, `AssetReturnsQuarterlySchema`, `RegimesSchema`, `RegimeNeighborsSchema`, `SeriesCatalogSchema` |
+| entrada e saída de `data/canonical/` | `MacroQuarterlySchema`, `MacroQuarterlyProvenanceSchema`, `AssetReturnsQuarterlySchema`, `RegimesSchema`, `RegimeNeighborsSchema`, `SeriesCatalogSchema` |
 | config de extrator / parâmetros de janela | `ExtractorConfig` (pydantic) |
 | catálogo de séries | `SeriesCatalogEntry` (pydantic) |
 
@@ -95,14 +96,21 @@ Fronteiras onde a validação é **obrigatória** (`wiki/architecture.md §4`):
 - `data_fim < data_inicio` → erro.
 - `series_id` duplicado no catálogo → `load_catalog()` falha.
 
-**Propriedades derivadas:** `cobre_2006` (`None` quando o início não foi medido) e
-`usavel_no_pacote_minimo` (só `status = ok`).
+**Propriedades derivadas:**
+
+| Propriedade | Regra | Por quê |
+|---|---|---|
+| `cobre_2006` | `data_inicio <= LIMIAR_COBERTURA_2006` (**2006-01-31**); `None` quando o início não foi medido | é o limiar da métrica de cobertura do **PRD §7** — o schema segue o PRD. `None` é "não medido", nunca "não cobre" |
+| `usavel_no_pacote_minimo` | `status = ok` **e** `fonte` fora de `FONTES_BLOQUEADAS_NO_PACOTE_MINIMO` (hoje: `FRED`) | `status` descreve o **identificador**; esta propriedade responde "dá para extrair até 14/10?". O FRED está bloqueado na camada de aplicação nesta máquina, 3/3 tentativas (`skills-manifest.md §3`) |
+
+As 13 séries FRED (10 delas `ok`) continuam no catálogo com identificador confirmado pela pesquisa —
+e **não** contam no pacote mínimo. O plano B é Yahoo/MSCI/PTAX (S-09 no `DECISIONS_LOG.md`).
 
 ### 2.1 Estado do catálogo em 2026-10-10 (132 séries, validadas por pydantic)
 
 | Status | n | Leitura |
 |---|---|---|
-| `ok` | **99** | usáveis; 63 delas cobrem 1T2006 com início medido |
+| `ok` | **99** | identificador real e série serve; **89** entram no pacote mínimo (as 10 FRED `ok` saem — fonte bloqueada). 70 cobrem 1T2006 com início medido, 12 não cobrem e **17 seguem sem início medido** (C-2 da auditoria, teste `xfail` declarado em `tests/unit/`) |
 | `a_confirmar` | **8** | identificador não confirmado pela pesquisa — **fora do caminho crítico** |
 | `descontinuada` | **10** | morreram numa data (swap DI×pré, IMA no SGS, IMA-C, EMBI+, `DTWEXM`) |
 | `descartada` | **14** | existem mas não servem (janela curta, não cobrem 2006, fora do escopo mínimo, armadilha) |
@@ -179,6 +187,37 @@ Colunas nulas são **legítimas e informativas**: `ipca_meta` (série de metas �
 `embi_br_fim` após 30/07/2024, `curva_nominal_*` onde o vértice não existe. Nulo **nunca** é
 preenchido para "fechar" a linha.
 
+### 3.1 `macro_quarterly_provenance` — procedência por célula (RF-047 / CA-120)
+
+`packages/shared/schemas/macro_quarterly.py` → `MacroQuarterlyProvenanceSchema`.
+PK `(quarter, column)`. Materializada em `data/canonical/macro_quarterly_provenance.parquet`,
+**junto** com a tabela wide, pela mesma feature (F-015).
+
+| Coluna | Tipo | Nulo? | Regra |
+|---|---|---|---|
+| `quarter` | str | não | mesmo domínio de `macro_quarterly.quarter` |
+| `column` | str | não | uma das `COLUNAS_RASTREAVEIS` — derivadas do próprio schema wide, menos chave e auditoria (`COLUNAS_SEM_PROCEDENCIA`) |
+| `series_id` | str | não | série de origem; existe em `series_catalog`, que carrega a `fonte_url` |
+| `source` | str | não | mesmo enum de 15 fontes de `raw_series` |
+| `vintage` | datetime | **sim** | nulo = série não revisável (igual a `raw_series`) |
+| `collected_at` | datetime | não | quando o pipeline baixou o dado que gerou a célula |
+| `lag_adjusted` | bool | não | a qual materialização (`asof` / `revised`) esta procedência pertence |
+| `fonte_versao` | str | não | mesmo hash de código da linha wide correspondente |
+
+**Checks:** `vintage_nao_posterior_a_coleta` (`vintage <= collected_at`) e `lag_adjusted_homogeneo`.
+
+**Por que uma tabela companheira e não 4 colunas por linha.** `macro_quarterly` é **wide**: a linha é
+um trimestre, e cada uma das ~40 colunas vem de uma série diferente. Colocar
+`source`/`series_id`/`vintage`/`collected_at` na linha responderia "de onde veio o trimestre?", que
+não é a pergunta de CA-120. A alternativa — 4 colunas de procedência por variável — multiplicaria a
+tabela por 5 e ainda assim só valeria para o wide. O long resolve as duas coisas e é consultável
+(`WHERE column = 'ipca_12m'`). CA-120 foi **reescrito** na SPEC para exigir exatamente isto
+(2026-10-10, E-1 da auditoria; ver `docs/wiki/log.md`).
+
+`asset_returns_quarterly` **não** precisa da companheira: é long por natureza e já carrega `source` e
+`series_id` na linha. `vintage`/`collected_at` de um retorno ficam em `raw_series`, pela PK
+`(series_id, date, vintage)`.
+
 ---
 
 ## 4. `asset_returns_quarterly` — retorno por ativo (RF-022/023/024) · **classe C**
@@ -207,7 +246,11 @@ PK `(quarter, asset_id)`.
 | `source`, `series_id`, `fonte_versao` | rastreabilidade por linha (RF-047) |
 
 **Checks:** `minimo_de_ativos` (≥ 18 `asset_id` distintos) e
-`sem_trimestre_antes_do_inicio_da_serie` (**proíbe backfill sintético** — CA-063).
+`sem_trimestre_antes_do_inicio_da_serie` (**proíbe backfill sintético** — CA-063). O segundo compara
+**ano e trimestre** de `data_inicio_serie`, não só o ano: comparar o ano deixava passar `2010Q1..Q3`
+do IFIX, `2007Q1..Q3` do IMOB e `2006Q1..Q3` do ICON — justamente os casos nomeados na Anti-SPEC
+§10.1.1 (corrigido em 2026-10-10, E-2 da auditoria). O trimestre que **contém** o início (2010Q4 do
+IFIX) é aceito pelo schema: é parcial, não anterior — quem o anula é a regra de `price_ini` em F-014.
 
 ### 4.1 `RegimeAssetMetricsSchema` — métricas por regime × ativo (RF-032/040)
 
@@ -242,7 +285,10 @@ Colunas: `n_obs`, `ret_medio`, `ret_mediana`, `ret_desvio`, `erro_padrao_media`,
 ### 5.2 `RegimeNeighborsSchema` — PK `(quarter_ref, rank, metrica, k_usado, restrito_pos_2016)`
 
 `distancia` ≥ 0 · `metrica` ∈ {`mahalanobis`, `euclidiana`} · `k_usado` ∈ {5, 8, 12} ·
-`n_features` ∈ {5, 6} (**5 quando a curva não ficou pronta — declarado, não silencioso**) ·
+`n_features` ∈ **{3, 4, 5, 6}** (6 = tudo pronto · 5 = sem a curva, CA-086 · 4 = sem Focus **e**
+sem curva, cortes 4 e 5 do `PLAN.md §5` · 3 = com G-02/`ipca_meta` também aberto; **sempre declarado,
+nunca silencioso**. O `ge=5` anterior rejeitava o único cenário de corte que o PLAN prevê como
+aceitável — P1-10 da auditoria) ·
 `regime_v1_neighbor` · `shrinkage` (`ledoit_wolf` obrigatório em Mahalanobis) ·
 `restrito_pos_2016` (variante de robustez) · `fonte_versao`.
 
@@ -265,7 +311,8 @@ z_usdbrl_var_12m, z_termos_troca_yoy)`.
 |---|---|
 | gravar DataFrame com coluna extra | `strict=True` → `SchemaError` |
 | linha canônica sem `source`/`series_id`/`fonte_versao` | `nullable=False` → `SchemaError` |
-| trimestre antes do início da série do ativo | check `sem_trimestre_antes_do_inicio_da_serie` falha |
+| célula de `macro_quarterly` sem linha de procedência | `macro_quarterly_provenance` tem PK `(quarter, column)`: a ausência é detectável por anti-join (teste de F-015, CA-120) |
+| trimestre antes do início da série do ativo | check `sem_trimestre_antes_do_inicio_da_serie` falha (por **trimestre**, não por ano) |
 | grade com 82 ou 84 trimestres | check `janela_de_83_trimestres` falha |
 | misturar `asof` e `revised` na mesma tabela | check `lag_adjusted_homogeneo` falha |
 | célula de métrica sem `n` | `n_obs` é `nullable=False` |

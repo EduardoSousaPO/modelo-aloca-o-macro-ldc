@@ -32,10 +32,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-# Nada implementado ainda: nenhum pacote Python existe em apps/ ou packages/.
-# Quando `apps/pipeline/` e `packages/shared/schemas/` virarem pacotes de verdade (com __init__.py),
-# troque a linha abaixo por: packages = ["apps/pipeline", "packages/shared"]
-bypass-selection = true
+# `packages/shared/schemas/` JÁ é pacote de verdade (tem `__init__.py` e imports absolutos
+# `from packages.shared.schemas import ...`), então o wheel precisa embarcá-lo: sem isto,
+# `pip install -e .` instala um pacote vazio e o import quebra no CI.
+# `apps/` ainda não tem código (só `.gitkeep`) — acrescente "apps" a esta lista na feature que
+# criar `apps/pipeline/` (F-001), junto com os `__init__.py` correspondentes.
+packages = ["packages"]
 
 # ─────────────────────────────────────────────
 # ruff — lint + format (substitui ESLint/Prettier deste harness)
@@ -43,13 +45,16 @@ bypass-selection = true
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-exclude = [".venv", "data", ".ipynb_checkpoints"]
+# `.claude/` traz código de skill vendorizado (96 erros de lint que não são nossos) e `data/`
+# é dado reconstruível — nenhum dos dois é código deste projeto.
+# `*.md`: ruff >= 0.14 formata trechos Python dentro de Markdown, e os docs (`docs/research/` em
+# especial, que é imutável para o agente) têm snippets ilustrativos de propósito não formatados.
+exclude = [".venv", "venv", ".claude", "data", ".ipynb_checkpoints", "*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "PD"]
-ignore = [
-    "PD901",  # nome `df` é aceitável em código de pipeline
-]
+# Sem `ignore`: a PD901 que estava aqui foi REMOVIDA do ruff (>= 0.5 emite
+# "rules have been removed and ignoring them has no effect") e poluía a saída do CI N1.
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["B011"]
@@ -61,6 +66,9 @@ ignore = [
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+# Raiz no `sys.path`: é o que faz `from packages.shared.schemas import ...` resolver sem depender
+# de `pip install -e .` (o modo `prepend` insere o diretório do teste, não a raiz do repo).
+pythonpath = ["."]
 addopts = "-q --strict-markers"
 markers = [
     "network: teste que faz chamada real a uma fonte externa (não roda no CI N1)",

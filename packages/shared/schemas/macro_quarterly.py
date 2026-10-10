@@ -9,12 +9,20 @@ classe C, diff numérico vs. a versão anterior e reconstrução completa de `da
 Duas materializações:
 - `macro_quarterly_asof`    → `lag_adjusted = True`  (respeita a defasagem; para decisão)
 - `macro_quarterly_revised` → `lag_adjusted = False` (série revisada de hoje; descritiva)
+
+**Procedência (RF-047 / CA-120).** `macro_quarterly` é **wide** — uma coluna por variável, cada uma
+vinda de uma série diferente —, então `source`/`series_id`/`vintage`/`collected_at` não cabem na
+linha: a linha é um trimestre, não um valor. A resposta a "de onde veio este número?" fica na tabela
+companheira `MacroQuarterlyProvenanceSchema` (long, PK `(quarter, column)`), materializada em
+`data/canonical/macro_quarterly_provenance.parquet` junto com a tabela wide.
 """
 
 from __future__ import annotations
 
 import pandera as pa
 from pandera.typing import Series
+
+from packages.shared.schemas.raw_series import FONTES_VALIDAS
 
 QUARTER_REGEX = r"^(200[6-9]|20[1-2][0-9])Q[1-4]$"
 N_TRIMESTRES_JANELA = 83
@@ -115,4 +123,79 @@ class MacroQuarterlySchema(pa.DataFrameModel):
     @pa.dataframe_check(name="lag_adjusted_homogeneo")
     def _lag_homogeneo(cls, df: object) -> bool:  # noqa: N805
         """Uma materialização não mistura `asof` e `revised` na mesma tabela."""
+        return int(df["lag_adjusted"].nunique()) == 1  # type: ignore[index]
+
+
+# Colunas que são chave ou auditoria da própria linha — não vêm de uma série do catálogo e por isso
+# não têm (nem precisam de) linha de procedência.
+COLUNAS_SEM_PROCEDENCIA: tuple[str, ...] = (
+    "quarter",
+    "quarter_end",
+    "is_estimated",
+    "lag_adjusted",
+    "fonte_versao",
+)
+
+# Derivado do próprio schema: coluna nova em `MacroQuarterlySchema` entra aqui automaticamente, e
+# `macro_quarterly_provenance` passa a aceitá-la sem edição manual (nem esquecimento).
+COLUNAS_RASTREAVEIS: tuple[str, ...] = tuple(
+    nome for nome in MacroQuarterlySchema.to_schema().columns if nome not in COLUNAS_SEM_PROCEDENCIA
+)
+
+
+class MacroQuarterlyProvenanceSchema(pa.DataFrameModel):
+    """Procedência por célula de `macro_quarterly` — a resposta de CA-120 para a tabela wide.
+
+    Uma linha por `(quarter, column)` com valor não nulo na tabela wide. É o que torna
+    "de onde veio este número?" respondível **no dado**, e não só no código: `series_id` resolve em
+    `series_catalog` (que carrega `fonte_url`), `vintage` diz em que data o valor era aquele e
+    `collected_at` diz quando o pipeline o baixou.
+
+    **Classe C** (`AGENTS.md §2`): é parte do contrato do canônico.
+    """
+
+    quarter: Series[str] = pa.Field(nullable=False, str_matches=QUARTER_REGEX)
+    column: Series[str] = pa.Field(
+        nullable=False,
+        isin=COLUNAS_RASTREAVEIS,
+        description="Coluna de `macro_quarterly` à qual esta procedência se refere.",
+    )
+    series_id: Series[str] = pa.Field(
+        nullable=False,
+        str_matches=r"^[A-Z0-9_\.\^=\-]+$",
+        description="Série de origem; existe em `series_catalog` (CA-120).",
+    )
+    source: Series[str] = pa.Field(nullable=False, isin=FONTES_VALIDAS)
+    vintage: Series[pa.DateTime] = pa.Field(
+        nullable=True,
+        description="Vintage usado; nulo = série não revisável (igual a `raw_series`).",
+    )
+    collected_at: Series[pa.DateTime] = pa.Field(
+        nullable=False, description="Quando o pipeline baixou o dado que gerou a célula."
+    )
+    lag_adjusted: Series[bool] = pa.Field(
+        nullable=False,
+        description="Materialização a que esta procedência pertence (`asof` ou `revised`).",
+    )
+    fonte_versao: Series[str] = pa.Field(
+        nullable=False, description="Mesmo hash de código da linha wide correspondente."
+    )
+
+    class Config:
+        """Configuração do schema."""
+
+        name = "macro_quarterly_provenance"
+        strict = True
+        coerce = True
+        unique = ["quarter", "column"]
+
+    @pa.dataframe_check(name="vintage_nao_posterior_a_coleta")
+    def _vintage_coerente(cls, df: object) -> bool:  # noqa: N805
+        """`vintage <= collected_at`: não se conhece um valor antes de baixá-lo."""
+        vintage = df["vintage"]  # type: ignore[index]
+        return bool((vintage.isna() | (vintage <= df["collected_at"])).all())  # type: ignore[index]
+
+    @pa.dataframe_check(name="lag_adjusted_homogeneo")
+    def _lag_homogeneo(cls, df: object) -> bool:  # noqa: N805
+        """Uma materialização de procedência não mistura `asof` e `revised`."""
         return int(df["lag_adjusted"].nunique()) == 1  # type: ignore[index]

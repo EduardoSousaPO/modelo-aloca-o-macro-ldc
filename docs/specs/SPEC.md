@@ -593,8 +593,20 @@ mais figuras e as duas tabelas de 1 página.
 
 ### RF-047 — Rastreabilidade por linha
 
-- **CA-120** — *Given* qualquer valor do canônico; *When* se pergunta "de onde veio?"; *Then* `source`,
-  `series_id`, `vintage`, `collected_at` e a URL do catálogo respondem sem ambiguidade.
+- **CA-120** — *Given* qualquer valor do canônico; *When* se pergunta "de onde veio?"; *Then* a
+  resposta está **no dado**, não só no código, e resolve até a URL do `series_catalog`:
+  - em `raw_series` e nas tabelas **longas**, pelas colunas `source`, `series_id`, `vintage` e
+    `collected_at` da própria linha;
+  - em `macro_quarterly`, que é **wide** (uma coluna por variável, cada uma de uma série diferente,
+    logo a linha é um trimestre e não um valor), pela tabela companheira
+    `macro_quarterly_provenance` — PK `(quarter, column)`, com `series_id`, `source`, `vintage`,
+    `collected_at` —, que tem uma linha para **toda** célula não nula de coluna rastreável e é
+    materializada junto com a tabela wide.
+
+  > Reescrito em 2026-10-10 (E-1 da auditoria do harness): a redação anterior exigia as 4 colunas em
+  > "qualquer valor do canônico", o que não era satisfazível em tabela wide sem repetir 4 colunas por
+  > variável. A exigência de rastreabilidade não mudou; mudou **onde** ela é cumprida.
+  > Ver `docs/contracts/CONTRACTS.md §3.1` e `docs/wiki/log.md`.
 
 ### RF-048 — Idempotência
 
@@ -774,6 +786,7 @@ G-07 (código SGS antigo da DBGG). Nenhum deles está no caminho crítico do pac
 | `series_catalog` | `series_catalog.py` (+ `series_catalog_data.py`) | `series_id` | metadado e procedência de cada série |
 | `ExtractorConfig` | `series_catalog.py` | — | config pydantic de um extrator (fonte, identificador, url, freq, início, unidade, transformação, lag) |
 | `macro_quarterly` | `macro_quarterly.py` | `quarter` | 83 trimestres de variáveis macro |
+| `macro_quarterly_provenance` | `macro_quarterly.py` | `(quarter, column)` | procedência por célula da tabela wide (CA-120) |
 | `asset_returns_quarterly` | `asset_returns_quarterly.py` | `(quarter, asset_id)` | retornos trimestrais por ativo |
 | `regimes` | `regimes.py` | `quarter` | rótulos V1/V2 + escores contínuos |
 | `regime_neighbors` | `regimes.py` | `(quarter_ref, rank, metrica)` | saída da V3 |
@@ -830,7 +843,7 @@ G-07 (código SGS antigo da DBGG). Nenhum deles está no caminho crítico do pac
 | RF-044 | CA-115..116 | F-031 | D | N3 | mínimo |
 | RF-045 | CA-117 | F-031, F-032 | D/A | N3 | mínimo |
 | RF-046 | CA-118..119 | F-029 | C | N2 | mínimo |
-| RF-047 | CA-120 | F-013 | C | N2 | mínimo |
+| RF-047 | CA-120 | F-013, F-015 | C | N2 | mínimo |
 | RF-048 | CA-121..122 | F-029 | C | N2/N3 | mínimo |
 | RF-049 | CA-123..124 | F-001, F-030 | B | N1 | mínimo |
 | RF-050 | CA-125..126 | F-030 | B | N1/N2 | mínimo |

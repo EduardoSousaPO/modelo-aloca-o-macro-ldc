@@ -118,10 +118,25 @@ class AssetReturnsQuarterlySchema(pa.DataFrameModel):
 
     @pa.dataframe_check(name="sem_trimestre_antes_do_inicio_da_serie")
     def _sem_backfill_sintetico(cls, df: object) -> bool:  # noqa: N805
-        """Nenhuma linha anterior ao início real da série do ativo (CA-063 / Anti-SPEC §10.1)."""
-        ini_ano = df["data_inicio_serie"].dt.year  # type: ignore[index]
-        q_ano = df["quarter"].str.slice(0, 4).astype(int)  # type: ignore[index]
-        return bool((q_ano >= ini_ano).all())
+        """Nenhuma linha anterior ao início real da série do ativo (CA-063 / Anti-SPEC §10.1.1).
+
+        A comparação é por **trimestre** (ano *e* trimestre), não por ano. Comparar só o ano deixava
+        passar exatamente os três casos que a Anti-SPEC §10.1.1 nomeia como backfill proibido:
+        `2010Q1..Q3` para o IFIX (início 2010-12-30), `2007Q1..Q3` para o IMOB (2007-12-28) e
+        `2006Q1..Q3` para o ICON (2006-12-28).
+
+        O trimestre que **contém** `data_inicio_serie` (2010Q4 no IFIX) segue aceito aqui:
+        ele não é anterior ao início, só é parcial. Quem decide se ele tem retorno
+        calculável é a regra de `price_ini` (último dia útil de T−1) em F-014 — com dado
+        de meia janela, `ret_tri` é `NULL`, não zero.
+        """
+        inicio = df["data_inicio_serie"]  # type: ignore[index]
+        indice_inicio = inicio.dt.year * 4 + inicio.dt.quarter
+        indice_quarter = (
+            df["quarter"].str.slice(0, 4).astype(int) * 4  # type: ignore[index]
+            + df["quarter"].str.slice(5, 6).astype(int)  # type: ignore[index]
+        )
+        return bool((indice_quarter >= indice_inicio).all())
 
 
 class RegimeAssetMetricsSchema(pa.DataFrameModel):

@@ -17,7 +17,7 @@ imutável**. Toda feature se justifica ali; o que estiver fora exige pausa e reg
 
 ## Prazo
 
-**Comitê de Alocação: 2026-10-14 (terça).** Heatmap para revisão do Edu em **2026-10-13**. Publicar
+**Comitê de Alocação: 2026-10-14 (quarta-feira).** Heatmap para revisão do Edu em **2026-10-13 (terça)**. Publicar
 qualquer número para o Comitê é operação **classe D** (revisão humana + dataset congelado + 3 valores por
 série conferidos na fonte + linha em `docs/wiki/log.md`).
 
@@ -114,10 +114,10 @@ Detalhe em [`docs/plans/PLAN.md`](docs/plans/PLAN.md); uma onda só começa com 
 |---|---|---|
 | **0** | sáb 10/10 | job diário de arquivamento ANBIMA (janela rolante de ~20 d.u.) · infra de extração · `DECISIONS_LOG` |
 | **1** | dom 11/10 | todos os extratores de esforço baixo em paralelo (ANBIMA S3, SGS, SIDRA, Tesouro, B3, Yahoo/MSCI, calendário) + Focus, FRED-fallback, Teva |
-| **2** | dom/seg 11-13/10 | camada canônica — `raw_series`, alinhamento trimestral, curva, retornos, `macro_quarterly`, anti-look-ahead (**classe C**) |
-| **3** | seg 13/10 | regimes V1 (quadrantes) + V3 (vizinhos) + V2 (ciclo Selic) e métricas por regime × ativo (**classe C**) |
-| **4** | seg 13/10 | heatmap, timeline, ranking, internacional, orquestrador — **marco de revisão humana do Edu** |
-| **5** | ter 14/10 | limitações, notebook de entrega e **pacote do Comitê (classe D)** |
+| **2** | dom/seg 11-12/10 | camada canônica — `raw_series`, alinhamento trimestral, curva, retornos, `macro_quarterly`, anti-look-ahead (**classe C**) |
+| **3** | ter 13/10 | regimes V1 (quadrantes) + V3 (vizinhos) + V2 (ciclo Selic) e métricas por regime × ativo (**classe C**) |
+| **4** | ter 13/10 | heatmap, timeline, ranking, internacional, orquestrador — **marco de revisão humana do Edu** |
+| **5** | qua 14/10 | limitações, notebook de entrega e **pacote do Comitê (classe D)** |
 
 Ciclo por feature: pegar o item do `TODO.md` → confirmar classe e Definition of Ready → checar contra o
 e-mail de escopo → teste falhando sobre fixture gravada → implementar → CI no nível da classe → PR com

@@ -123,15 +123,20 @@ class RegimeNeighborsSchema(pa.DataFrameModel):
     rank: Series[int] = pa.Field(nullable=False, ge=1, le=12)
     quarter_neighbor: Series[str] = pa.Field(nullable=False, str_matches=QUARTER_REGEX)
     distancia: Series[float] = pa.Field(nullable=False, ge=0)
-    metrica: Series[str] = pa.Field(
-        nullable=False, isin=tuple(m.value for m in MetricaDistancia)
-    )
+    metrica: Series[str] = pa.Field(nullable=False, isin=tuple(m.value for m in MetricaDistancia))
     k_usado: Series[int] = pa.Field(nullable=False, isin=K_VIZINHOS_SENSIBILIDADE)
+    # Piso 3, não 5: o `ge=5` rejeitava o único cenário de corte que o `PLAN.md §5` prevê como
+    # aceitável. Os cortes 4 (F-010/Focus → cai `z_juro_real_exante`) e 5 (F-016/curva → cai
+    # `z_inclinacao`) são independentes e podem acontecer juntos, sobrando 4 das 6 features; com
+    # G-02 (`ipca_meta`, "fora do caminho crítico" na `SPEC.md §13`) ainda aberto, cai também
+    # `z_ipca_desvio_meta` e sobram 3. 3 é o piso: abaixo disso a V3 não é "momentos semelhantes",
+    # é ruído — aí o caminho é `BLOQUEADO`, não um número com 2 features.
     n_features: Series[int] = pa.Field(
         nullable=False,
-        ge=5,
+        ge=3,
         le=6,
-        description="5 quando a curva (RF-009) não ficou pronta — declarado, não silencioso.",
+        description="< 6 = feature cortada (CA-086, PLAN §5) — declarado no output, nunca "
+        "silencioso. 5 sem a curva; 4 sem Focus e curva; 3 com G-02 também aberto.",
     )
     regime_v1_neighbor: Series[str] = pa.Field(
         nullable=False, isin=tuple(r.value for r in RegimeV1)
@@ -154,5 +159,10 @@ class RegimeNeighborsSchema(pa.DataFrameModel):
 
     @pa.dataframe_check(name="exclui_vizinhos_adjacentes")
     def _exclui_adjacentes(cls, df: object) -> bool:  # noqa: N805
-        """Os 2 trimestres imediatamente anteriores ao de referência não entram (CA-085)."""
+        """O trimestre de referência não é vizinho de si mesmo.
+
+        **O que este check NÃO faz:** a exclusão dos 2 trimestres imediatamente anteriores
+        (`N_TRIMESTRES_EXCLUIDOS_VIZINHANCA`) que CA-085 exige. Isso é verificado no teste da
+        feature F-019, não aqui — ver `CONTRACTS.md §5.2`.
+        """
         return bool((df["quarter_ref"] != df["quarter_neighbor"]).all())  # type: ignore[index]
