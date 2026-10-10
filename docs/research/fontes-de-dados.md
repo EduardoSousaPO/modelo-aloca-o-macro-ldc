@@ -978,9 +978,15 @@ https://api.stlouisfed.org/fred/series/observations?series_id={ID}&api_key={KEY}
 - ⚠️ **Pegadinha crítica:** `fredgraph.csv` **sem `cosd` aplica a janela-padrão do gráfico**, não a série
   inteira (ex.: `BAMLEMCBPIOAS` sem `cosd` começava em 2023-10-10). **Sempre passe `cosd=1900-01-01`.** **[CONFIRMADO-SUB]**
 - ⚠️ ID inexistente → **404 com HTML**; detecte checando se a 1ª linha começa com `<`. **[CONFIRMADO-SUB]**
-- ⚠️ **Latência:** `fred.stlouisfed.org` respondeu muito lentamente / com corpo vazio nas minhas tentativas
-  desta sessão (timeout de 120 s estourado em lote de 4 IDs). Trate como fonte lenta: serialize,
-  `timeout` alto, retry. **[CONFIRMADO por mim — comportamento de rede, não refuta os IDs]**
+- 🚨 **`fred.stlouisfed.org` ficou INACESSÍVEL desta máquina durante toda a sessão. [CONFIRMADO por mim]**
+  Evidências colhidas: `curl` → `http=000`, corpo vazio; `urllib` com User-Agent de browser → **10 de 10
+  IDs falharam**, 8 com `TimeoutError` (60 s) e 2 com **`ConnectionResetError(10054)`** ("cancelamento
+  forçado da conexão pelo host"). O reset ativo sugere **bloqueio** (ou filtro de rede local), não
+  apenas lentidão. O agente auxiliar, de outro caminho de rede, conseguiu acesso normal.
+  → **Antes de arquitetar em cima do FRED, teste a conectividade do ambiente de execução.** Se o
+  bloqueio se confirmar em produção, use **Yahoo `^TNX`/`^FVX`/`^IRX`/`^VIX`/`DX-Y.NYB`** e
+  **MSCI** como fontes primárias, e BCB PTAX para o câmbio — a combinação cobre quase tudo que o FRED
+  daria. Isso não refuta os IDs e históricos da tabela abaixo (marcados `[CONFIRMADO-SUB]`).
 
 ### IDs verificados (com `cosd=1900-01-01`) **[CONFIRMADO-SUB]**
 
@@ -1352,7 +1358,7 @@ Versões e datas lidas de `https://pypi.org/pypi/{nome}/json`. **[CONFIRMADO-SUB
 | R2 | **Truncamento silencioso** — `$top=20000` no Olinda devolve 20.000 linhas **sem `nextLink`**; `range=max` no Yahoo trunca mensais; `fredgraph.csv` sem `cosd` trunca | Olinda, Yahoo, FRED | **alta** | Omitir `$top` ou paginar com `$skip`; usar `period1/period2`; sempre `cosd=1900-01-01`; **assert de contagem mínima** |
 | R3 | **Filtros ignorados** — `$filter`/`$top`/`$orderby` ignorados em `ValoresSerie` do Ipeadata; `$apply`/`$count` ignorados no Olinda | Ipeadata, Olinda | média | Baixar inteiro e filtrar em pandas |
 | R4 | **Anti-bot** — Yahoo sem UA → **429**; `dadosabertos.bcb.gov.br` sem UA → página de erro; `api.investing.com` → **403 Cloudflare**; Yahoo v7 CSV → **401** | Yahoo, BCB CKAN, Investing | **alta** | UA de browser em **todas** as requisições; nunca usar Investing/investpy |
-| R5 | **`fred.stlouisfed.org` inacessível nesta sessão** (`http=000`, corpo vazio, timeout de 120 s) enquanto o agente auxiliar conseguiu acesso | FRED | **média** | Tratar FRED como fonte lenta/instável: serializar, timeout alto, retry, cache local. Alternativa: Yahoo + MSCI |
+| R5 | **`fred.stlouisfed.org` inacessível desta máquina**: `curl` → `http=000`; `urllib` com UA de browser → **10/10 IDs falharam** (8 `TimeoutError`, 2 **`ConnectionResetError(10054)`**). Reset ativo = provável bloqueio, não lentidão. Outro caminho de rede funcionou | FRED | **alta** | **Testar conectividade no ambiente de execução antes de depender do FRED.** Plano B já mapeado: Yahoo (`^TNX`, `^FVX`, `^IRX`, `^VIX`, `DX-Y.NYB`) + MSCI + BCB PTAX cobrem quase todo o bloco internacional |
 | R6 | **reCAPTCHA de uso único** — `data-api.prd.anbima.com.br/web-bff/*` exige JWT com token reCAPTCHA; reuso → **418** | ANBIMA Data (API interna) | **alta** | **Não usar.** Usar o S3 público |
 | R7 | **Listagem de bucket bloqueada** — S3 da ANBIMA dá `AccessDenied` em `list-type=2`; nomes de arquivo da Teva têm **versão embutida** (`v0.27`) | ANBIMA S3, Teva | média | ANBIMA: SLUGs hard-coded + teste de disponibilidade no CI. Teva: **listar o bucket GCS e casar por regex** |
 | R8 | **Janela rolante que apaga o passado** — ANBIMA `ms*.txt` e `CZ` (~20 d.u.); ICE BofA no FRED (3 anos); `SP500`/`DJIA` (10 anos) | ANBIMA, FRED | **alta** | **Arquivar diariamente desde já**; nunca tratar como fonte de backfill |
