@@ -7,9 +7,9 @@
 > (DoR + escopo + arquivos + CAs + testes + matriz). Features A podem ter apenas a descrição mínima.
 
 **Última revisão:** 2026-10-10
-**Fase:** kickoff
+**Fase:** PRD v1.0 escrito (modo autônomo), aguardando aprovação do Edu
 **Tipo:** ferramenta interna (dados / quant — não SaaS, não web, roda local)
-**Foco atual:** kickoff concluído; aguardando `/consultor-prd` → `/SDD-avancado`
+**Foco atual:** responder as **8 decisões bloqueantes** da §4 → aprovar `docs/product/PRD.md` → `/SDD-avancado`
 
 ---
 
@@ -142,7 +142,37 @@ do backlog para "Em andamento"). Versão completa: docs/plans/_templates/FEATURE
 
 ## 4. Bloqueios
 
-- [ ] *(vazio)*
+> **8 decisões de Edu/Alexandre bloqueiam o início da implementação.** Origem: `docs/product/PRD.md §13.2`
+> (PRD gerado em modo autônomo em 2026-10-10 — nenhuma dessas respostas veio de humano). Enquanto não
+> respondidas, as features de regime e os extratores do caminho crítico não têm Definition of Ready completa.
+> Cada item traz a **recomendação da pesquisa** — responder "aceito a recomendação" já destrava.
+
+- [ ] **D1 — Qual lente de regime é a oficial do Comitê?** (V1 / V2 / V3 / as três). Define o que o notebook
+      entrega e o que vai ao slide, e precisa estar congelada em ADR **antes** de rodar sobre os retornos
+      (RF-031). *Recomendação: V1 oficial + V3 como "momentos semelhantes" + V2 como corte secundário.*
+- [ ] **D3 — Eixo inflação da V1: nível vs. meta ou aceleração (Δ IPCA 12m)?** Muda o rótulo dos 83
+      trimestres; reclassificar depois invalida o heatmap. *Recomendação: aceleração.*
+- [ ] **D5 — Métrica primária do heatmap: nominal, excesso sobre CDI ou real?** É a coluna do entregável
+      visual central (RF-033). *Recomendação: excesso sobre CDI (neutraliza a Selic de 19% → 2% → 14%).*
+- [ ] **D6 — Internacional: piso estrutural, 100% tático por regime ou híbrido?** Sem isso não se sabe o que
+      RF-038/RF-039 devem entregar — e é a resposta ao item C1 do e-mail. *Recomendação: piso 16-20% + banda
+      tática 15-35% por regime (n≈20 não sustenta número pontual).*
+- [ ] **D12 — Setoriais B3 e FII segmentado entram no pacote mínimo?** (completo / best-effort / fora).
+      Define quantos extratores entram no caminho crítico de 3 dias. *Recomendação: best-effort, com `n` e
+      `data_inicio` visíveis.*
+- [ ] **L1 — IFIX só existe de 2011 em diante (metade da janela).** Aceitar janela própria 2011-2026?
+      *Recomendação: janela própria + IMOB (2008+) como proxy imperfeito; **não** reconstruir IFIX sintético.*
+- [ ] **L2 — Segmentação de FII (Tijolo/Papel/Logística/Shoppings) só desde 2019 e via provedor privado
+      (Teva) sem licença comercial explícita.** Autorizar o uso? *Recomendação: usar para dispersão setorial,
+      declarando que cobre ~2 ciclos macro; tratar como qualitativo.*
+- [ ] **L4 — ETTJ oficial da ANBIMA com 20 anos exige contratar o ANBIMA Feed (≈R$ 686–8.238/mês).**
+      Contratar ou aceitar a inclinação construída do Tesouro Direto? Era pedido explícito do e-mail (item A6).
+      *Recomendação: Tesouro Direto — tecnicamente defensável sem comprar o Feed; registrar em DECISIONS_LOG
+      e comunicar ao Alexandre.*
+
+**Não bloqueantes** (17 decisões D2/D4/D7-D11 e lacunas L3/L5-L13 + 7 gaps "a confirmar") estão em
+`docs/product/PRD.md §13.3` e §13.4 com a recomendação adotada por padrão — podem ser decididas durante a
+execução, sem travar o início.
 
 > Se tiver bloqueio: descreva o problema, o que já foi tentado e o que precisa para destravar.
 > **Não pausar trabalho em outra feature para resolver bloqueio** — use o bloqueio como input de conversa
