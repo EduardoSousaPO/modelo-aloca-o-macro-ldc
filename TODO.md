@@ -1061,22 +1061,6 @@ hash do dataset substituído; 3) marcar a versão como revogada em `wiki/log.md`
 
 ---
 
-### [ ] F-032 — `DECISIONS_LOG` inicial com as substituições de fonte já conhecidas
-
-- **Risco:** A · **CI alvo:** N1 · **Branch:** direto em `main` (< 30 min, classe A)
-- **Cobre:** RF-052, RF-045 (parcial) · e-mail: autorização de ajuste
-- **CAs da SPEC:** CA-128
-- **Descrição:** criar `docs/plans/DECISIONS_LOG.md` a partir de
-  `docs/plans/_templates/DECISIONS_LOG-template.md` e registrar as substituições já decididas, cada uma
-  com **fonte pedida / fonte usada / por quê / impacto na comparabilidade**: ETTJ ANBIMA → Tesouro
-  Direto interpolado (L4); swap DI × pré do SGS (morto em set/2019) → Tesouro Direto (L7);
-  "ANBIMA DataFit" inexistente → ANBIMA Data + S3 (L12); IFIX com janela 2011-2026 (L1);
-  FII segmentado via Teva 2019+ (L2); dívida bruta → DLSP (L10); S&P 500 do FRED → Yahoo/MSCI (L11);
-  FRED com fallback Yahoo se a conectividade falhar (G-06).
-- **Teste:** `tests/unit/test_decisions_log.py` — cada substituição tem os 4 campos preenchidos.
-
----
-
 ## PACOTE ESTENDIDO — fase 2 (depois de 2026-10-14)
 
 > Não comprometido com o Comitê. Entram só depois de o pacote mínimo estar entregue e conferido.
@@ -1126,6 +1110,7 @@ trimestre anterior. Sem dashboard hospedado (fora de escopo). CI N1.
 - [x] **SDD — SPEC + Anti-SPEC + contratos pandera/pydantic + catálogo de 132 séries + 6 ADRs
       propostos** — 2026-10-10 (classe A) — `docs/specs/SPEC.md`, `docs/contracts/CONTRACTS.md`,
       `packages/shared/schemas/`, `docs/decisions/adr/`, `docs/plans/PLAN.md`
+- [x] **F-032 — `DECISIONS_LOG` inicial com as 12 substituições de fonte (todas provisórias, aguardando aval de Edu/Alexandre)** — 2026-10-10 (classe A) — `docs/plans/DECISIONS_LOG.md`
 
 ---
 

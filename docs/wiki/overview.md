@@ -6,8 +6,8 @@
 > (imutável). **Fonte de verdade do produto:** [`docs/product/PRD.md`](../product/PRD.md) (v1.0, 2026-10-10).
 > Esta página **resume** o PRD — não o duplica. Em conflito, vale o PRD; em conflito de escopo, vale o e-mail.
 
-**Última revisão:** 2026-10-10
-**Versão refletida:** PRD v1.0 (gerado em modo autônomo; **aprovação do Edu pendente**)
+**Última revisão:** 2026-10-10 (housekeeping — §8 atualizada para o estado pós-SDD)
+**Versão refletida:** PRD v1.0 + SPEC v1.0 (gerados em modo autônomo; **aprovação do Edu pendente**)
 
 ---
 
@@ -85,18 +85,25 @@ truncamento sem aviso, filtros ignorados) · janela rolante e descontinuações 
 anti-bot (FRED pode estar bloqueado) · unidade/escala/formato mentirosos · overfitting e confusão
 descritivo × preditivo.
 
-## 8. Estado atual
+## 8. Estado atual (2026-10-10, pós-housekeeping)
 
-- **Fase:** PRD v1.0 escrito, **aguardando aprovação do Edu** e resposta das decisões bloqueantes.
-- **Pipeline implementado:** nenhum — `apps/pipeline/` e `apps/analysis/` vazios.
-- **Dataset canônico:** não existe.
+- **Fase:** **harness estruturado** — escopo → pesquisa → PRD v1.0 → SPEC v1.0 + Anti-SPEC → contratos →
+  TODO (40 features) → PLAN (ondas) → `/agents-protocol`. **Aprovação do Edu ainda pendente** no PRD e na SPEC.
+- **Pipeline implementado:** **nenhum extrator** — `apps/pipeline/` e `apps/analysis/` vazios. O que existe
+  de código são os contratos em `packages/shared/schemas/` (6 módulos pandera/pydantic + 132 séries).
+- **Dataset canônico:** não existe. `data/raw/` tem só as amostras baixadas na pesquisa.
 - **Pesquisa:** concluída — fontes (`fontes-de-dados.md`) e metodologia (`metodologia-regimes-macro.md`).
+- **Decisões de fonte:** 12 substituições registradas como **provisórias** em
+  [`docs/plans/DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md); **ADR-001..006 em Proposta**.
+- **Ambiente:** `uv sync --extra dev` entrega o ambiente completo (deps corrigidas em 2026-10-10).
+  **FRED bloqueado nesta máquina** → bloco internacional pelo plano B (Yahoo + MSCI + PTAX).
 - **CI:** N1 configurado; N2/N3 comentados aguardando testes reais.
-- **Bloqueios:** **8 decisões** travam implementação — ver `TODO.md §4` e PRD §13.2
+- **Bloqueios:** **8 decisões** travam a publicação — ver `TODO.md §4`, PRD §13.2 e SPEC §11
   (**D1** lente oficial, **D3** eixo inflação, **D5** métrica do heatmap, **D6** forma do internacional,
   **D12** setoriais/FII no pacote mínimo, **L1** IFIX 2011+, **L2** FII segmentado via terceiro, **L4**
-  contratar ANBIMA Feed ou não).
-- **Próximo passo:** responder as 8 decisões → aprovar o PRD → `/SDD-avancado`.
+  contratar ANBIMA Feed ou não). **Extração e camada canônica não estão bloqueadas.**
+- **Próximo passo:** Onda 0 do `PLAN.md` — **F-009** (job diário ANBIMA, urgente) e **F-001** (infra de
+  extração); em paralelo, responder as 8 decisões.
 
 ## 9. Próximo grande objetivo
 
@@ -111,8 +118,13 @@ regime × ativo, **antes do Comitê de Alocação de 2026-10-14** (heatmap para 
 - **PRD v1.0** → [`docs/product/PRD.md`](../product/PRD.md)
 - Pesquisas → [`docs/research/fontes-de-dados.md`](../research/fontes-de-dados.md) ·
   [`docs/research/metodologia-regimes-macro.md`](../research/metodologia-regimes-macro.md)
-- SPEC + Anti-SPEC (a criar) → [`docs/specs/SPEC.md`](../specs/SPEC.md)
-- Arquitetura → [`wiki/architecture.md`](./architecture.md) · Histórico → [`wiki/log.md`](./log.md)
+- **SPEC v1.0 + Anti-SPEC §10** → [`docs/specs/SPEC.md`](../specs/SPEC.md) ·
+  contratos → [`docs/contracts/CONTRACTS.md`](../contracts/CONTRACTS.md)
+- Plano de ondas → [`docs/plans/PLAN.md`](../plans/PLAN.md) ·
+  ADRs → [`docs/decisions/adr/`](../decisions/adr/) ·
+  trocas de fonte → [`docs/plans/DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md)
+- Arquitetura → [`wiki/architecture.md`](./architecture.md) · Histórico → [`wiki/log.md`](./log.md) ·
+  módulos → [`wiki/modules/`](./modules/) · runbooks → [`wiki/runbooks/`](./runbooks/)
 - Estado vivo → [`TODO.md`](../../TODO.md) · Contrato com agentes → [`AGENTS.md`](../../AGENTS.md)
 
 ---

@@ -5,7 +5,8 @@
 
 **Data:** 2026-10-10 · **Versão:** 1.0 · **Referência:** PRD §9/§12, `docs/research/fontes-de-dados*.md`
 **Veredito em 1 frase:** zero skill nova, zero MCP novo; o único bloqueio real da máquina é o **FRED**
-(R5 **CONFIRMADO**), e o setup se resolve com **um comando** (`uv sync`) + 2 deps que faltam no `pyproject`.
+(R5 **CONFIRMADO**), e o setup se resolve com **um comando** (`uv sync --extra dev`) — as 3 deps que
+faltavam no `pyproject` (`openpyxl`, `lxml`, `matplotlib`) **já foram adicionadas em 2026-10-10**.
 
 ---
 
@@ -20,7 +21,7 @@
 | 5 | Parse de **HTML `<table>` disfarçado de `.xls`** (ANBIMA Curva Zero) | **nativo** | `pandas.read_html` + `lxml` | B | R7; sniff de magic bytes antes de escolher o leitor |
 | 6 | CSV pt-BR (`;`, decimal vírgula, latin-1) | **nativo** | `pandas.read_csv` + normalizador único de número pt-BR | B | R7 — um só normalizador, testado com datas-armadilha |
 | 7 | Armazenamento **Parquet** | **nativo** | `pyarrow` (via pandas) | C em `data/canonical/` | — |
-| 8 | Consulta analítica / **DuckDB** | **nativo, opcional** | `duckdb` | C | **decidir antes de instalar:** Parquet + pandas cobre 83 trimestres × ~30 séries. **ADR necessário** (DuckDB vs Parquet puro) |
+| 8 | Consulta analítica / **DuckDB** | **nativo** | `duckdb` | C | **decidido:** ADR-006 = Parquet por camada + DuckDB **só como engine de consulta** (derivado e descartável). `duckdb` fica no `pyproject` |
 | 9 | Validação de schema de DataFrame | **nativo** | `pandera` (obrigatório em tudo que entra/sai de `data/canonical/`) | **C** | é o gate técnico contra dado errado; sem pandera não há classe C aprovável |
 | 10 | Contrato de config/payload | **nativo** | `pydantic` v2 | B | `python-dotenv` para `.env` (nenhuma key obrigatória hoje) |
 | 11 | Notebook reprodutível (RF-041) | **nativo** | `jupyterlab` 4.4.7 (instalado, **fora do PATH** — usar `python -m jupyter lab`) | B | outputs limpos no commit; sem lógica de negócio |
@@ -44,7 +45,7 @@ existentes** (`dataviz`, `xlsx`, e `pptx`/`pdf` em standby) · **0 skills novas*
 | `python` / `py` | ✅ | **3.13.3** em `C:\Python313\python.exe` (pyproject pede ≥ 3.11 — ok) |
 | `uv` | ✅ | **0.11.25** → caminho preferido |
 | `pip` | ✅ | 25.2 (user site em `%APPDATA%\Python\Python313`) |
-| `git` | ✅ | 2.46.0.windows.1 — ⚠️ **o diretório do projeto não é repo git ainda** (`git init` pendente) |
+| `git` | ✅ | 2.46.0.windows.1 — repo **já inicializado desde o kickoff** (`git log`: 7 commits, de `143d936` a `5a36035`); `.gitignore` em vigor |
 | `jupyter` (CLI) | ⚠️ | pacote instalado (`jupyter` 1.1.1, `jupyterlab` 4.4.7) mas **`Scripts/` fora do PATH** → usar `python -m jupyter` |
 | Playwright + Chromium | ✅ | `playwright` 1.58.0 + browsers em `%LOCALAPPDATA%\ms-playwright` |
 
@@ -60,10 +61,11 @@ existentes** (`dataviz`, `xlsx`, e `pptx`/`pdf` em standby) · **0 skills novas*
 | `jupyter` | ✅ | 1.1.1 |
 | **`pyarrow`** | ❌ | **ausente** — sem ele não há Parquet |
 | **`pandera`** | ❌ | **ausente** — sem ele não há gate de schema (classe C travada) |
-| **`duckdb`** | ❌ | ausente (ver ADR em §5 — pode nem ser necessário) |
+| **`duckdb`** | ❌ | ausente — **entra no `uv sync`**: ADR-006 manteve `duckdb` como engine de consulta |
 
-**Fora do `pyproject`, mas presentes e usados pelo plano:** `openpyxl` 3.1.5, `lxml` 6.0.0, `bs4` 4.13.4,
-`matplotlib` 3.10.3, `yfinance` 0.2.61, `ruff` 0.16.4, `pytest` 8.4.0, `numpy` 2.4.6.
+**Fora do `pyproject`, mas presentes e usados pelo plano (medido de manhã):** `openpyxl` 3.1.5,
+`lxml` 6.0.0 e `matplotlib` 3.10.3 — **os três entraram no `pyproject` à tarde**. Seguem fora:
+`bs4` 4.13.4, `yfinance` 0.2.61 (decisão aberta), `ruff` 0.16.4, `pytest` 8.4.0, `numpy` 2.4.6.
 **Ausentes e desnecessários:** `xlrd`, `xlsxwriter`, `python-pptx`, `html5lib`, `odfpy`.
 
 ---
@@ -111,20 +113,22 @@ uv run python -m jupyter lab          # evita o problema de PATH do jupyter
 python -m venv .venv && .venv\Scripts\activate && pip install -e ".[dev]"
 ```
 
-**Antes de rodar, corrigir `pyproject.toml` (3 linhas) — hoje o `uv sync` entrega um ambiente que não lê
-os arquivos da ANBIMA:**
+**Estado do `pyproject.toml` (corrigido em 2026-10-10) — o `uv sync --extra dev` agora entrega um ambiente
+que lê os arquivos da ANBIMA e desenha o heatmap:**
 
-- **`openpyxl>=3.1`** → obrigatório. É o leitor dos 10 arquivos IMA (que são XLSX apesar da extensão) e o
-  writer do XLSX de entrega (RF-043). **Está faltando no `pyproject`** e só funciona hoje por acidente
-  (instalado no Python global).
-- **`lxml>=5.0`** → obrigatório para `read_html` na Curva Zero da ANBIMA (que é HTML `<table>`).
-- **`matplotlib>=3.8`** → obrigatório para o heatmap (RF-033). Hoje também só existe no Python global.
+- ✅ **`openpyxl>=3.1`** → **adicionado.** É o leitor dos 10 arquivos IMA (que são XLSX apesar da extensão)
+  e o writer do XLSX de entrega (RF-043). Antes só funcionava por acidente (instalado no Python global).
+- ✅ **`lxml>=5.0`** → **adicionado.** Obrigatório para `read_html` na Curva Zero da ANBIMA (HTML `<table>`).
+- ✅ **`matplotlib>=3.8`** → **adicionado.** Obrigatório para o heatmap (RF-033) e a timeline (RF-035).
+- ✅ **`duckdb>=1.0`** → **mantido.** O **ADR-006** decidiu *Parquet por camada + DuckDB apenas como engine
+  de consulta*; a dúvida "DuckDB vs. Parquet puro" desta §5 está resolvida lá (status: Proposta).
+- **`seaborn`** → **não adicionar.** Nenhum documento do projeto o exige: o heatmap de RF-033 é
+  `matplotlib` puro com a paleta da skill `dataviz`.
 - **`xlrd`** → **não adicionar.** Nenhum arquivo do projeto é XLS/BIFF real: o magic bytes do S3 da ANBIMA
   veio `PK\x03\x04` nesta sessão. Só entra se aparecer um XLS legado — e aí vira linha no `DECISIONS_LOG`.
-- **`duckdb`** → **manter fora até o ADR decidir.** Não há evidência de necessidade: o canônico tem ~83
-  trimestres. Parquet + pandas resolve.
-- **`yfinance`** → virou **caminho crítico** (é o plano B do FRED). Adicionar com versão fixada, ou trocar
-  por chamada direta ao `chart/v8` (que já funciona com UA de browser e é menos frágil que a lib).
+- ⏳ **`yfinance`** → **única dep ainda pendente.** Virou **caminho crítico** (é o plano B do FRED).
+  Adicionar com versão fixada, ou trocar por chamada direta ao `chart/v8` (que já funciona com UA de
+  browser e é menos frágil que a lib) — decidir em F-007/F-011 e registrar no `DECISIONS_LOG`.
 
 **FRED exige plano B? Sim — obrigatório nesta máquina.** Mapeamento direto:
 `DGS10`→`^TNX`, `DGS2`/`DGS5`→`^FVX`, `VIXCLS`→`^VIX`, `DTWEXBGS`→`DX-Y.NYB`, `DEXBZUS`→**BCB SGS 1/10813
@@ -138,7 +142,7 @@ execução de outra rede ou registrar como lacuna. Toda troca entra em `docs/pla
 
 | Item | Onde | Por quê |
 |---|---|---|
-| **ADR — DuckDB vs. Parquet puro** | `docs/decisions/adr/` | dependência nova crítica; hoje não há evidência de necessidade |
+| ~~ADR — DuckDB vs. Parquet puro~~ — **resolvido** | [`ADR-006`](../decisions/adr/ADR-006-armazenamento-e-convencao-de-retornos.md) | **Parquet por camada + DuckDB só como engine de consulta** (status: Proposta). `duckdb` permanece no `pyproject` |
 | **ADR — `httpx` vs `requests` como cliente único** | `docs/decisions/adr/` | os dois estão no `pyproject`; dois clientes = dois lugares para errar UA/timeout/retry |
 | **ADR — especificação de regime congelada antes de rodar** (R-08/RF-031) | `docs/decisions/adr/` | evita overfitting ao heatmap |
 | **DECISIONS_LOG — FRED substituído por Yahoo+PTAX+MSCI** | `docs/plans/DECISIONS_LOG.md` | fonte pedida indisponível neste ambiente (evidência nesta §3) |
@@ -161,7 +165,7 @@ Comitê em 2026-10-14.** O gate é a **classe D**.
 | RO-5 | Endpoint não documentado muda sem aviso (B3, MSCI, S3 ANBIMA) | classe C: teste de contrato com valor-canário; fallback documentado por fonte |
 | RO-6 | **Janela rolante apaga o passado** (ANBIMA ~20 d.u.) | classe B, mas **prioridade de dia 1**: ligar o job de arquivamento hoje; alerta quando a última observação envelhecer |
 | RO-7 | Playwright MCP vira fonte de dado de produção | gate: **proibido**. Playwright é diagnóstico. Virar fonte → pausa + ADR |
-| RO-8 | Dado bruto > 5 MB ou `.parquet`/`.duckdb` commitado | gate: `.gitignore` + `git init` pendente nesta máquina (hoje o projeto **não é repo**) |
+| RO-8 | Dado bruto > 5 MB ou `.parquet`/`.duckdb` commitado | gate: o `.gitignore` do repo (que **existe desde o kickoff**, commit `143d936`) já ignora `data/raw|processed|canonical`, `*.parquet`, `*.duckdb`, `*.xls*` e `.env` — conferir `git status` antes de cada commit |
 
 **Riscos de auto-reclassificação alta:** qualquer feature marcada **B** que toque `data/canonical/` ou
 produza figura/tabela do pacote de entrega **é C ou D desde o início** — trate assim e economize o retrabalho.
@@ -175,7 +179,8 @@ produza figura/tabela do pacote de entrega **é C ou D desde o início** — tra
 - [x] Classe de risco por capacidade
 - [x] ADRs e linhas de DECISIONS_LOG listados
 - [x] Ambiente e conectividade medidos nesta máquina (não inferidos)
-- [ ] `pyproject.toml` corrigido (`openpyxl`, `lxml`, `matplotlib`; decidir `duckdb`/`yfinance`)
+- [x] `pyproject.toml` corrigido em 2026-10-10 — `openpyxl`, `lxml` e `matplotlib` adicionados; `duckdb`
+      mantido por ADR-006; `seaborn` dispensado. **Resta decidir `yfinance`.**
 - [ ] `uv sync --extra dev` executado
-- [ ] `git init` + `.gitignore` conferido
+- [x] Repo git e `.gitignore` conferidos — o repo **existe desde o kickoff**; `git init` não é pendência
 - [ ] Próximo passo: `/agents-protocol`

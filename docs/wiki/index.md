@@ -1,103 +1,78 @@
 # Wiki — estrategia-macro-ldc-dados
 
-> **Mapa principal da Project Wiki.** Primeira leitura de qualquer agente (orquestrador Fable, subagentes
-> Opus, sessão interativa) ao abrir o projeto.
->
-> A wiki é a **memória sintetizada** do projeto. Não substitui ESCOPO-EMAIL/PRD/SPEC/CONTRACTS/ADR —
-> referencia e resume. Mantida via `/wiki ingest`, `/wiki context`, `/wiki lint`, `/wiki repair`.
+> **Mapa principal da Project Wiki** — primeira leitura de qualquer agente. A wiki é a **memória
+> sintetizada**: não substitui ESCOPO-EMAIL/PRD/SPEC/CONTRACTS/ADR, referencia e resume.
+> Mantida via `/wiki ingest · context · lint · repair`.
 
-**Última revisão:** 2026-10-10
-**Saúde da wiki:** verde (recém-criada no kickoff)
-
----
+**Última revisão:** 2026-10-10 (housekeeping + `/wiki lint` → `repair`)
+**Saúde da wiki:** verde — `modules/` e `runbooks/` populados; índice alinhado aos arquivos que existem
 
 ## O projeto em 3 linhas
 
 Ferramenta interna de dados/quant da **LDC Capital**: pipeline Python que extrai e alinha 20 anos de séries
-macroeconômicas brasileiras e de desempenho de ativos/subsetores em um dataset canônico **trimestral**, para
-identificar **regimes macro** e medir como cada classe de ativo performou em momentos semelhantes.
-Alimenta o **modelo de alocação macro doméstica + dimensionamento da alocação internacional**.
-**Prazo:** Comitê de Alocação em **2026-10-14**. Roda local — sem auth, sem pagamento, sem deploy.
-
----
+macro brasileiras e de desempenho de ativos/subsetores num dataset canônico **trimestral** (83 trimestres),
+para identificar **regimes macro** e medir como cada classe de ativo performou em momentos semelhantes.
+Alimenta o modelo de alocação macro doméstica + o dimensionamento da alocação internacional.
+**Prazo:** Comitê de Alocação em **2026-10-14**. Roda local — sem auth, pagamento ou deploy.
+**Estado:** harness estruturado; **nenhum extrator implementado**; 8 decisões bloqueantes abertas.
 
 ## Leitura inicial obrigatória
 
-1. **este arquivo** (`docs/wiki/index.md`)
-2. [`docs/product/ESCOPO-EMAIL-ALEXANDRE.md`](../product/ESCOPO-EMAIL-ALEXANDRE.md) — **fonte de verdade do
-   escopo**, imutável (e-mail do Alexandre Kaercher, out/2026)
-3. [`TODO.md`](../../TODO.md) — estado vivo + Feature Contract do item ativo
-4. [`AGENTS.md`](../../AGENTS.md) — papéis, classificação A/B/C/D, autonomia/pausa, Fast Fix
+1. **este arquivo** · 2. [`ESCOPO-EMAIL-ALEXANDRE.md`](../product/ESCOPO-EMAIL-ALEXANDRE.md) — **fonte de
+verdade do escopo, imutável** · 3. [`TODO.md`](../../TODO.md) — estado vivo + Feature Contract do item
+ativo · 4. [`AGENTS.md`](../../AGENTS.md) — papéis, A/B/C/D, autonomia/pausa, Fast Fix
 
----
-
-## Páginas vivas
+## Páginas da wiki
 
 | Página | O que tem | Quando ler |
 |---|---|---|
-| [overview.md](./overview.md) | O que o projeto entrega hoje em 1 página | toda nova sessão |
-| [architecture.md](./architecture.md) | Arquitetura do pipeline (fontes → raw → processed → canonical → análise) | antes de mexer em módulo novo |
-| [log.md](./log.md) | Histórico cronológico (ingests, releases, fixes, validações) | abertura de sessão; quando um número "parece estranho" |
-| [modules/](./modules/) | Memória por área (`sgs`, `sidra`, `anbima`, `b3`, `canonical`, `regimes`) | antes de tocar o módulo |
-| [features/](./features/) | Resumo de 1 parágrafo por feature mergeada (C/D) | ao consultar histórico de uma feature |
-| [runbooks/](./runbooks/) | Reconstruir dataset, atualizar série, fonte fora do ar, fechar relatório do Comitê | em emergência ou operação repetida |
+| [overview.md](./overview.md) | o que o projeto entrega hoje, em 1 página | toda nova sessão |
+| [architecture.md](./architecture.md) | topologia fontes → raw → processed → canonical → análise | antes de mexer em módulo |
+| [log.md](./log.md) | histórico cronológico (≤ 200 linhas) | abertura de sessão; quando um número "parece estranho" |
+| [modules/](./modules/) | [`sgs`](./modules/sgs.md) · [`sidra`](./modules/sidra.md) · [`anbima`](./modules/anbima.md) · [`b3`](./modules/b3.md) · [`internacional`](./modules/internacional.md) · [`canonical`](./modules/canonical.md) · [`regimes`](./modules/regimes.md) | **antes de tocar o módulo** |
+| [runbooks/](./runbooks/) | [reconstruir-dataset](./runbooks/reconstruir-dataset.md) · [fonte-fora-do-ar](./runbooks/fonte-fora-do-ar.md) | emergência ou operação repetida |
+| [features/](./features/) | resumo de 1 parágrafo por feature C/D mergeada | *(vazio — nenhuma C/D mergeada)* |
 | [context/](./context/) | Context Packs temporários por tarefa ativa | início de feature/fix |
 
-## Fontes externas de contexto (fora da wiki)
+## Fontes de verdade (fora da wiki)
 
-| Pasta | O que tem | Regra |
+| Domínio | Onde | Espelho na wiki |
 |---|---|---|
-| [`docs/research/`](../research/) | Pesquisas de **fontes de dados e metodologia** — endpoints, formatos, limites, cobertura temporal, pegadinhas; **em andamento, escrito em paralelo por vários agentes** | leia antes de escrever extrator; **nunca apague nem sobrescreva** arquivo de outro agente |
-| [`docs/product/`](../product/) | E-mail de escopo (imutável) + PRD | escopo se checa aqui |
-| `data/` | Dados brutos/processados/canônicos — **não versionados**, reconstruíveis | nunca editar à mão |
+| Escopo pedido | [`product/ESCOPO-EMAIL-ALEXANDRE.md`](../product/ESCOPO-EMAIL-ALEXANDRE.md) | citado em `overview.md` |
+| Produto (52 RFs) | [`product/PRD.md`](../product/PRD.md) | `overview.md` |
+| Comportamento + **Anti-SPEC §10** | [`specs/SPEC.md`](../specs/SPEC.md) | `architecture.md` §6 |
+| Contratos de dados | [`packages/shared/schemas/`](../../packages/shared/schemas/) · espelho legível em [`contracts/CONTRACTS.md`](../contracts/CONTRACTS.md) | `modules/canonical.md` |
+| Pesquisa de fontes e metodologia | [`research/`](../research/) — **vários agentes escrevem; nunca sobrescrever** | `modules/*.md` |
+| Plano de execução (ondas) | [`plans/PLAN.md`](../plans/PLAN.md) | — |
+| Risco A/B/C/D | [`plans/risk-classification.md`](../plans/risk-classification.md) | — |
+| Capacidades, ambiente e conectividade medidos | [`plans/skills-manifest.md`](../plans/skills-manifest.md) | `runbooks/fonte-fora-do-ar.md` |
+| Decisões arquiteturais | [`decisions/adr/`](../decisions/adr/) — **ADR-001..006, todos em Proposta** | `architecture.md` §5 |
+| Decisão operacional / **troca de fonte** | [`plans/DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md) — 12 substituições provisórias | linha em `log.md` |
+| Prompts do dia a dia | [`plans/prompts-cheatsheet.md`](../plans/prompts-cheatsheet.md) | — |
+| Rollback / operação | [`plans/infra-ops.md`](../plans/infra-ops.md) | `runbooks/reconstruir-dataset.md` §6 |
+| Checklists (daily-ops, feature-PR) | [`plans/checklists/`](../plans/checklists/) | — |
+| Estado vivo | [`TODO.md`](../../TODO.md) + `git log` | resumo em `log.md` |
+| Dados | `data/` — **não versionado**, reconstruível; a verdade é o **script** | `modules/canonical.md` |
 
----
+> `plans/prompts-cheatsheet.md`, `plans/infra-ops.md` e `plans/checklists/` (`daily-ops.md`,
+> `feature-pr.md`) vieram do `/agents-protocol` em 2026-10-10 — todos existentes e linkados acima.
 
 ## Atalhos por cenário
 
 | Cenário | Comece por |
 |---|---|
-| **Número errado / série quebrada** | `/fast-fix` se A/B sem camada canônica → lê `wiki/runbooks/` + `log.md` |
-| **Vários problemas para triar** | `/triage-bugs` (lista colada) → plano de ataque do dia |
-| **Novo extrator de fonte** | `docs/research/` da fonte → `/wiki context F-NNN` → Prompt 2 (classe B) |
-| **Mexer em schema canônico, alinhamento temporal ou cálculo de retorno** | **classe C** — pause, Feature Contract detalhado, diff numérico obrigatório |
-| **Mandar resultado para o Alexandre/Comitê** | **classe D** — revisão humana + dataset congelado + linha no log |
-| **Sondagem exploratória de uma fonte (notebook descartável)** | modo **MVP Lite** — não produz dado canônico |
-| **Passar tarefa para outro subagente Opus** | `/wiki context <F-NNN>` antes de encerrar |
-| **Projeto bagunçado / wiki contraditória** | `/wiki lint` → `/wiki repair` antes de codar |
-| **Decisão grande** (DuckDB vs. Parquet, lib de HTTP) | ADR em `docs/decisions/adr/` (não wiki) |
-| **Substituição de fonte / convenção de trimestre** | linha em `docs/plans/DECISIONS_LOG.md` (não wiki) |
+| **Número errado / série quebrada** | `/fast-fix` se A/B sem camada canônica → [runbooks/](./runbooks/) + `log.md` |
+| **Fonte não responde, ou responde lixo com HTTP 200** | [runbooks/fonte-fora-do-ar.md](./runbooks/fonte-fora-do-ar.md) |
+| **Regenerar `data/canonical/`** | [runbooks/reconstruir-dataset.md](./runbooks/reconstruir-dataset.md) |
+| **Novo extrator de fonte** | `modules/<fonte>.md` → `research/` da fonte → `/wiki context F-NNN` |
+| **Schema canônico, alinhamento temporal ou cálculo de retorno** | **classe C** — pause, Feature Contract, diff numérico |
+| **Mandar resultado ao Alexandre/Comitê** | **classe D** — revisão humana + dataset congelado + linha no log |
+| **Passar tarefa a outro subagente** | `/wiki context <F-NNN>` antes de encerrar |
+| **Decisão grande** (armazenamento, lente de regime) | ADR em [`decisions/adr/`](../decisions/adr/), não wiki |
+| **Substituição de fonte / convenção de trimestre** | [`plans/DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md), não wiki |
 
----
+## Sinais de que a wiki precisa de `/wiki lint`
 
-## Fonte de verdade vs. wiki
+`log.md` passou de 200 linhas · módulo cita endpoint que não existe mais · runbook de reconstrução com mais de 3 meses sem revisar · context pack sem feature correspondente no `TODO.md` · decisão no `DECISIONS_LOG` que contradiz `architecture.md` · número citado na wiki que não bate com o canônico atual.
 
-A wiki **nunca** é fonte de verdade. Sintetiza. Quando há conflito, valem:
-
-| Domínio | Fonte de verdade | Espelho na wiki |
-|---|---|---|
-| Escopo pedido | `docs/product/ESCOPO-EMAIL-ALEXANDRE.md` | citado em `wiki/overview.md` |
-| Produto | `docs/product/PRD.md` | `wiki/overview.md` |
-| Comportamento + Anti-SPEC | `docs/specs/SPEC.md` | `wiki/architecture.md` (resumo) |
-| Contratos de dados | `packages/shared/schemas/` (Pydantic + pandera) | `docs/contracts/CONTRACTS.md` (espelho legível) |
-| Dados | o **script** que produz o dataset | `wiki/modules/<fonte>.md` |
-| Decisão arquitetural | `docs/decisions/adr/ADR-NNN.md` | citada em `wiki/architecture.md` |
-| Decisão operacional / troca de fonte | `docs/plans/DECISIONS_LOG.md` | linha em `wiki/log.md` |
-| Estado vivo | `TODO.md` + `git log` | resumo em `wiki/log.md` |
-
----
-
-## Saúde da wiki
-
-A wiki é **viva mas pequena**. Sinais de que precisa de `/wiki lint`:
-
-- `log.md` passou de 200 linhas sem revisão.
-- Módulo em `modules/` cita fonte/endpoint que não existe mais.
-- Runbook de reconstrução do dataset com data > 3 meses sem revisar.
-- Context pack ativo sem feature correspondente em `TODO.md`.
-- Decisão em `DECISIONS_LOG` que contradiz `architecture.md` (ex.: convenção de trimestre).
-- Número citado na wiki que não bate com o dataset canônico atual.
-
----
-
-*Esta wiki é mantida pela IA. O humano só dispara comandos. Se a wiki virar atrito, corte.*
+*Mantida pela IA; o humano só dispara comandos. Se a wiki virar atrito, corte.*
