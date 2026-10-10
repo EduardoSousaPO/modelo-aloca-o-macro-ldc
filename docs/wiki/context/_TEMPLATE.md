@@ -1,6 +1,6 @@
 # Context Pack — [F-NNN ou TAREFA]
 
-> **Pacote de contexto reutilizável** para uma tarefa ativa. Reduz alucinação no início e permite que **outro agente** (Codex/Cursor) continue de onde Claude parou.
+> **Pacote de contexto reutilizável** para uma tarefa ativa. Reduz alucinação no início e permite que **outro subagente Opus** continue de onde o anterior parou (`AGENTS.md §22`).
 >
 > **Onde vive:** `docs/wiki/context/<F-NNN-slug>.md`.
 > **Tempo de vida:** enquanto a feature/tarefa estiver aberta. Após merge, deletar (resumo vai para `wiki/features/F-NNN.md` se relevante).
@@ -13,7 +13,7 @@
 **Modo:** [Fast Fix | Standard | Deep Work | Production | Reorg]
 **Criado em:** YYYY-MM-DD HH:MM
 **Última atualização:** YYYY-MM-DD HH:MM
-**Agente atual:** [Claude Code | Codex | Cursor]
+**Agente atual:** [Fable (orquestrador) | subagente Opus | Claude Code]
 
 ---
 
@@ -33,10 +33,11 @@
 
 > O que já foi feito **nesta tarefa**. Não duplique git log; resuma.
 
-- [x] Schema Zod criado em `packages/shared/types/auth.ts`
+- [x] Schema `pandera` identificado em `packages/shared/schemas/raw_series.py`
+- [x] Fixture da fonte gravada em `tests/fixtures/sgs/ipca.json`
 - [x] Teste falhando para CA-001
-- [ ] Implementação de `apps/api/src/auth/login.ts`
-- [ ] Smoke test em staging
+- [ ] Implementação de `apps/pipeline/extract/sgs.py`
+- [ ] Evidência de dados (linhas, `min`/`max`, % de nulos, 3 valores conferidos na fonte)
 
 **Branch:** `feat/<slug>` (commit atual: `<sha>`)
 
@@ -44,28 +45,29 @@
 
 | Arquivo | Por que importa nesta tarefa |
 |---|---|
-| `packages/shared/types/auth.ts` | schema Zod canônico |
-| `apps/api/src/auth/login.ts` | implementação principal |
-| `tests/integration/auth.login.test.ts` | testes obrigatórios |
+| `packages/shared/schemas/raw_series.py` | schema `pandera` canônico |
+| `apps/pipeline/extract/sgs.py` | implementação principal |
+| `tests/unit/test_sgs.py` · `tests/fixtures/sgs/` | testes obrigatórios + fixture gravada |
+| `docs/research/fontes-de-dados.md §X` | pegadinhas da fonte (ler **antes** de codar) |
 | `docs/specs/SPEC.md §3.1` | RF-001 e RF-002 |
-| `wiki/modules/auth.md` | módulo de auth |
-| `docs/decisions/adr/ADR-002` | cookie httpOnly |
+| `wiki/modules/sgs.md` | módulo da fonte |
+| `docs/decisions/adr/ADR-006` | armazenamento e convenção de alinhamento |
 
 ## 5. Restrições desta tarefa
 
-- Anti-SPEC relevante: NÃO logar senhas/tokens; NÃO armazenar senha em texto claro.
-- Arquivos proibidos: `docs/specs/SPEC.md`, tabela `users` (migration).
+- Anti-SPEC relevante: §10.1.1 não inventar/interpolar dado · §10.1.5 HTTP 200 ≠ sucesso · §10.4.23 nenhuma rede em teste de CI.
+- Arquivos proibidos: `docs/specs/SPEC.md`, `docs/product/*`, `docs/research/*`, schema canônico já existente.
 - Decisões operacionais aplicáveis (DECISIONS_LOG): L12, L18.
 
 ## 6. Próximos passos concretos
 
 > Em ordem. O agente que pegar pode executar.
 
-1. Rodar `npm test -- auth.login` e confirmar que CA-001 falha do jeito esperado.
-2. Implementar `apps/api/src/auth/login.ts` usando schema de `auth.ts`.
-3. Atualizar matriz de validação no Feature Contract.
-4. Rodar CI N2 local (`npm run ci:n2`).
-5. Abrir PR + Prompt 3 (QA Validation Mode).
+1. Rodar `pytest tests/unit/test_sgs.py` e confirmar que CA-001 falha do jeito esperado.
+2. Implementar `apps/pipeline/extract/sgs.py` usando o schema de `packages/shared/schemas/`.
+3. Atualizar matriz de validação + evidência de dados no Feature Contract.
+4. Rodar o CI local do nível alvo (`ruff check . && ruff format --check . && pytest tests/unit`; N2 inclui `pytest tests/integration tests/contract`).
+5. Abrir PR + Prompt 3 (QA Validation Mode de dados).
 
 ## 7. Decisões abertas (precisa humano)
 
@@ -77,10 +79,10 @@
 
 > Para passar de Claude → Codex → Cursor sem perder contexto.
 
-- **De:** Claude Code (sessão YYYY-MM-DD HH:MM)
-- **Para:** [Codex | Cursor | Claude Code amanhã]
-- **Última ação:** [ex: criei Zod schema, abri branch, escrevi teste falhando]
-- **O que NÃO fiz e o próximo deveria evitar:** [ex: não tentei subir em staging — tem env faltando; não mexi em `users.ts` — escopo proíbe]
+- **De:** [subagente Opus / Claude Code] (sessão YYYY-MM-DD HH:MM)
+- **Para:** [próximo subagente Opus | Fable | a sessão de amanhã]
+- **Última ação:** [ex: gravei a fixture da fonte, abri branch, escrevi teste falhando]
+- **O que NÃO fiz e o próximo deveria evitar:** [ex: não conferi o valor-canário na fonte; não mexi no schema canônico — escopo proíbe]
 
 ---
 

@@ -38,10 +38,10 @@
 - [ ] Classificação de risco A/B/C/D confirmada.
 - [ ] Arquivos prováveis de alteração listados.
 - [ ] Testes esperados listados (unit / integration / e2e / smoke).
-- [ ] Contratos Zod necessários identificados (ou decisão explícita de que não precisa).
-- [ ] Dependências externas/services identificados.
-- [ ] Impacto em banco avaliado (migration necessária? destrutiva?).
-- [ ] Impacto em produção avaliado (rollback? staging? feature flag?).
+- [ ] Contratos `pydantic` + `pandera` necessários identificados (ou decisão explícita de que não precisa).
+- [ ] Fontes externas identificadas, com **fixture gravada** em `tests/fixtures/`.
+- [ ] Impacto na **camada canônica** avaliado (altera schema, alinhamento temporal ou cálculo de retorno? → classe C).
+- [ ] Impacto em **publicação** avaliado (número sai para o Comitê? exige dataset congelado + Rollback em `docs/plans/infra-ops.md`? → classe D).
 
 ---
 
@@ -54,12 +54,12 @@
 
 ## Escopo incluído
 
-- [bullet concreto: "POST /auth/login retornando JWT em cookie httpOnly"]
+- [bullet concreto: "extrator do BCB SGS gravando IPCA, Selic e CDI em `data/raw/sgs/`, validado por pandera"]
 - ...
 
 ## Escopo excluído (não será feito nesta feature)
 
-- [bullet concreto: "Não adiciona 2FA — fica para F-0XX"]
+- [bullet concreto: "Não agrega para trimestral nem entra no canônico — fica para F-014"]
 - ...
 
 ---
@@ -68,27 +68,28 @@
 
 ### Arquivos que podem ser alterados
 
-- `apps/api/src/auth/login.ts`
-- `apps/web/src/routes/login.tsx`
-- `packages/shared/types/auth.ts`
-- `tests/integration/auth.login.test.ts`
+- `apps/pipeline/extract/sgs.py`
+- `apps/pipeline/transform/alinhamento.py`
+- `packages/shared/schemas/series_catalog.py` (**acréscimo** de campo; alteração de schema existente = pausa)
+- `tests/unit/test_sgs.py` · `tests/fixtures/sgs/ipca.json`
 
 ### Arquivos que NÃO podem ser alterados
 
-- `docs/specs/SPEC.md` (sem autorização humana)
+- `docs/product/ESCOPO-EMAIL-ALEXANDRE.md` (imutável)
+- `docs/specs/SPEC.md` (sem autorização humana), inclusive a **Anti-SPEC §10**
 - `docs/product/PRD.md`
-- Anti-SPEC (`SPEC.md §6`)
+- `docs/research/*` (arquivos de outros agentes)
 - Arquivos fora do escopo listado acima
 
 > **Regra v3.1 Validation Mode Patch:** qualquer alteração fora da lista "podem ser alterados" resulta em `BLOQUEADO — ARQUIVO FORA DO FEATURE CONTRACT` no QA, exceto se o agente apresentar **justificativa aceita** com 7 itens (arquivo, motivo, impacto, escopo, contrato, testes, reclassificação — ver `AGENTS.md §18`).
 >
-> Se a justificativa toca **produto, produção, banco, auth, pagamento ou dados sensíveis**, o agente pausa e pede confirmação humana. Nunca prossegue automaticamente.
+> Se a justificativa toca **produto, camada canônica, credencial/fonte paga ou entregável do Comitê**, o agente pausa e pede confirmação humana. Nunca prossegue automaticamente.
 
 ---
 
 ## Contratos
 
-- [ ] Contratos Zod já existem em `packages/shared/types/` — **sim**, especificamente: `LoginInput`, `LoginResponse`.
+- [ ] Contratos já existem em `packages/shared/schemas/` — **sim**, especificamente: `ExtractorConfig` (pydantic), `RawSeriesSchema` (pandera).
 - [ ] Contratos a **criar/atualizar**: [lista]
 - [ ] `CONTRACTS.md` precisa ser atualizado? **[sim/não]** — justifique.
 
@@ -102,18 +103,18 @@
 >
 > - **A:** teste opcional se a mudança é realmente isolada; senão vira B.
 > - **B:** ≥1 teste por CA (unit ou integration).
-> - **C:** ≥1 teste por CA crítico + ≥1 edge case + ≥1 teste negativo + integration obrigatório se há API/auth/regra/dados + e2e se toca fluxo principal + build.
-> - **D:** integration quando aplicável + smoke + staging + rollback + migration validation + envs + e2e/manual evidenciado.
+> - **C:** ≥1 teste por CA crítico + ≥1 edge case + ≥1 teste negativo + integration/contract obrigatório sobre fixture + **diff numérico** vs. o canônico anterior + reconstrução completa.
+> - **D:** integration quando aplicável + **smoke do pacote** + **dataset congelado** (versão + hash) + Rollback em `docs/plans/infra-ops.md` + duas execuções com o mesmo hash + e2e/manual evidenciado.
 >
-> Testes "fake" (`expect(true).toBe(true)`, teste que só renderiza, teste que mocka a regra sob validação) **não contam** — o Prompt 3 rejeita.
+> Testes "fake" (`assert True`, teste que só confirma que a função rodou, teste que mocka a regra sob validação, `len(df) > 0` sem contagem esperada) **não contam** — o Prompt 3 rejeita.
 
 | Teste | Tipo | Cobre CA | Arquivo |
 |---|---|---|---|
-| `login com credenciais válidas retorna 200 + cookie` | integration | CA-001 | `tests/integration/auth.login.test.ts` |
-| `login com senha errada retorna 401 INVALID_CREDENTIALS` | integration negativo | CA-002 | idem |
-| `rate limit 5/min/IP` | integration | CA-003 | idem |
-| `login com payload sem campo email retorna 400` | integration edge case | CA-001 | idem |
-| `fluxo login na UI` | e2e (classe C/D) | CA-001 | `tests/e2e/login.spec.ts` |
+| `extrator devolve as 5 séries com o shape esperado` | unit sobre fixture | CA-001 | `tests/unit/test_sgs.py` |
+| `HTTP 200 com corpo de erro levanta e não grava` | unit negativo | CA-002 | idem |
+| `valor-canário confere (CDI 2006 = 15,0271%)` | contract | CA-003 | `tests/contract/test_valores_canario.py` |
+| `trimestre que termina em feriado usa o último dia útil` | unit edge case | CA-004 | `tests/unit/test_alinhamento.py` |
+| `pipeline do zero duas vezes gera o mesmo hash` | e2e (classe C/D) | CA-005 | `tests/e2e/test_reprodutibilidade.py` |
 
 ---
 
@@ -121,24 +122,24 @@
 
 **Nível CI alvo:** [N1 | N2 | N3] — derivado da classe de risco.
 
-- `npm run lint`
-- `npm run typecheck`
-- `npm test`
-- `npm run test:integration`  *(a partir de N2)*
-- `npm run test:e2e`          *(a partir de N3)*
-- `npm run build`             *(a partir de N2)*
+- `ruff check .`
+- `ruff format --check .`
+- `pytest tests/unit`
+- `pytest tests/integration tests/contract`   *(a partir de N2)*
+- `pytest tests/e2e -m "not network"`         *(a partir de N3)*
+- build do canônico do zero (`python -m pipeline.build_canonical`)  *(a partir de N2)*
 
 ---
 
-## Infra / Produção (só para classes C e D)
+## Dados / Publicação (só para classes C e D)
 
-- **Migration necessária?** [sim/não] — se sim: `infra/supabase/migrations/NNNN_nome.sql`
-- **Migration é destrutiva?** [sim/não] — se sim, descreva backup plan.
-- **Precisa Cursor Agent via MCP?** [sim/não] — se sim, seção correspondente em `docs/plans/cursor-brief.md`.
-- **Env vars novas?** [lista]
-- **Staging obrigatório?** [sim/não] — para classe D, sempre sim.
-- **Feature flag?** [sim/não] — sim se altera contrato público ou rollout gradual.
-- **Rollback plan (≤5 linhas):**
+- **Altera schema do canônico?** [sim/não] — se sim: qual tabela e quais colunas; o espelho `docs/contracts/CONTRACTS.md` precisa ser atualizado.
+- **Exige reconstrução completa de `data/canonical/`?** [sim/não] — para classe C, sempre sim.
+- **Diff numérico vs. a versão anterior anexado?** [sim/não] — cada divergência explicada, não só "melhorou".
+- **Usa credencial ou fonte paga?** [sim/não] — se sim, **classe D** e seção própria em `docs/plans/infra-ops.md`.
+- **Número sai para o Alexandre/Comitê?** [sim/não] — se sim: **dataset congelado** (versão + hash) + revisão humana + linha em `docs/wiki/log.md`.
+- **Revisão numérica independente feita por quem?** [subagente/humano — nunca quem calculou]
+- **Rollback plan (≤5 linhas, obrigatório em D — espelhado em `docs/plans/infra-ops.md`):**
   1. [passo]
   2. [passo]
 
@@ -150,18 +151,19 @@
 
 | CA | Teste | Tipo | Status | Evidência (comando/arquivo/log) |
 |---|---|---|---|---|
-| CA-001 | `auth.login.test.ts` | integration | [passou/falhou/não coberto] | `npm test -- auth.login` log |
-| CA-002 | idem | integration | — | — |
-| CA-003 | idem | integration | — | — |
+| CA-001 | `test_sgs.py::test_shape` | unit | [passou/falhou/não coberto] | `pytest tests/unit/test_sgs.py` log + nº de linhas e `min`/`max` de data |
+| CA-002 | idem | unit negativo | — | — |
+| CA-003 | `test_valores_canario.py` | contract | — | 3 valores conferidos na fonte (print/link) |
 
 ---
 
 ## Anti-SPEC — checagem específica
 
-Para classes C e D, o agente **lista explicitamente** quais itens da Anti-SPEC (`SPEC.md §6`) são mais relevantes para esta feature, e confirma no QA que nenhum foi violado.
+Para classes C e D, o agente **lista explicitamente** quais itens da Anti-SPEC (`SPEC.md §10`) são mais relevantes para esta feature, e confirma no QA que nenhum foi violado.
 
-- [ ] NÃO logar senhas/tokens/PII.
-- [ ] NÃO permitir admin alterar senha de outros usuários.
+- [ ] NÃO inventar, interpolar ou estimar dado para fechar série (§10.1.1).
+- [ ] NÃO misturar dado real e sintético sem coluna de origem (§10.1.2).
+- [ ] NÃO aceitar HTTP 200 sem validar shape (§10.1.5); NÃO usar fonte paga no caminho crítico (§10.3.14).
 - [ ] [item específico desta feature]
 
 ---
@@ -176,11 +178,11 @@ O agente pode prosseguir automaticamente enquanto:
 - A classe não precisou subir (ver auto-reclassificação em `AGENTS.md §16`).
 
 O agente **deve pausar** se:
-- Precisar alterar arquivo fora da lista permitida **e** a alteração toca produto/produção/banco/auth/pagamento/dados sensíveis (se for operacional sem risco, aplica-se o fluxo de justificativa — `AGENTS.md §18`).
+- Precisar alterar arquivo fora da lista permitida **e** a alteração toca produto/camada canônica/credencial/entregável do Comitê (se for operacional sem risco, aplica-se o fluxo de justificativa — `AGENTS.md §18`).
 - Um CA novo surgir (mudança de escopo).
 - Encontrar conflito entre código existente e SPEC.
 - Classe estimada era A/B e precisa subir para C/D (reclassifique primeiro).
-- Qualquer operação de produção/infra real (classe D).
+- Qualquer publicação de número ou uso de credencial (classe D).
 
 O agente **deve retornar BLOQUEADO** se:
 - DoR está incompleta e a lacuna toca domínio sensível → `BLOQUEADO — DEFINITION OF READY INCOMPLETA`.

@@ -54,9 +54,12 @@ S-09, S-10, S-11, S-12**) são operacionais e podem ser aceitas por e-mail, sem 
 - [2026-10-10] [deps] **`openpyxl`, `lxml` e `matplotlib` adicionados ao `pyproject`** — motivo: eram
   caminho crítico (ANBIMA IMA, Curva Zero, heatmap) e só funcionavam por existirem no Python global —
   impacto: `uv sync --extra dev` passa a entregar ambiente completo — ref: `skills-manifest §4`
-- [2026-10-10] [deps] **`yfinance` ainda não adicionado** — motivo: virou caminho crítico (plano B do
-  FRED), mas a lib é frágil (rate limit disfarçado, `auto_adjust` mudou de default) e o `chart/v8` direto
-  já funciona com UA de browser — impacto: decidir em F-007/F-011 e voltar aqui — ref: `skills-manifest §4`
+- [2026-10-10] [deps] **`yfinance>=0.2.50` adicionado ao `pyproject` — DECIDIDO** — motivo: **FRED
+  bloqueado nesta máquina, confirmado 3/3** nos testes de conectividade, e o Yahoo é o plano B do
+  contexto externo (`^TNX`, `^FVX`, `^VIX`, `DX-Y.NYB`, `^GSPC`) — impacto: a lib é frágil (rate limit
+  disfarçado, `auto_adjust` mudou de default), então F-007/F-011 mantêm a chamada direta ao `chart/v8`
+  com UA de browser como fallback e passam `auto_adjust` explicitamente — ref: `skills-manifest §4` /
+  F-007, F-011
 - [2026-10-10] [fontes] **Playwright é diagnóstico, nunca fonte de pipeline** — motivo: as páginas da B3 e
   do ANBIMA Data são shells Angular (~2 KB, só `<app-root>`) — impacto: scraping de HTML não funciona; o
   caminho é sempre a API. Virar fonte → pausa + ADR — ref: `skills-manifest §1` cap. 15, RO-7

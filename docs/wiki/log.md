@@ -32,7 +32,7 @@ Uma linha por evento. Frase curta com data ISO, tipo, contexto, link com fonte (
 - `DECISION` — referência a entrada nova no DECISIONS_LOG ou ADR
 - `RECLASSIFY` — feature mudou de classe durante execução
 - `BLOQUEADO` — agente retornou BLOQUEADO; resolvido em… 
-- `VALIDATION` — validação de produção (smoke, staging, migration)
+- `VALIDATION` — validação de publicação (smoke do pacote, dataset congelado, reprodutibilidade)
 - `WIKI` — manutenção da própria wiki (lint, repair, mover página)
 - `HOUSEKEEPING` — manutenção do repo fora da wiki (deps, README, docs de plano)
 - `HARNESS` — marco de fase do harness (kickoff, research, PRD, SDD, agents-protocol)
@@ -50,6 +50,7 @@ Uma linha por evento. Frase curta com data ISO, tipo, contexto, link com fonte (
 - [2026-10-10] [HOUSEKEEPING] `README.md` reescrito para o estado real (149 linhas): o que é o projeto, prazo 2026-10-14, estrutura de pastas conferida no disco, setup (`uv sync --extra dev`; jupyter via `python -m jupyter lab`), ondas do PLAN, mapa de 10 documentos, as 8 decisões pendentes com link ao `TODO.md §4` e o estado "harness estruturado; nenhum extrator implementado" — ref: `README.md`
 - [2026-10-10] [WIKI] `/wiki lint` → **amarelo**: `modules/` e `runbooks/` prometidos no índice estavam **vazios**; `index.md` não linkava SPEC, CONTRACTS, PLAN, ADRs, skills-manifest nem DECISIONS_LOG (que não existia); `overview.md §8` ainda dizia "próximo passo: `/SDD-avancado`" (já feito) e marcava a SPEC como "a criar"; `index.md` com 103 linhas (alvo ≤ 80). Nenhuma página órfã; único link quebrado era o placeholder `ADR-NNN-...` de `runbooks/_TEMPLATE.md` (esperado) — ref: lint 2026-10-10
 - [2026-10-10] [WIKI] `/wiki repair` aplicado — criadas 7 páginas em `modules/` (`sgs`, `sidra`, `anbima`, `b3`, `internacional`, `canonical`, `regimes`, ≤ 39 linhas cada) com propósito, séries/RFs, fonte primária e fallback, armadilhas da pesquisa e features do TODO; criados `runbooks/reconstruir-dataset.md` (60) e `runbooks/fonte-fora-do-ar.md` (60); `index.md` reduzido a 78 linhas com todos os links conferidos; `overview.md §8` e seção de links atualizadas — ref: `docs/wiki/`
+2026-10-10 | CONSOLIDAÇÃO | inconsistências pós-agents-protocol corrigidas (PLAN dias da semana, branch main, risk-classification e templates adaptados a dados, TODO §1 populado, yfinance)
 2026-10-10 | HARNESS | estruturação completa: kickoff → research → PRD → SDD → agents-protocol; 0 código de pipeline; aguardando 8 decisões
 2026-10-10 | SDD | SPEC + Anti-SPEC + contratos pandera/pydantic + TODO com 40 features + 6 ADRs propostos
 2026-10-10 | PRD | docs/product/PRD.md v1 gerado em modo autônomo a partir do e-mail + research; 8 decisões pendentes

@@ -16,9 +16,9 @@
 
 - [x] **Repositório git existe** (`git init` feito; 3 commits de documentação em 2026-10-10). Sem git não
       haveria tag, `git diff` nem rastreabilidade de versão — e **nenhuma classe D seria possível**.
-- [ ] ⚠️ **Branch padrão é `master`, mas o CI (`.github/workflows/ci.yml`) dispara em `main`** e
-      `AGENTS.md §10` fala em `main`. Renomeie (`git branch -m master main`) **antes** da primeira entrega,
-      ou o CI nunca roda — e classe D sem CI N3 verde é `BLOQUEADO`.
+- [x] **Branch padrão é `main`** — resolvido em 2026-10-10 (renomeada de `master`;
+      `git branch --show-current` → `main`). Alinhada ao CI (`.github/workflows/ci.yml`) e a
+      `AGENTS.md §10`.
 - [ ] `uv sync` (ou venv + `pip install -e ".[dev]"`) com CI N1 verde localmente.
 - [ ] `.gitignore` cobrindo `data/`, `*.parquet`, `*.duckdb`, `.env`.
 - [ ] `docs/plans/DECISIONS_LOG.md` existente (F-032) — o pacote é enviado **com** o texto das

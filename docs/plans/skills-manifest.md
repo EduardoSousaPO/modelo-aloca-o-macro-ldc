@@ -126,9 +126,11 @@ que lê os arquivos da ANBIMA e desenha o heatmap:**
   `matplotlib` puro com a paleta da skill `dataviz`.
 - **`xlrd`** → **não adicionar.** Nenhum arquivo do projeto é XLS/BIFF real: o magic bytes do S3 da ANBIMA
   veio `PK\x03\x04` nesta sessão. Só entra se aparecer um XLS legado — e aí vira linha no `DECISIONS_LOG`.
-- ⏳ **`yfinance`** → **única dep ainda pendente.** Virou **caminho crítico** (é o plano B do FRED).
-  Adicionar com versão fixada, ou trocar por chamada direta ao `chart/v8` (que já funciona com UA de
-  browser e é menos frágil que a lib) — decidir em F-007/F-011 e registrar no `DECISIONS_LOG`.
+- ✅ **`yfinance>=0.2.50`** → **adicionado e decidido** em 2026-10-10. Virou **caminho crítico** (é o
+  plano B do FRED): **FRED bloqueado nesta máquina, confirmado 3/3** nos testes de conectividade
+  (§3). Entra com piso de versão; a chamada direta ao `chart/v8` com UA de browser continua como
+  fallback dentro de F-007/F-011 se a lib falhar (rate limit disfarçado). Registrado em
+  `DECISIONS_LOG §2`.
 
 **FRED exige plano B? Sim — obrigatório nesta máquina.** Mapeamento direto:
 `DGS10`→`^TNX`, `DGS2`/`DGS5`→`^FVX`, `VIXCLS`→`^VIX`, `DTWEXBGS`→`DX-Y.NYB`, `DEXBZUS`→**BCB SGS 1/10813

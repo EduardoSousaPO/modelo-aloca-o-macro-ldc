@@ -10,8 +10,9 @@
 **Fase:** SPEC + Anti-SPEC + contratos (pandera/pydantic) prontos · **40 features mapeadas** ·
 execução pode começar pelos extratores (classe B) sem esperar as 8 decisões bloqueantes
 **Tipo:** ferramenta interna (dados / quant — não SaaS, não web, roda local)
-**Foco atual:** **F-009** (job diário ANBIMA — cada dia sem ele é série perdida) e
-**F-001 → F-008** (extratores de esforço baixo, caminho crítico de 2026-10-14)
+**Foco atual:** §1 Em andamento = **F-009** (job diário ANBIMA — cada dia sem ele é série perdida)
+e **F-001** (infra de extração, pré-requisito de todos os extratores). Em seguida, **F-002 → F-008**
+(extratores de esforço baixo, caminho crítico de 2026-10-14)
 
 ---
 
@@ -56,7 +57,65 @@ qualquer mudança na camada canônica — ver `AGENTS.md §2`.
 
 > Máximo 2 itens simultâneos. Se tiver mais, você está dispersando.
 
-*(vazio — mova F-009 e F-001 para cá ao iniciar a Onda 0, conforme `docs/plans/PLAN.md`)*
+### [ ] F-009 — Job diário de arquivamento ANBIMA (`Msec_txt.txt` + Curva Zero) — **URGENTE, HOJE**
+
+- **Risco:** B · **CI alvo:** N1 · **Branch:** `data/anbima-arquivamento`
+- **Cobre:** RF-010 · e-mail: **A5, A6**
+- **CAs da SPEC:** CA-027, CA-028, CA-029
+- **Por que é a primeira:** a janela é **rolante (~20 dias úteis)**. Cada dia sem o job é um dia de série
+  proprietária **perdido para sempre** (riscos L6/R3). Não depende de nenhuma decisão humana.
+
+**DoR específica** — [x] URLs e formatos confirmados (`ms{AAMMDD}.txt`, POST `CZ-down.asp`);
+[x] `ausencia_e_caso_normal = True` previsto no `ExtractorConfig`; [x] sem bloqueio.
+
+**Escopo incluído:** download idempotente diário, gravação versionada por data em
+`data/raw/anbima-ms/` e `data/raw/anbima-ettj/`, parse mínimo de validação, log de dia ausente.
+**Excluído:** uso dessas séries no canônico (a curva histórica vem do Tesouro — ADR-004);
+agendador do sistema (o Edu dispara; não há cron no projeto).
+
+**Arquivos:** `apps/pipeline/extract/anbima_diario.py`, `tests/unit/test_anbima_diario.py`,
+`tests/fixtures/anbima/ms261008.txt`, `tests/fixtures/anbima/cz.csv`,
+`docs/wiki/runbooks/arquivamento-diario-anbima.md`.
+
+| Teste | Tipo | Cobre CA |
+|---|---|---|
+| rodar 2x no mesmo dia não duplica nem sobrescreve diferente | integration | CA-027 |
+| resposta de 0 bytes / 404 → sucesso com registro | unit negativo | CA-028 |
+| parse do `ms*.txt` (`@`, `skiprows=2`, latin-1, 5 títulos) | contract | CA-029 |
+| `saida=xls` do CZ é HTML → rejeitado por magic bytes | unit negativo | CA-029 |
+
+**Anti-SPEC específica:** §10.1.3 (janela rolante nunca é backfill), base.
+
+---
+
+### [ ] F-001 — Infra de extração (cliente HTTP, parsing e guardas)
+
+- **Risco:** B · **CI alvo:** N1 · **Branch:** `feat/infra-extracao`
+- **Cobre:** RF-049 (e é pré-requisito dos riscos R1, R2, R4, R10-R13 da pesquisa) · e-mail: base de A/B/C
+- **CAs da SPEC:** CA-003, CA-022, CA-035, CA-045, CA-123, CA-124
+
+**DoR específica** — [x] fontes e pegadinhas levantadas em `docs/research/fontes-de-dados.md`;
+[x] `ExtractorConfig` já existe em `packages/shared/schemas/series_catalog.py`; [x] sem bloqueio humano.
+
+**Escopo incluído:** cliente HTTP com **User-Agent de browser** em toda requisição, retry com backoff,
+timeout; **validador de shape** (corpo é JSON array? tem chave `error`/`erro`? começa com `<`?);
+**normalizador único de número pt-BR** (`"38.484,84"` → `38484.84`); leitor com **encoding explícito**
+por fonte; checagem de **magic bytes** (`PK` = XLSX, `<` = HTML); helper de fatiamento de janela
+(≤ 10 anos); gravação em `data/raw/<fonte>/` e `data/processed/`.
+**Excluído:** cache condicional por ETag (→ F-030); qualquer extrator concreto.
+
+**Arquivos:** `apps/pipeline/extract/http.py`, `.../parsing.py`, `.../io_layers.py`,
+`tests/unit/test_http.py`, `tests/unit/test_parsing.py`.
+
+| Teste | Tipo | Cobre CA |
+|---|---|---|
+| HTTP 200 com corpo de erro → levanta e não grava | unit negativo | CA-003 |
+| número pt-BR com ponto de milhar converte certo | unit | CA-035 |
+| `.xls` que é XLSX é detectado por magic bytes | unit | CA-030 (pré) |
+| leitor sem `encoding` explícito falha no lint do próprio teste | unit | CA-022 |
+| requisição sem UA é bloqueada por asserção do cliente | unit | CA-045 |
+
+**Anti-SPEC específica:** §10.1.5 (HTTP 200 ≠ sucesso), §10.4.26 (encoding), §10.4.23 (sem rede no CI).
 
 ---
 
@@ -110,37 +169,6 @@ divergência explicada + reconstrução completa de `data/canonical/`.
 ---
 
 ## PACOTE MÍNIMO — caminho crítico para 2026-10-14
-
-### [ ] F-001 — Infra de extração (cliente HTTP, parsing e guardas)
-
-- **Risco:** B · **CI alvo:** N1 · **Branch:** `feat/infra-extracao`
-- **Cobre:** RF-049 (e é pré-requisito dos riscos R1, R2, R4, R10-R13 da pesquisa) · e-mail: base de A/B/C
-- **CAs da SPEC:** CA-003, CA-022, CA-035, CA-045, CA-123, CA-124
-
-**DoR específica** — [x] fontes e pegadinhas levantadas em `docs/research/fontes-de-dados.md`;
-[x] `ExtractorConfig` já existe em `packages/shared/schemas/series_catalog.py`; [x] sem bloqueio humano.
-
-**Escopo incluído:** cliente HTTP com **User-Agent de browser** em toda requisição, retry com backoff,
-timeout; **validador de shape** (corpo é JSON array? tem chave `error`/`erro`? começa com `<`?);
-**normalizador único de número pt-BR** (`"38.484,84"` → `38484.84`); leitor com **encoding explícito**
-por fonte; checagem de **magic bytes** (`PK` = XLSX, `<` = HTML); helper de fatiamento de janela
-(≤ 10 anos); gravação em `data/raw/<fonte>/` e `data/processed/`.
-**Excluído:** cache condicional por ETag (→ F-030); qualquer extrator concreto.
-
-**Arquivos:** `apps/pipeline/extract/http.py`, `.../parsing.py`, `.../io_layers.py`,
-`tests/unit/test_http.py`, `tests/unit/test_parsing.py`.
-
-| Teste | Tipo | Cobre CA |
-|---|---|---|
-| HTTP 200 com corpo de erro → levanta e não grava | unit negativo | CA-003 |
-| número pt-BR com ponto de milhar converte certo | unit | CA-035 |
-| `.xls` que é XLSX é detectado por magic bytes | unit | CA-030 (pré) |
-| leitor sem `encoding` explícito falha no lint do próprio teste | unit | CA-022 |
-| requisição sem UA é bloqueada por asserção do cliente | unit | CA-045 |
-
-**Anti-SPEC específica:** §10.1.5 (HTTP 200 ≠ sucesso), §10.4.26 (encoding), §10.4.23 (sem rede no CI).
-
----
 
 ### [ ] F-002 — Extrator ANBIMA S3: índices IMA (esforço baixo, maior valor/hora)
 
@@ -347,37 +375,6 @@ mapeado; [x] sem decisão humana pendente.
 | datas-armadilha (01/02 vs 02/01, Carnaval, 31/12 no fim de semana) | unit | CA-052 |
 
 **Anti-SPEC específica:** base.
-
----
-
-### [ ] F-009 — Job diário de arquivamento ANBIMA (`Msec_txt.txt` + Curva Zero) — **URGENTE, HOJE**
-
-- **Risco:** B · **CI alvo:** N1 · **Branch:** `data/anbima-arquivamento`
-- **Cobre:** RF-010 · e-mail: **A5, A6**
-- **CAs da SPEC:** CA-027, CA-028, CA-029
-- **Por que é a primeira:** a janela é **rolante (~20 dias úteis)**. Cada dia sem o job é um dia de série
-  proprietária **perdido para sempre** (riscos L6/R3). Não depende de nenhuma decisão humana.
-
-**DoR específica** — [x] URLs e formatos confirmados (`ms{AAMMDD}.txt`, POST `CZ-down.asp`);
-[x] `ausencia_e_caso_normal = True` previsto no `ExtractorConfig`; [x] sem bloqueio.
-
-**Escopo incluído:** download idempotente diário, gravação versionada por data em
-`data/raw/anbima-ms/` e `data/raw/anbima-ettj/`, parse mínimo de validação, log de dia ausente.
-**Excluído:** uso dessas séries no canônico (a curva histórica vem do Tesouro — ADR-004);
-agendador do sistema (o Edu dispara; não há cron no projeto).
-
-**Arquivos:** `apps/pipeline/extract/anbima_diario.py`, `tests/unit/test_anbima_diario.py`,
-`tests/fixtures/anbima/ms261008.txt`, `tests/fixtures/anbima/cz.csv`,
-`docs/wiki/runbooks/arquivamento-diario-anbima.md`.
-
-| Teste | Tipo | Cobre CA |
-|---|---|---|
-| rodar 2x no mesmo dia não duplica nem sobrescreve diferente | integration | CA-027 |
-| resposta de 0 bytes / 404 → sucesso com registro | unit negativo | CA-028 |
-| parse do `ms*.txt` (`@`, `skiprows=2`, latin-1, 5 títulos) | contract | CA-029 |
-| `saida=xls` do CZ é HTML → rejeitado por magic bytes | unit negativo | CA-029 |
-
-**Anti-SPEC específica:** §10.1.3 (janela rolante nunca é backfill), base.
 
 ---
 
@@ -1152,7 +1149,7 @@ trimestre anterior. Sem dashboard hospedado (fora de escopo). CI N1.
       *Recomendação: Tesouro Direto — tecnicamente defensável sem comprar o Feed; registrar em DECISIONS_LOG
       e comunicar ao Alexandre.*
       → **ADR-004** (Proposta) · features afetadas: **F-005, F-016** (vira **classe D** se o Feed for
-      contratado), **F-009, F-032**
+      contratado), **F-009**
 
 **Não bloqueantes** (17 decisões D2/D4/D7-D11 e lacunas L3/L5-L13 + 7 gaps "a confirmar") estão em
 `docs/product/PRD.md §13.3` e §13.4 com a recomendação adotada por padrão — podem ser decididas durante a
@@ -1163,7 +1160,7 @@ execução, sem travar o início.
 > com o humano/Alexandre e siga em outra coisa.
 
 **O que NÃO está bloqueado** (pode começar agora, sem nenhuma das 8 respostas): **F-001 a F-011** e
-**F-013, F-014, F-015, F-017, F-018, F-029, F-030, F-032** — extração e camada canônica. As features de
+**F-013, F-014, F-015, F-017, F-018, F-029, F-030** — extração e camada canônica. As features de
 regime/visualização (**F-016, F-019 a F-026**) carregam a decisão como **item de DoR** e podem ser
 implementadas com o padrão provisório, mas **não publicadas** sem ADR aceito.
 

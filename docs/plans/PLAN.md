@@ -82,7 +82,7 @@ valor-canário verde e **3 valores conferidos contra a fonte** registrados na ma
 
 ---
 
-### Onda 2 — domingo à noite e segunda 2026-10-12/13, manhã · **camada canônica (classe C)**
+### Onda 2 — domingo à noite e segunda 2026-10-12, manhã · **camada canônica (classe C)**
 
 **Objetivo:** `macro_quarterly` com 83 trimestres e `asset_returns_quarterly` com ≥ 18 ativos, validados
 por pandera e com diff numérico explicado.
@@ -106,7 +106,7 @@ ativos; painel desbalanceado correto (nenhuma linha antes do início de cada sé
 
 ---
 
-### Onda 3 — segunda 2026-10-13, manhã · **regimes V1 + V3 (classe C)**
+### Onda 3 — terça 2026-10-13, manhã · **regimes V1 + V3 (classe C)**
 
 **Objetivo:** cada um dos 83 trimestres classificado e os vizinhos calculados.
 
@@ -118,12 +118,12 @@ ativos; painel desbalanceado correto (nenhuma linha antes do início de cada sé
 | 4 | **F-022** métricas por regime × ativo | C | insumo do heatmap |
 
 **Gate importante:** o número só é **publicável** com **ADR-001 aceito** (RF-031/CA-090). Sem resposta de
-D1/D3 até segunda, a execução segue com o padrão provisório e o pacote vai ao Edu marcado
+D1/D3 até terça, a execução segue com o padrão provisório e o pacote vai ao Edu marcado
 "especificação não congelada".
 
 ---
 
-### Onda 4 — segunda 2026-10-13, tarde · **visualização + revisão do Edu**
+### Onda 4 — terça 2026-10-13, tarde · **visualização + revisão do Edu**
 
 | Ordem | Feature | Classe |
 |---|---|---|
@@ -134,14 +134,14 @@ D1/D3 até segunda, a execução segue com o padrão provisório e o pacote vai 
 | 5 | **F-029** orquestrador "um comando" + idempotência | C |
 | 6 | **F-030** testes de contrato com valor-canário + cache | B |
 
-**Fim de segunda = marco de revisão humana.** O Edu recebe: heatmap, timeline, tabela de 1 página,
+**Fim de terça = marco de revisão humana.** O Edu recebe: heatmap, timeline, tabela de 1 página,
 `macro_quarterly`/`asset_returns_quarterly` e o relatório de saída do pipeline (linhas, min/max, % de
 nulos, hash). **A timeline é o sanity check**: se a classificação não "fizer sentido" para quem viveu o
-período, há tempo de corrigir na terça pela manhã.
+período, há tempo de corrigir na quarta pela manhã.
 
 ---
 
-### Onda 5 — terça 2026-10-14 · **entrega (classe D)**
+### Onda 5 — quarta 2026-10-14 · **entrega (classe D)**
 
 | Ordem | Feature | Classe |
 |---|---|---|
@@ -154,7 +154,7 @@ do número pelo Edu, com 3 valores conferidos por série → dataset **congelado
 `docs/plans/infra-ops.md` com **Rollback** → linha em `docs/wiki/log.md` → **comunicação escrita das
 substituições de fonte** (F-032) → envio.
 
-> **Sem ADR-001 aceito, o envio não é liberado pelo gate.** Se até terça-feira cedo D1/D3 não tiverem
+> **Sem ADR-001 aceito, o envio não é liberado pelo gate.** Se até quarta-feira cedo D1/D3 não tiverem
 > resposta, a saída é o Edu aceitar formalmente a recomendação da pesquisa (1 linha em cada ADR), o que
 > congela a especificação e destrava a publicação.
 
@@ -229,8 +229,8 @@ Ordem de corte (primeiro a cair está no topo). Tudo que cai vira item do pacote
 | Endpoint não documentado muda (B3, MSCI, S3) | Média × Alto | testes de contrato com valor-canário (F-030); fallbacks no catálogo |
 | Curva interpolada não conferida em tempo | Média × Médio | V3 com 5 features; inclinação fica fora da V1 |
 | `n` por quadrante desbalanceado | Alta × Médio | alerta automático (CA-080); `n` em toda célula |
-| Classificação "não faz sentido" na revisão de segunda | Média × Alto | timeline entregue **antes** do pacote; terça de manhã reservada para ajuste |
-| D1/D3 sem resposta até terça | Alta × Alto | Edu aceita formalmente a recomendação (1 linha nos ADRs) e o gate destrava |
+| Classificação "não faz sentido" na revisão de terça | Média × Alto | timeline entregue **antes** do pacote; quarta de manhã reservada para ajuste |
+| D1/D3 sem resposta até quarta | Alta × Alto | Edu aceita formalmente a recomendação (1 linha nos ADRs) e o gate destrava |
 | Dependência nova (shrinkage Ledoit-Wolf) | Média × Baixo | checar `scipy`/`scikit-learn`; se precisar instalar → **ADR** antes |
 
 ---
@@ -258,4 +258,4 @@ Ordem de corte (primeiro a cair está no topo). Tudo que cai vira item do pacote
 
 ---
 
-*Próximo passo: mover **F-009** e **F-001** para `TODO.md §1` e executar a Onda 0 hoje.*
+*Próximo passo: **feito** — **F-009** e **F-001** já estão em `TODO.md §1`; executar a Onda 0 hoje.*

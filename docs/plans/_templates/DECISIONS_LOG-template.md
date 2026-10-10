@@ -22,7 +22,7 @@ Use esta lista como filtro. Se a resposta for "sim" em ≥1 item, registre.
 
 ## Quando NÃO registrar
 
-- Fatos óbvios do código ou da stack ("usamos TypeScript").
+- Fatos óbvios do código ou da stack ("usamos pandas").
 - Coisas que pertencem ao PRD, SPEC ou Anti-SPEC — **essas continuam protegidas**, só mudam com autorização humana.
 - Decisões arquiteturais com trade-off real → **ADR**, não log.
 - Bugs, TODOs, ideias — vão no `TODO.md`.
@@ -44,10 +44,10 @@ Uma linha por decisão. Frase curta com data (ISO), contexto mínimo, decisão, 
 
 ## Decisões operacionais
 
-- [2026-04-12] [auth] mantivemos o endpoint `/v1/login-legacy` — motivo: 2 clientes externos ainda consomem — impacto: não remover sem aviso de 30 dias — ref: F-003 / PR #24
-- [2026-04-15] [deps] não adicionamos `zod-to-openapi` — motivo: escopo atual não gera OpenAPI — impacto: se surgir, avaliar reuso do schema — ref: F-005
-- [2026-04-18] [schema] campo `users.locale` continua opcional — motivo: decisão de produto (cliente aceita derivar do header `Accept-Language`) — impacto: cobrir fallback em teste de integração — ref: F-007
-- [2026-04-20] [ui] não implementamos skeleton loading no dashboard agora — motivo: overengineering para MVP — impacto: revisar depois do beta — ref: F-010
+- [2026-10-10] [fontes] série pedida X substituída por Y — motivo: a fonte pedida não é localizável/é paga — impacto: comparabilidade (declarar na página de limitações) — ref: F-0NN / PR #NN
+- [2026-10-10] [deps] não adicionamos `seaborn` — motivo: o heatmap é `matplotlib` puro — impacto: uma dep menos no `uv sync` — ref: F-023
+- [2026-10-10] [schema] coluna `fonte_versao` continua opcional em `data/processed/` — motivo: só o canônico exige — impacto: cobrir o default em teste `pandera` — ref: F-013
+- [2026-10-10] [convenção] trimestre = **fim de período** (último dia útil) — motivo: alinha macro e ativos sem look-ahead — impacto: toda agregação nova segue; mudar exige classe C — ref: F-014
 
 ---
 

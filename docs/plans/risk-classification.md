@@ -1,8 +1,8 @@
-# Risk Classification — Harness v3.1
+# Risk Classification — Harness v3.2
 
-> Toda feature é classificada A / B / C / D **antes** de começar. A classificação define o rigor do Feed Forward (Definition of Ready + Feature Contract) e do Feedback (CI por níveis, matriz de validação, staging/rollback).
+> Toda feature é classificada A / B / C / D **antes** de começar. A classificação define o rigor do Feed Forward (Definition of Ready + Feature Contract) e do Feedback (CI por níveis, matriz de validação, dataset congelado/rollback).
 >
-> **Escopo:** referência curta usada por `/SDD-avancado`, `/agents-protocol`, pelos prompts 1–3 e pelo `AGENTS.md`.
+> **Escopo:** referência curta usada por `/SDD-avancado`, `/agents-protocol`, pelos prompts 1–3 e pelo `AGENTS.md`. Projeto de **dados/quant que roda local**: não há deploy, servidor, banco real nem env de produção — o que existe de "produção" aqui é **publicar número para o Comitê**.
 
 ---
 
@@ -10,20 +10,20 @@
 
 | Classe | Exemplos | Feed Forward exigido | Feedback exigido |
 |---|---|---|---|
-| **A — Trivial** | typo, ajuste de cópia, layout pequeno, mudança isolada sem contrato | Item no `TODO.md` com 1 CA | CI Nível 1 (lint+typecheck+test) · `main` direto permitido |
-| **B — Normal** | nova tela, CRUD simples, ajuste de fluxo, endpoint não crítico | DoR completa + Feature Contract curto (bloco no TODO.md) | CI Nível 1 + matriz CA→teste→evidência · branch `feat/*` obrigatória |
-| **C — Crítica** | auth, autorização, pagamento, billing, permissões, dados sensíveis, webhooks, regra de negócio central | DoR + Feature Contract dedicado + Anti-SPEC revisada | CI Nível 2 (integration + contract tests) + matriz + revisão humana sugerida |
-| **D — Produção/Infra** | migration, RLS, deploy, env var, Stripe/MP, alteração em banco real, rollout público | DoR + Feature Contract + cursor-brief + plano de rollback + feature flag se muda contrato público | CI Nível 3 (E2E/smoke/migration validation) + staging obrigatório + smoke test pós-deploy |
+| **A — Trivial** | typo, docstring, título/cor de figura sem mudar o número, entrada de catálogo que ninguém consome | Item no `TODO.md` com 1 CA | CI Nível 1 (`ruff check` + `ruff format --check` + `pytest tests/unit`) · `main` direto permitido |
+| **B — Normal** | novo extrator de fonte, infra de extração, job de arquivamento, figura/tabela sobre número já validado | DoR completa + Feature Contract curto (bloco no TODO.md) + **fixture gravada** da fonte | CI Nível 1 + matriz CA→teste→evidência + evidência de dados (linhas, `min`/`max`, % de nulos, 3 valores conferidos na fonte) · branch `feat/*` ou `data/*` obrigatória |
+| **C — Crítica** | schema do canônico, alinhamento temporal, cálculo de retorno/deflação, série derivada que alimenta regime, classificação de regime, métricas do heatmap, orquestrador | DoR + Feature Contract dedicado + Anti-SPEC revisada | CI Nível 2 (integration + contract tests sobre fixture, `pandera` em todo DataFrame) + **diff numérico** vs. o canônico anterior + reconstrução completa + **revisão numérica independente** |
+| **D — Publicação/credencial** | enviar número ao Alexandre/Comitê, congelar e versionar o dataset entregue, usar credencial ou API paga, corrigir número já apresentado | DoR + Feature Contract + seção em `docs/plans/infra-ops.md` com **Rollback** | CI Nível 3 (e2e + duas execuções → mesmo hash) + **dataset congelado** (versão + hash) + revisão humana do número + smoke test do pacote |
 
 ---
 
 ## Como classificar (regras de desempate)
 
-1. Se toca **produção, banco real ou env vars reais** → **D**, não negociável.
-2. Se envolve **auth, dinheiro, permissões ou dados sensíveis** → **C**.
-3. Se cria/altera **contrato público** (rota, schema, evento) → mínimo **B** (C se crítico).
-4. Se é **código isolado** sem contrato, sem efeito visível em produção → **A**.
-5. Em dúvida entre duas classes, **escolha a mais alta**. Escalar é barato; rebaixar depois de um incidente é caro.
+1. Se o resultado **sai para fora** (Alexandre, Comitê, print por WhatsApp) ou se usa **credencial/fonte paga** → **D**, não negociável.
+2. Se toca a **camada canônica** — schema, alinhamento temporal, cálculo de retorno, definição ou classificação de regime → **C**.
+3. Se cria/altera **contrato de dados** (schema `pandera`/`pydantic`, coluna, `series_id` do catálogo) ou liga uma série nova no pipeline → mínimo **B** (C se entra no canônico).
+4. Se é mudança **isolada**, sem alterar nenhum valor de output → **A**.
+5. Em dúvida entre duas classes, **escolha a mais alta**. Escalar é barato; número errado no Comitê é caro.
 
 ---
 
@@ -33,26 +33,31 @@
 - Pode ir direto em `main` se o agente tem CI local verde e registro no TODO.
 - Dispensa Feature Contract.
 - Não precisa de matriz de validação formal — o teste unitário já é a evidência.
+- **Vira B no instante em que qualquer valor de output muda** ou em que uma série passa a ser consumida.
 
 ### Classe B
-- Branch `feat/<slug>` + PR.
+- Branch `feat/<slug>` (ou `data/<slug>`) + PR.
 - Feature Contract inline no item do `TODO.md` (ver template).
 - Matriz de validação simples: cada CA tem 1 teste identificado.
+- **Fixture gravada** da resposta real da fonte em `tests/fixtures/`; rede só sob `@pytest.mark.network`.
+- Evidência de dados: nº de linhas, `min`/`max` de data, % de nulos por coluna crítica e **3 valores conferidos contra a fonte** (print/link).
 
 ### Classe C
 - Idem B, mais:
   - Feature Contract dedicado (bloco detalhado no TODO ou arquivo em `docs/plans/feature-contracts/`).
-  - Testes de integração obrigatórios.
+  - Testes de integração/contrato obrigatórios sobre fixture, com `pandera` no DataFrame de entrada e de saída.
   - Anti-SPEC revisada especificamente para a feature (checagem explícita no Prompt 3).
-  - Revisão humana sugerida antes do merge (não só autorrevisão do Claude).
+  - **Reconstrução completa** de `data/canonical/` a partir de zero.
+  - **Diff numérico** vs. a versão anterior do canônico, com **cada** divergência explicada.
+  - **Revisão numérica independente** antes do merge: quem calculou **não** confere.
 
 ### Classe D
 - Idem C, mais:
-  - `cursor-brief.md` com seção **Rollback** obrigatória.
-  - Staging antes de produção — sem exceção.
-  - Smoke test automatizado ou script manual descrito no brief.
-  - Feature flag se altera contrato público ou rollout gradual.
-  - **Backup/restore plan** se a migration for destrutiva (DROP, ALTER TYPE incompatível, etc).
+  - Seção própria em `docs/plans/infra-ops.md` com **Rollback** obrigatória — sem ela, não sai.
+  - **Dataset congelado** antes do envio: hash por arquivo + hash agregado registrados, diretório nunca mais tocado.
+  - Smoke test do pacote evidenciado (abre no Excel, contagem de linhas, nulos em coluna crítica, paridade Parquet × CSV/XLSX).
+  - **Revisão humana do número** pelo Edu, com 3 valores conferidos por série.
+  - Linha em `docs/wiki/log.md` + comunicação escrita das substituições de fonte (`docs/plans/DECISIONS_LOG.md`).
   - ADR se há trade-off arquitetural real.
 
 ---
@@ -61,7 +66,7 @@
 
 - **Primeira passagem:** `/SDD-avancado` marca cada feature do TODO com a classe sugerida.
 - **Revisão contínua:** o desenvolvedor ou o Claude Code no **Prompt 2** valida a classe antes de começar — se a feature cresceu ou a natureza mudou, reclassifique **antes** de implementar.
-- **Escalada automática:** se durante a implementação uma feature B começa a tocar produção/banco/RLS, o agente deve **pausar**, reclassificar para D e pedir Feature Contract expandido.
+- **Escalada automática:** se durante a implementação uma feature B começa a tocar a **camada canônica** (schema, alinhamento, retorno, regime), o agente deve **pausar**, reclassificar para **C** e pedir Feature Contract expandido; se o resultado passa a sair para o Alexandre/Comitê ou a exigir credencial, vai para **D**.
 
 ---
 
@@ -70,10 +75,10 @@
 O Claude Code pode **continuar automaticamente** em features A e B sem pedir confirmação a cada passo, desde que dentro do escopo do Feature Contract.
 
 Para **C e D**, o agente **deve pausar** em marcos específicos:
-- Antes de tocar migration/RLS/env (qualquer classe D).
-- Antes de alterar rota/endpoint legado sem paridade de teste.
-- Antes de ativar feature flag em produção.
-- Antes de executar rollback ou smoke test manual.
+- Antes de alterar schema do canônico, regra de alinhamento temporal ou cálculo de retorno (qualquer classe C).
+- Antes de congelar o dataset ou gerar o pacote de entrega (qualquer classe D).
+- Antes de usar credencial ou qualquer fonte paga.
+- Antes de executar o rollback de uma versão já enviada, ou o smoke test manual do pacote.
 
 Regras completas de autonomia em `AGENTS.md §9`.
 
@@ -85,30 +90,30 @@ Regras completas de autonomia em `AGENTS.md §9`.
 
 ### Classe A — Trivial
 - Teste **opcional**, desde que a mudança seja realmente isolada e sem comportamento novo.
-- `lint` e `typecheck` **obrigatórios** se houve código.
-- **Se alterar comportamento observável → vira Classe B.**
+- `ruff check .` e `ruff format --check .` **obrigatórios** se houve código.
+- **Se alterar qualquer valor de output → vira Classe B.**
 
 ### Classe B — Normal
 - **≥1 teste por critério de aceite** (unit ou integration conforme natureza).
-- `lint + typecheck + test` obrigatórios.
-- `build` obrigatório se o projeto tem script de build.
+- `ruff` + `pytest tests/unit` obrigatórios.
+- **Fixture gravada** da resposta real da fonte; nenhum teste de rede fora de `@pytest.mark.network`.
+- **≥1 teste de caminho de erro**: HTTP 200 com corpo de erro, corpo vazio/0 bytes, encoding errado, HTML onde se esperava planilha.
 
 ### Classe C — Crítica
-- **≥1 teste por CA crítico** (auth, permissões, valores).
-- **≥1 teste de edge case** (input inválido, ausência de dados, estado vazio/erro).
-- **≥1 teste negativo** (permissão errada, token expirado, idempotência quebrada, etc.).
-- **Integration test obrigatório** quando envolve API, auth, regra de negócio ou dados.
-- **E2E obrigatório** se a feature toca o fluxo principal do usuário.
-- `build` obrigatório.
+- **≥1 teste por CA crítico** (alinhamento, acumulação geométrica, deflação, limiar de regime).
+- **≥1 teste de edge case** (feriado, fim de trimestre em fim de semana, série que começa depois de 2006, ausência de dado).
+- **≥1 teste negativo** (`ffill` além do limite, look-ahead, excesso sobre CDI por subtração em vez de razão).
+- **Integration/contract test obrigatório** sobre fixture quando toca fonte, schema `pandera` ou cálculo.
+- **Diff numérico** vs. o canônico anterior + **reconstrução completa** de `data/canonical/` do zero.
+- **Valor-canário** conhecido da fonte (ex.: CDI 2006 = 15,0271%) — não a fórmula reimplementada no teste.
 
-### Classe D — Produção / Infra
-- **Integration test** quando aplicável (ex.: validar migration com seed → query).
-- **Smoke test obrigatório** (script ou manual evidenciado com log).
-- **Validação em staging obrigatória** antes de produção — com print/log anexado.
-- **Rollback plan obrigatório** no `cursor-brief.md`.
-- **Migration validation** quando tocar banco (dry-run, diff de schema).
-- **Validação de env/secrets** quando aplicável (listar variáveis, confirmar presença).
-- **E2E automatizado ou teste manual evidenciado** se a automação ainda não existir — manual só vale com passos escritos + print/log.
+### Classe D — Publicação / credencial
+- **CI N3**: `pytest tests/e2e -m "not network"` + **duas execuções do zero com o mesmo hash**.
+- **Smoke test obrigatório** do pacote (script ou manual evidenciado com log/print).
+- **Dataset congelado**: hash por arquivo + hash agregado registrados antes do envio.
+- **Rollback plan obrigatório** em `docs/plans/infra-ops.md`.
+- **Validação de credencial** quando aplicável (onde vive, escopo, como revogar) — hoje: nenhuma autorizada.
+- **Revisão humana do número** com 3 valores conferidos por série — automação não substitui.
 
 ---
 
@@ -118,21 +123,21 @@ Regras completas de autonomia em `AGENTS.md §9`.
 
 **Sinais de teste fake:**
 
-- `expect(true).toBe(true)` ou variantes tautológicas.
-- Teste que só verifica que um componente **renderiza** sem validar comportamento (clique, input, output).
+- `assert True` ou variantes tautológicas.
+- Teste que só verifica que a função **roda sem exceção**, sem validar nenhum valor.
 - Teste que declara um CA no nome mas **não exercita** a regra correspondente.
-- Teste que mocka **justamente a regra que deveria validar** (ex.: mocka o `bcrypt.compare` para retornar `true` num teste de login com senha errada).
-- Teste com assertion genérica (`expect(result).toBeDefined()`) em cima de valor que o código garante estaticamente.
+- Teste que mocka **justamente a regra que deveria validar** (ex.: mocka o normalizador de número pt-BR no teste que deveria provar a conversão de `"38.484,84"`).
+- Assertion genérica (`assert df is not None`) em cima de valor que o código já garante.
 - Teste que lê o próprio valor de retorno e o compara consigo mesmo.
-- Teste condicional de tipo (`expect(typeof x).toBe('string')`) sem validar conteúdo.
-- Teste que roda mas cuja falha não invalida a feature (ex.: `try/catch` silencioso em volta do assertion).
-- Teste com `.only` ou `.skip` deixado no PR.
+- Checagem de tipo (`assert isinstance(x, str)`) sem validar conteúdo.
+- Teste que roda mas cuja falha não invalida a feature (`try/except` silencioso em volta do `assert`).
+- `@pytest.mark.skip`, `xfail` sem ADR, ou teste excluído por `-k` deixado no PR.
 
 **Quando usar mocks:**
 
-- Mock vale para dependências externas (HTTP, clock, UUID determinístico).
+- Mock vale para dependências externas (HTTP, relógio, caminho temporário).
 - Mock **não** vale para substituir a regra do sistema sob teste.
-- Em classe C/D que toca dados, prefira container real (Postgres local via Testcontainers, Supabase local) em vez de mock do banco.
+- Em classe B/C que toca fonte externa, use **fixture gravada** da resposta real — e, em C, o **dataset congelado** da versão anterior para o diff numérico — nunca dado sintético "plausível".
 
 ---
 
@@ -246,4 +251,4 @@ Além dos padrões genéricos listados acima:
 
 ---
 
-*Esta referência é espelhada em `harness-v3-manual.md §7`. Em caso de divergência, prevalece este arquivo.*
+*Esta referência é espelhada em `.claude/harness-v3.2-manual.md §7`. Em caso de divergência, prevalece este arquivo.*

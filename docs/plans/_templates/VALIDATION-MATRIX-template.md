@@ -22,11 +22,11 @@
 
 | CA | Descrição resumida | Teste que cobre | Tipo | Status | Evidência |
 |---|---|---|---|---|---|
-| CA-001 | login credenciais válidas retorna 200 + cookie | `auth.login.test.ts::valid_credentials` | integration | passou | `npm test -- auth.login` ver `tests/integration/auth.login.test.ts:42` |
-| CA-002 | login senha errada retorna 401 INVALID_CREDENTIALS | `auth.login.test.ts::invalid_password` | integration | passou | idem, log no PR |
-| CA-003 | rate limit 5/min/IP | `auth.login.test.ts::rate_limit` | integration | passou | idem |
-| CA-004 | fluxo login na UI ponta a ponta | `login.spec.ts::happy_path` | e2e | passou | `npx playwright show-report` artifact no CI |
-| CA-005 | erro amigável se Supabase cair | N/A | **não coberto** | **falhou** | precisa criar mock/stub antes do merge |
+| CA-001 | extrator devolve as 5 séries com o shape esperado | `test_sgs.py::test_shape` | unit (fixture) | passou | `pytest tests/unit/test_sgs.py` + 1.248 linhas, `min`/`max` = 2006-01/2026-09 |
+| CA-002 | HTTP 200 com corpo de erro levanta e não grava | `test_sgs.py::test_corpo_de_erro` | unit negativo | passou | idem, log no PR |
+| CA-003 | valor-canário CDI 2006 = 15,0271% | `test_valores_canario.py::test_cdi_2006` | contract | passou | 3 valores conferidos na fonte (print/link) |
+| CA-004 | pipeline do zero duas vezes gera o mesmo hash | `test_reprodutibilidade.py::test_dois_runs` | e2e | passou | `DATASET_SHA256` idêntico nos dois runs, colado no PR |
+| CA-005 | % de nulos em coluna crítica = 0 | N/A | **não coberto** | **falhou** | precisa de asserção `pandera` antes do merge |
 
 ---
 
@@ -45,13 +45,13 @@
 
 | Categoria | Cenário exercitado | Evidência / Nota |
 |---|---|---|
-| Inputs inválidos | payload sem campo obrigatório → 400 | teste `auth.login.test.ts::missing_email` |
-| Inputs no limite | senha com 7 caracteres (min=8) → 400 | coberto em `missing_email`-like |
-| Ausência de dados | usuário inexistente → 401 genérico (não 404) | coberto em `invalid_password` |
-| Permissão errada | tentar `/admin/*` com user não-admin → 403 | teste `admin.guard.test.ts` |
-| Idempotência / chamadas repetidas | 6ª tentativa dentro de 1min → 429 | `rate_limit` test |
-| Edge case óbvio | email com unicode, timezone estranho | manual: validado em dev |
-| UI vazio/loading/erro | dashboard sem dados → empty state | `dashboard.spec.ts::empty` |
+| Resposta inválida da fonte | HTTP 200 com corpo de erro / HTML onde se esperava planilha | teste `test_sgs.py::test_corpo_de_erro` |
+| Truncamento silencioso | janela > 10 anos, `range=max`, limite de 20.000 linhas do Olinda | contagem mínima esperada asseverada no teste |
+| Ausência de dados | dia sem publicação / feriado → sucesso **com registro**, não exceção | `test_anbima_diario.py::test_zero_bytes` |
+| Caso-armadilha de calendário | 31/12 em fim de semana, feriado em fim de trimestre, série que começa depois de 2006 | `test_alinhamento.py::test_feriados` |
+| Idempotência / execuções repetidas | rodar 2x não duplica nem grava conteúdo diferente; dois runs → mesmo hash | `test_reprodutibilidade.py` |
+| Escala e sinal | retorno acumulado por razão (não subtração), IPCA aplicado uma única vez, % vs. fração | diff numérico vs. o canônico anterior |
+| Nulos e painel desbalanceado | coluna crítica sem `NaN`; nenhuma linha antes do início real da série | `pandera` + print do `isna().sum()` |
 | Fora de escopo alterado? | diff só toca arquivos permitidos | `git diff --stat` anexado ao PR |
 
 Se alguma linha está vazia ou marcada como "não exercitado", o agente deve **criar o teste** (A/B) ou **solicitar** (C/D) antes de aprovar.
@@ -60,22 +60,24 @@ Se alguma linha está vazia ou marcada como "não exercitado", o agente deve **c
 
 ## Tipos de teste aceitos (prioridade decrescente)
 
-1. **unit** — cobre lógica pura, sem IO.
-2. **integration** — cobre contratos reais entre módulos, idealmente com DB real ou container.
-3. **contract test** — cobre schema Zod vs. payload real (consumer-driven quando aplicável).
-4. **e2e** — Playwright/Cypress, cobre fluxo na UI com backend real ou mock determinístico.
-5. **smoke test** — verificação curta pós-deploy (health checks, login básico).
+1. **unit** — cobre lógica pura, sem IO (parsing, normalização de número pt-BR, cálculo de retorno).
+2. **integration** — cobre a costura entre etapas do pipeline sobre **fixture gravada** da fonte.
+3. **contract test** — cobre schema `pandera`/`pydantic` vs. a resposta real da fonte + **valor-canário** conhecido.
+4. **e2e** — pipeline do zero (`pytest tests/e2e -m "not network"`), incluindo duas execuções com o mesmo hash.
+5. **smoke test** — verificação curta do **pacote de entrega** (abre no Excel, contagens, nulos, paridade Parquet × CSV).
 6. **manual — só se inevitável** — descreva o passo a passo e anexe print/log como evidência.
 
 ---
 
 ## O que conta como evidência objetiva
 
-- Saída de `npm test` com teste nomeado passando.
-- Playwright HTML report com o cenário verde.
-- Log do CI do GitHub Actions com linha final `✔ passed`.
-- Migration aplicada em staging com `select` comprovando estado esperado.
-- Smoke test script rodado com exit code 0 e output anexado.
+- Saída de `pytest` com o teste nomeado passando.
+- Nº de linhas + `min`/`max` de data + % de nulos por coluna crítica do output real.
+- **3 valores conferidos contra a fonte original** (print/link) — não contra o teste.
+- **Diff numérico** vs. a versão anterior do canônico, com cada divergência explicada (classe C).
+- **Dataset congelado**: `DATASET_SHA256` registrado e idêntico em duas execuções do zero (classe D).
+- Log do CI do GitHub Actions com a linha final de sucesso.
+- Smoke test do pacote rodado com exit code 0 e output anexado.
 
 **O que NÃO conta:**
 - "O agente afirma que funciona."
@@ -91,7 +93,7 @@ Escolha **um**:
 
 - [ ] **APROVADO** — todos os CAs têm evidência objetiva; Validation Mode exercitado; CI verde no nível da classe; Anti-SPEC respeitada; contratos consistentes; nenhum arquivo fora do contrato alterado (ou justificativa aceita com contrato atualizado).
 - [ ] **MUDANÇAS_SOLICITADAS** — há CA sem evidência OU teste falhando OU teste fake (ver `risk-classification.md`) OU teste mínimo por classe ausente OU CI vermelho OU contrato divergente OU Validation Mode pulado em C/D.
-- [ ] **BLOQUEADO** — Definition of Ready incompleta em domínio sensível OU Anti-SPEC violada OU arquivo fora do Feature Contract sem justificativa aceita OU reclassificação de risco pendente OU operação classe D sem rollback/staging.
+- [ ] **BLOQUEADO** — Definition of Ready incompleta em domínio sensível OU Anti-SPEC violada OU arquivo fora do Feature Contract sem justificativa aceita OU reclassificação de risco pendente OU operação classe D sem Rollback em `docs/plans/infra-ops.md` / sem dataset congelado.
 
 ### Issues (se MUDANÇAS_SOLICITADAS ou BLOQUEADO)
 

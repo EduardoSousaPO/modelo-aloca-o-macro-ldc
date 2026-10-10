@@ -23,49 +23,50 @@
 
 ---
 
-## 2. Rotas reais
+## 2. Extratores reais
 
-> Endpoints que de fato existem e estão acessíveis. Confirme lendo o código, não o README.
+> Fontes que de fato são extraídas hoje. Confirme lendo o código e o conteúdo de `data/raw/`, não o README.
 
-| Método | Rota | Arquivo | Status | Notas |
+| Fonte | Endpoint / arquivo de origem | Arquivo do extrator | Status | Notas |
 |---|---|---|---|---|
-| POST | `/api/v1/auth/login` | `apps/api/src/auth/login.ts` | funcional | sem rate limit |
-| GET | `/api/v1/users/me` | `apps/api/src/users/me.ts` | funcional | retorna campos internos (PII leak potencial) |
-| GET | `/api/v1/admin/*` | `apps/api/src/admin/*` | parcial | 3 endpoints, 1 quebrado |
+| BCB SGS | `api.bcb.gov.br/dados/serie/...` | `apps/pipeline/extract/sgs.py` | funcional | sem cache condicional |
+| ANBIMA S3 | bucket público (arquivos IMA) | `apps/pipeline/extract/anbima_s3.py` | funcional | `.xls` que é XLSX — escolhe leitor por magic bytes |
+| API B3 | `indexStatisticsProxy` | `apps/pipeline/extract/b3.py` | parcial | 11 índices mapeados, 1 sem histórico completo |
 
 ---
 
-## 3. Telas reais
+## 3. Figuras, tabelas e notebooks reais
 
-| Rota UI | Arquivo | Estado | Notas |
+| Entregável visual | Arquivo | Estado | Notas |
 |---|---|---|---|
-| `/` | `apps/web/src/routes/index.tsx` | funcional | landing estática |
-| `/login` | `apps/web/src/routes/login.tsx` | funcional | sem "esqueci senha" |
-| `/dashboard` | `apps/web/src/routes/dashboard.tsx` | parcial | gráfico quebrado em mobile |
+| heatmap regime × ativo | `apps/analysis/figuras/heatmap.py` | funcional | `n` anotado em toda célula |
+| timeline de regimes | `apps/analysis/figuras/timeline.py` | parcial | sem a Selic no eixo secundário |
+| notebook de entrega | `apps/analysis/entrega.ipynb` | parcial | ainda contém lógica de negócio (deveria importar de `apps/pipeline/`) |
 
 ---
 
-## 4. Banco real
+## 4. Camadas de dados reais
 
-- **Provider:** [Supabase / Postgres / MySQL / SQLite / ...]
-- **Versão/plano:** [ex: Supabase free + plano pago Q3]
-- **Migrations aplicadas em produção:** [ex: 0001..0017]
-- **Tabelas ativas:**
-  - `users` — X linhas (aprox) — último schema change: 2026-03
-  - `sessions` — Y linhas
-  - `orders` — Z linhas
-- **Políticas RLS:** [mapa curto — quem pode ler/escrever o quê]
-- **Índices/views manuais fora de migration:** [lista, se houver — risco alto]
+- **Formato por camada:** [Parquet por camada + DuckDB como engine de consulta — ADR-006]
+- **`data/raw/`:** [quais subpastas existem, desde quando, tamanho aprox.]
+- **`data/processed/`:** [quais séries, frequência nativa, validadas por `pandera`? sim/não]
+- **`data/canonical/`:** tabelas materializadas hoje
+  - `macro_quarterly` — X linhas (esperado: 83) — última reconstrução: YYYY-MM-DD
+  - `asset_returns_quarterly` — Y linhas / Z ativos
+  - `regimes` / `regime_neighbors` — [existe? com qual lente?]
+- **Schemas `pandera` aplicados de fato:** [mapa curto — quais DataFrames passam por schema na entrada e na saída]
+- **Arquivos em `data/` sem script que os reproduza:** [lista, se houver — **risco alto**: a verdade é o script]
 
 ---
 
 ## 5. Integrações reais
 
-| Serviço | Finalidade | Status | Env var atual | Notas |
+| Fonte / serviço | Finalidade | Status | Credencial | Notas |
 |---|---|---|---|---|
-| Resend | envio de e-mail | ativo | `RESEND_API_KEY` | key no Vercel |
-| Stripe | billing (assinaturas) | ativo | `STRIPE_SECRET` | webhook em `/api/webhooks/stripe` |
-| Sentry | error tracking | configurado, mas sem DSN em prod | `SENTRY_DSN` | **risco** |
+| BCB SGS / Olinda | IPCA, Selic, CDI, PTAX, Focus | ativo | nenhuma | pública; HTTP 200 pode trazer corpo de erro |
+| IBGE SIDRA | IPCA nº-índice, PIB trimestral | ativo | nenhuma | `apisidra`; janela fatiada |
+| FRED | contexto externo (UST, VIX) | **bloqueado nesta máquina** | nenhuma | plano B: Yahoo (`^TNX`, `^VIX`) — ver `DECISIONS_LOG` |
+| ANBIMA Feed | ETTJ oficial com 20 anos | **não contratado** | paga | fora do caminho crítico (Anti-SPEC §10.3.14) |
 
 ---
 
@@ -73,10 +74,11 @@
 
 - **Unit:** X arquivos — pastas: `tests/unit/`
 - **Integration:** Y arquivos — pastas: `tests/integration/`
-- **E2E:** [existe? com quais fluxos?]
-- **Contract tests:** [sim/não]
-- **Cobertura (se disponível):** [ex: 42%]
-- **Testes conhecidos como instáveis:** [lista — `.skip` / flaky]
+- **E2E:** [existe? cobre o pipeline do zero e as duas execuções com o mesmo hash?]
+- **Contract tests com valor-canário:** [sim/não — quais séries]
+- **Fixtures gravadas:** [quais fontes têm fixture real em `tests/fixtures/`; quais ainda usam dado sintético]
+- **Testes de rede fora de `@pytest.mark.network`:** [nenhum, espera-se — liste se houver]
+- **Testes conhecidos como instáveis:** [lista — `skip` / `xfail` / flaky]
 
 ---
 
@@ -85,7 +87,7 @@
 - **Existe `.github/workflows/ci.yml`?** [sim/não]
 - **Está verde hoje?** [sim/não — se não, por quê]
 - **Rodar local funciona?** [sim/não]
-- **Jobs cobertos:** lint? typecheck? unit? integration? e2e? build?
+- **Jobs cobertos:** `ruff check`? `ruff format --check`? `pytest tests/unit`? integration/contract? e2e? build do canônico?
 - **Gate de merge em `main`?** [sim/não]
 - **Quem configurou?** [humano / herdado / nunca]
 
@@ -121,9 +123,9 @@
 
 | Item | Onde | Impacto | Urgência |
 |---|---|---|---|
-| Tipos duplicados em `apps/web/types/` e `apps/api/types/` | ambos | drift | média |
-| `scripts/` na raiz com 18 arquivos | raiz | bagunça | baixa |
-| Nenhum schema Zod — só TypeScript interfaces | app inteiro | boundaries sem runtime check | alta |
+| Mesma série lida por dois caminhos diferentes | `extract/` e notebook | drift de número | alta |
+| `scripts/` na raiz com N arquivos soltos | raiz | bagunça | baixa |
+| DataFrame ad hoc sem schema `pandera` na fronteira do canônico | `transform/` | erro silencioso de escala/coluna | alta |
 
 ---
 
@@ -131,29 +133,29 @@
 
 | Risco | Probabilidade | Impacto | Mitigação proposta |
 |---|---|---|---|
-| RLS pode estar permissivo demais | média | alto | auditoria antes de qualquer feature C/D nova |
-| Migration 0017 não foi rodada em staging | alta | alto | validar antes de próxima migration |
-| Sentry sem DSN em prod | alta | médio | configurar em F-XXX |
+| Endpoint não documentado muda sem aviso (B3, MSCI, S3) | média | alto | teste de contrato com valor-canário + fallback no catálogo |
+| Canônico atual não reproduz do zero | alta | alto | reconstrução completa + **diff numérico** antes de qualquer feature C nova |
+| Janela rolante da ANBIMA sem job rodando | alta | alto | job diário + `[DATA-LOSS]` no `wiki/log.md` se falhar > 20 d.u. |
 
 ---
 
-## 13. Riscos de produção
+## 13. Riscos de publicação
 
-- **Usuários ativos estimados:** [N]
-- **Receita/mês (se aplicável):** [R$/US$]
-- **SLA implícito ou explícito:** [uptime, latência]
-- **Horários de menor tráfego (janelas de deploy arriscado):** [ex: sáb 02h–05h BRT]
-- **Dependências críticas externas:** [Stripe, Supabase, ...]
+- **Números já enviados ao Alexandre/Comitê:** [versão, hash, data — ou "nenhum"]
+- **Decisões de alocação já tomadas sobre esses números:** [quais — define o custo de um rollback]
+- **Prazo duro mais próximo:** [ex: Comitê de Alocação em 2026-10-14]
+- **Séries que não cobrem a janela de 20 anos:** [lista — vão para a página de limitações]
+- **Dependências críticas externas:** [BCB SGS, IBGE SIDRA, ANBIMA, API B3, Yahoo/MSCI]
 
 ---
 
 ## 14. Pontos que NÃO devem ser tocados ainda
 
-> Alimenta direto a Anti-SPEC. Liste tabelas, rotas, módulos que não aceitam alteração sem migration plan dedicado.
+> Alimenta direto a Anti-SPEC. Liste tabelas canônicas, séries e módulos que não aceitam alteração sem Feature Contract classe C dedicado.
 
-- Tabela `users` não pode ser alterada sem migration com backup em staging.
-- Rota `/v1/legacy/*` tem 3 clientes externos — não alterar até migração combinada.
-- Webhook Stripe em `/api/webhooks/stripe` — qualquer mudança exige teste de contrato com Stripe CLI antes.
+- Schema do canônico (`macro_quarterly`, `asset_returns_quarterly`, `regimes`) — alteração é **feature classe C** própria, com diff numérico e **dataset congelado** da versão anterior preservado.
+- Regras de alinhamento temporal e cálculo de retorno — não ajustar "só um pouco" sem Feature Contract C.
+- `data/raw/` é **imutável**: nunca editar nem apagar; é a única base de reconstrução.
 
 ---
 

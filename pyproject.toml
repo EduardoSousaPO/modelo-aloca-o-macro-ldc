@@ -15,6 +15,7 @@ dependencies = [
     "duckdb>=1.0",          # engine de consulta sobre o Parquet (ADR-006)
     "openpyxl>=3.1",        # lê os .xls da ANBIMA (que são XLSX) + escreve o XLSX de entrega (RF-043)
     "lxml>=5.0",            # pandas.read_html na Curva Zero da ANBIMA (que é HTML <table>)
+    "yfinance>=0.2.50",     # plano B do FRED (^TNX, ^VIX, ^GSPC) — FRED bloqueado nesta máquina
     "matplotlib>=3.8",      # heatmap regime × ativo (RF-033) e timeline (RF-035)
     "python-dotenv>=1.0",
     "jupyter>=1.0",
