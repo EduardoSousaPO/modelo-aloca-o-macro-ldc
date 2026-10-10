@@ -1,0 +1,118 @@
+# ─────────────────────────────────────────────
+# Python
+# ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+sdist/
+wheels/
+*.egg-info/
+*.egg
+.installed.cfg
+MANIFEST
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Ferramentas
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Jupyter
+.ipynb_checkpoints/
+*.nbconvert.ipynb
+profile_default/
+ipython_config.py
+
+# ─────────────────────────────────────────────
+# Dados — NUNCA versionar (reconstruíveis via scripts)
+# Regra: nenhum dado bruto > 5 MB no git. Use script reprodutível.
+# ─────────────────────────────────────────────
+# Conteúdo das três camadas é regenerável — só o .gitkeep de cada pasta é rastreado
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/canonical/*
+!data/canonical/.gitkeep
+
+# Formatos de dado (em qualquer lugar do repo)
+*.parquet
+*.duckdb
+*.duckdb.wal
+*.feather
+*.arrow
+*.h5
+*.hdf5
+*.sqlite
+*.sqlite3
+*.db
+
+# Planilhas e CSVs grandes baixados das fontes
+*.xls
+*.xlsx
+*.xlsm
+*.csv.gz
+*.zip
+# Exceção: fixtures pequenas de teste são versionadas
+!tests/fixtures/**/*.csv
+!tests/fixtures/**/*.json
+!tests/fixtures/**/*.xlsx
+
+# ─────────────────────────────────────────────
+# Segredos / credenciais
+# ─────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.toml
+
+# ─────────────────────────────────────────────
+# Sistema operacional / editores
+# ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+!.vscode/extensions.json
+.idea/
+
+# ─────────────────────────────────────────────
+# Outputs temporários
+# ─────────────────────────────────────────────
+*.log
+tmp/
+out/
+outputs/
+reports/_draft/
+
+# ─────────────────────────────────────────────
+# Rascunhos de exploração na raiz (páginas baixadas das fontes, dumps de browser)
+# Se um desses arquivos for insumo real, mova para data/raw/<fonte>/ via script.
+# ─────────────────────────────────────────────
+/*.html
+/*.csv
+.playwright-mcp/

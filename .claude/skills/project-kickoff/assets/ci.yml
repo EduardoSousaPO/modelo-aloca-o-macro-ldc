@@ -1,0 +1,126 @@
+name: CI
+
+# Harness v3.1 — Feedback Hardened
+#
+# CI por níveis (N1 / N2 / N3). Cada projeto mapeia seus scripts reais.
+# Regra: a classe de risco da feature (A / B / C / D — ver AGENTS.md §2)
+# determina o nível mínimo de CI que PRECISA estar verde antes do merge.
+#
+#   N1 — lint + typecheck + unit (+ build se rápido)         → obrigatório para A, B
+#   N2 — N1 + integration + contract + db validation + build → obrigatório para B relevante, C
+#   N3 — N2 + e2e + smoke + migration validation              → obrigatório para C crítica, D
+#
+# Em um repo pequeno, rodar N1 em todo push e N2/N3 em PRs e em main cobre bem.
+# Em projetos maiores, separe em jobs e use "required checks" para bloquear merge.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ───────────────────────────────────────────────────────────────
+  # N1 — Sempre roda. Bloqueia merge para qualquer feature A/B/C/D.
+  # ───────────────────────────────────────────────────────────────
+  n1-basic:
+    name: N1 — Lint + Typecheck + Unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test -- --run
+
+  # ───────────────────────────────────────────────────────────────
+  # N2 — Roda em PR e em push para main. Obrigatório para B/C.
+  # Descomente e ajuste quando o projeto tiver integration/contract/db.
+  # ───────────────────────────────────────────────────────────────
+  # n2-integration:
+  #   name: N2 — Integration + Contract + Build
+  #   needs: n1-basic
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 20
+  #   services:
+  #     postgres:
+  #       image: postgres:16
+  #       env:
+  #         POSTGRES_PASSWORD: postgres
+  #       ports: ["5432:5432"]
+  #       options: >-
+  #         --health-cmd pg_isready
+  #         --health-interval 10s
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "20"
+  #         cache: "npm"
+  #     - run: npm ci
+  #     - name: Integration tests
+  #       run: npm run test:integration
+  #     - name: Contract tests
+  #       run: npm run test:contract
+  #     - name: Build
+  #       run: npm run build
+
+  # ───────────────────────────────────────────────────────────────
+  # N3 — Só em PR para main, ou manual. Obrigatório para C crítica/D.
+  # Descomente quando houver e2e e smoke tests rodáveis em CI.
+  # ───────────────────────────────────────────────────────────────
+  # n3-e2e-smoke:
+  #   name: N3 — E2E + Smoke + Migration Validation
+  #   needs: n2-integration
+  #   if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 30
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "20"
+  #         cache: "npm"
+  #     - run: npm ci
+  #     - name: Install Playwright browsers
+  #       run: npx playwright install --with-deps
+  #     - name: E2E
+  #       run: npm run test:e2e
+  #     - name: Migration dry-run
+  #       run: npm run migrate:check
+  #     - name: Smoke test (preview)
+  #       env:
+  #         PREVIEW_URL: ${{ secrets.PREVIEW_URL }}
+  #       run: npm run smoke
+
+# ───────────────────────────────────────────────────────────────
+# Notas
+# ───────────────────────────────────────────────────────────────
+# - Scripts referenciados acima são os nomes sugeridos. Mapeie em package.json:
+#     "lint": "eslint .",
+#     "typecheck": "tsc --noEmit",
+#     "test": "vitest run",
+#     "test:integration": "vitest run --config vitest.integration.ts",
+#     "test:contract": "vitest run --config vitest.contract.ts",
+#     "test:e2e": "playwright test",
+#     "build": "next build",
+#     "migrate:check": "your migration dry-run command",
+#     "smoke": "node scripts/smoke.mjs"
+#
+# - Para classes D (produção/infra), valide também:
+#     - Rollback plan documentado no Feature Contract.
+#     - Staging validado antes do deploy em produção.
+#     - Feature flag se altera contrato público.

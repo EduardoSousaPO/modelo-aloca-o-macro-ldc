@@ -1,0 +1,30 @@
+# Environment variables (NEVER commit)
+.env
+.env.*
+!.env.example
+
+# OpenClaw runtime
+.openclaw/
+
+# Memory with real data
+agents/*/memory.md
+
+# Node
+node_modules/
+package-lock.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Build
+dist/
+build/

@@ -1,0 +1,61 @@
+[project]
+name = "estrategia-macro-ldc-dados"
+version = "0.1.0"
+description = "Pipeline de extração de séries macro e índices de ativos brasileiros + análise de regimes macro para o Comitê de Alocação da LDC Capital"
+requires-python = ">=3.11"
+readme = "README.md"
+
+dependencies = [
+    "pandas>=2.2",
+    "pyarrow>=16.0",
+    "requests>=2.32",
+    "httpx>=0.27",
+    "pydantic>=2.7",
+    "pandera>=0.20",
+    "duckdb>=1.0",
+    "python-dotenv>=1.0",
+    "jupyter>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "ruff>=0.5",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["apps/pipeline", "packages/shared"]
+
+# ─────────────────────────────────────────────
+# ruff — lint + format (substitui ESLint/Prettier deste harness)
+# ─────────────────────────────────────────────
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "data", ".ipynb_checkpoints"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "PD"]
+ignore = [
+    "PD901",  # nome `df` é aceitável em código de pipeline
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011"]
+"apps/analysis/**" = ["E402"]  # notebooks exportados podem ter import depois de código
+
+# ─────────────────────────────────────────────
+# pytest
+# ─────────────────────────────────────────────
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "network: teste que faz chamada real a uma fonte externa (não roda no CI N1)",
+    "slow: teste que leva mais de alguns segundos",
+]

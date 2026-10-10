@@ -1,0 +1,71 @@
+{
+  "name": "lead-qualifier",
+  "model": "claude-sonnet-4-6",
+  "modelProvider": "anthropic",
+
+  "systemPrompt": {
+    "source": "soul.md",
+    "injectMemory": true,
+    "injectSkills": true
+  },
+
+  "tools": {
+    "read": { "enabled": true },
+    "write": { "enabled": true },
+    "edit": { "enabled": true },
+    "web_search": { "enabled": true },
+    "web_fetch": { "enabled": true },
+    "image": { "enabled": false },
+    "exec": { "enabled": false },
+    "browser": { "enabled": false },
+    "message": { "enabled": true },
+    "cron": { "enabled": false }
+  },
+
+  "toolPolicy": {
+    "message": {
+      "requireApproval": false,
+      "maxPerHour": 100
+    }
+  },
+
+  "memory": {
+    "enabled": true,
+    "source": "memory.md",
+    "maxEntries": 200,
+    "autoSave": true
+  },
+
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "token": "${TELEGRAM_BOT_TOKEN}"
+    }
+  },
+
+  "gateway": {
+    "auth": {
+      "enabled": true,
+      "token": "${GATEWAY_AUTH_TOKEN}"
+    },
+    "allowlist": {
+      "mode": "open"
+    },
+    "binding": "127.0.0.1"
+  },
+
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": ["@supabase/mcp-server-supabase@latest"],
+      "env": {
+        "SUPABASE_URL": "${SUPABASE_URL}",
+        "SUPABASE_SERVICE_ROLE_KEY": "${SUPABASE_SERVICE_ROLE_KEY}"
+      }
+    }
+  },
+
+  "sandbox": {
+    "enabled": false
+  }
+}

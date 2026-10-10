@@ -1,0 +1,1724 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Harness v3.2 — Manual Operacional Único</title>
+<meta name="description" content="Manual único do Harness v3.2 — Project Wiki + Fast Fix. Workflow solo para Claude Code, Codex e Cursor.">
+<style>
+
+:root {
+  --bg: #0f1115;
+  --bg-elev: #161a22;
+  --bg-code: #11151c;
+  --fg: #e6e8eb;
+  --fg-muted: #98a2b3;
+  --accent: #7dd3fc;
+  --accent-strong: #38bdf8;
+  --border: #1f2630;
+  --warn: #fbbf24;
+  --good: #34d399;
+  --bad: #f87171;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #fafafa;
+    --bg-elev: #ffffff;
+    --bg-code: #f3f4f6;
+    --fg: #111827;
+    --fg-muted: #6b7280;
+    --accent: #0369a1;
+    --accent-strong: #075985;
+    --border: #e5e7eb;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter",
+               "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.layout { display: grid; grid-template-columns: 320px 1fr; min-height: 100vh; }
+@media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } aside { display: none; } }
+aside {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--bg-elev);
+  border-right: 1px solid var(--border);
+  padding: 18px 14px 60px 18px;
+}
+aside h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  margin: 6px 0 10px 0;
+  letter-spacing: .08em;
+}
+aside .toc ul { list-style: none; padding-left: 12px; margin: 0; }
+aside .toc > ul { padding-left: 0; }
+aside .toc li { margin: 2px 0; }
+aside .toc a {
+  color: var(--fg);
+  text-decoration: none;
+  display: block;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+aside .toc a:hover { background: rgba(125, 211, 252, .12); color: var(--accent-strong); }
+aside .toc a.active { background: rgba(125, 211, 252, .18); color: var(--accent-strong); font-weight: 600; }
+.searchbox {
+  position: sticky; top: -18px; background: var(--bg-elev); padding: 10px 0 10px 0; z-index: 5;
+  margin: -18px -14px 8px -18px; padding-left: 18px; padding-right: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.searchbox input {
+  width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--fg); font-size: 13px;
+}
+.brand { font-weight: 700; margin-bottom: 14px; font-size: 14px; color: var(--fg); }
+.brand small { display: block; font-weight: 400; color: var(--fg-muted); font-size: 11px; margin-top: 2px; }
+main {
+  padding: 36px 56px 120px 56px;
+  max-width: 920px;
+  margin: 0 auto;
+}
+@media (max-width: 700px) { main { padding: 24px 18px 80px 18px; } }
+main h1 { font-size: 26px; margin-top: 0; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+main h2 { font-size: 21px; margin-top: 40px; padding-top: 8px; border-top: 1px solid var(--border); }
+main h3 { font-size: 17px; margin-top: 28px; }
+main h4 { font-size: 15px; margin-top: 24px; color: var(--fg-muted); }
+main h2 .headerlink, main h3 .headerlink, main h4 .headerlink { opacity: 0; padding-left: 8px; text-decoration: none; color: var(--accent); }
+main h2:hover .headerlink, main h3:hover .headerlink, main h4:hover .headerlink { opacity: 1; }
+main a { color: var(--accent-strong); text-decoration: none; }
+main a:hover { text-decoration: underline; }
+main blockquote {
+  border-left: 3px solid var(--accent);
+  background: rgba(125, 211, 252, .06);
+  margin: 16px 0;
+  padding: 10px 16px;
+  border-radius: 0 8px 8px 0;
+  color: var(--fg);
+}
+main blockquote p:first-child { margin-top: 0; }
+main blockquote p:last-child { margin-bottom: 0; }
+main code {
+  background: var(--bg-code);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: .9em;
+  font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+}
+main pre {
+  background: var(--bg-code);
+  padding: 14px 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.5;
+}
+main pre code { background: none; padding: 0; }
+main table {
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 13px;
+  width: 100%;
+  display: block;
+  overflow-x: auto;
+}
+main th, main td {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+main th { background: var(--bg-elev); font-weight: 600; }
+main tr:nth-child(even) td { background: rgba(125, 211, 252, .03); }
+main hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+main ul, main ol { padding-left: 24px; }
+main li { margin: 4px 0; }
+.no-result { display: none; color: var(--fg-muted); font-size: 13px; padding: 12px 6px; }
+@media print {
+  aside { display: none; }
+  .layout { grid-template-columns: 1fr; }
+  main { padding: 24px; max-width: none; }
+  body { background: white; color: black; }
+  main pre, main code { background: #f6f8fa; color: #111; }
+}
+
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <div class="brand">Harness v3.2<small>Project Wiki + Fast Fix</small></div>
+    <div class="searchbox"><input id="toc-search" type="search" placeholder="Buscar no índice..."></div>
+    <h2>Índice</h2>
+    <nav class="toc">
+<ul>
+<li><a href="#harness-v32-manual-operacional-unico-project-wiki-fast-fix">Harness v3.2 — Manual Operacional Único (Project Wiki + Fast Fix)</a><ul>
+<li><a href="#indice">Índice</a></li>
+<li><a href="#0-quick-start-qual-cenario-sou-eu">0. Quick Start — qual cenário sou eu?</a></li>
+<li><a href="#1-o-que-e-harness-v32-em-60-segundos">1. O que é Harness v3.2 em 60 segundos</a></li>
+<li><a href="#2-principios-nao-negociaveis">2. Princípios não-negociáveis</a></li>
+<li><a href="#3-feed-forward-feedback-e-memoria">3. Feed Forward, Feedback e Memória</a></li>
+<li><a href="#4-estrutura-padrao-do-projeto">4. Estrutura padrão do projeto</a></li>
+<li><a href="#5-as-8-skills">5. As 8 skills</a></li>
+<li><a href="#6-os-4-prompts-do-dia-a-dia">6. Os 4 prompts do dia a dia</a></li>
+<li><a href="#7-classificacao-de-risco-abcd">7. Classificação de risco A/B/C/D</a></li>
+<li><a href="#8-definition-of-ready">8. Definition of Ready</a></li>
+<li><a href="#9-feature-contract">9. Feature Contract</a></li>
+<li><a href="#10-matriz-de-validacao">10. Matriz de Validação</a></li>
+<li><a href="#11-ci-por-niveis">11. CI por níveis</a></li>
+<li><a href="#12-project-wiki-memoria-sintetizada-viva">12. Project Wiki — memória sintetizada viva</a></li>
+<li><a href="#13-fast-fix-project-quick-para-bug-urgente">13. Fast Fix — Project Quick para bug urgente</a></li>
+<li><a href="#14-modos-de-rigor">14. Modos de rigor</a></li>
+<li><a href="#15-cenario-a-projeto-novo">15. Cenário A — Projeto novo</a></li>
+<li><a href="#15-cenario-a-projeto-novo_1">15. Cenário A — Projeto novo</a></li>
+<li><a href="#16-cenario-b-projeto-ja-iniciado">16. Cenário B — Projeto já iniciado</a></li>
+<li><a href="#17-cenario-c-projeto-em-producao">17. Cenário C — Projeto em produção</a></li>
+<li><a href="#18-cenario-d-projeto-baguncado">18. Cenário D — Projeto bagunçado</a></li>
+<li><a href="#19-cenario-e-migracao-v2-v31-v32">19. Cenário E — Migração v2 / v3.1 → v3.2</a></li>
+<li><a href="#20-cenario-f-bug-urgente-project-quick">20. Cenário F — Bug urgente / Project Quick</a></li>
+<li><a href="#21-cenario-g-triagem-de-bugs-em-lote">21. Cenário G — Triagem de bugs em lote</a></li>
+<li><a href="#22-cenario-h-mvp-validacao-de-ideia">22. Cenário H — MVP / validação de ideia</a></li>
+<li><a href="#23-continuidade-entre-agentes-claude-codex-cursor">23. Continuidade entre agentes (Claude ↔ Codex ↔ Cursor)</a></li>
+<li><a href="#24-operacao-diaria">24. Operação diária</a></li>
+<li><a href="#25-checklist-por-feature-pr">25. Checklist por feature / PR</a></li>
+<li><a href="#26-antipadroes">26. Antipadrões</a></li>
+<li><a href="#27-quando-nao-usar-o-harness">27. Quando NÃO usar o Harness</a></li>
+<li><a href="#28-referencia-rapida">28. Referência rápida</a></li>
+<li><a href="#29-anexos-mapa-do-pacote">29. Anexos — mapa do pacote</a></li>
+</ul>
+</li>
+</ul>
+</nav>
+    <div class="no-result" id="no-result">Nenhum item do índice corresponde.</div>
+  </aside>
+  <main>
+<h1 id="harness-v32-manual-operacional-unico-project-wiki-fast-fix"><a class="toclink" href="#harness-v32-manual-operacional-unico-project-wiki-fast-fix">Harness v3.2 — Manual Operacional Único (Project Wiki + Fast Fix)</a></h1>
+<blockquote>
+<p><strong>Documento único do Harness v3.2.</strong> Tudo que você precisa para operar o Harness nos seus projetos está aqui. Comece pelo Quick Start (§0). Use o resto como referência por seção quando precisar.</p>
+</blockquote>
+<p><strong>Versão:</strong> 3.2 — Project Wiki + Fast Fix + MVP Lite + Triage
+<strong>Escopo:</strong> desenvolvedor solo, um agente gerador (Claude Code), Codex e Cursor opcionais para continuidade ou infra/MCP, CI como avaliador independente.
+<strong>Tempo de leitura:</strong> 5 min para o Quick Start (§0). 25-35 min para o manual inteiro.</p>
+<hr>
+<h2 id="indice"><a class="toclink" href="#indice">Índice</a></h2>
+<ol start="0">
+<li><a href="#0-quick-start--qual-cenário-sou-eu"><strong>Quick Start — qual cenário sou eu?</strong></a> ← <strong>comece aqui</strong></li>
+<li><a href="#1-o-que-é-harness-v32-em-60-segundos">O que é Harness v3.2 em 60 segundos</a></li>
+<li><a href="#2-princípios-não-negociáveis">Princípios não-negociáveis</a></li>
+<li><a href="#3-feed-forward-feedback-e-memória">Feed Forward, Feedback e Memória</a></li>
+<li><a href="#4-estrutura-padrão-do-projeto">Estrutura padrão do projeto</a></li>
+<li><a href="#5-as-8-skills">As 8 skills</a></li>
+<li><a href="#6-os-4-prompts-do-dia-a-dia">Os 4 prompts do dia a dia</a></li>
+<li><a href="#7-classificação-de-risco-abcd">Classificação de risco A/B/C/D</a></li>
+<li><a href="#8-definition-of-ready">Definition of Ready</a></li>
+<li><a href="#9-feature-contract">Feature Contract</a></li>
+<li><a href="#10-matriz-de-validação">Matriz de Validação</a></li>
+<li><a href="#11-ci-por-níveis">CI por níveis</a></li>
+<li><a href="#12-project-wiki--memória-sintetizada-viva">Project Wiki — memória sintetizada viva</a></li>
+<li><a href="#13-fast-fix--project-quick-para-bug-urgente">Fast Fix — Project Quick para bug urgente</a></li>
+<li><a href="#14-modos-de-rigor">Modos de rigor (incluindo MVP Lite)</a></li>
+<li><a href="#15-cenário-a--projeto-novo">Cenário A — Projeto novo</a></li>
+<li><a href="#16-cenário-b--projeto-já-iniciado">Cenário B — Projeto já iniciado</a></li>
+<li><a href="#17-cenário-c--projeto-em-produção">Cenário C — Projeto em produção</a></li>
+<li><a href="#18-cenário-d--projeto-bagunçado">Cenário D — Projeto bagunçado</a></li>
+<li><a href="#19-cenário-e--migração-v2--v31--v32">Cenário E — Migração v2 / v3.1 → v3.2</a></li>
+<li><a href="#20-cenário-f--bug-urgente--project-quick">Cenário F — Bug urgente / Project Quick</a></li>
+<li><a href="#21-cenário-g--triagem-de-bugs-em-lote">Cenário G — Triagem de bugs em lote</a></li>
+<li><a href="#22-cenário-h--mvp--validação-de-ideia">Cenário H — MVP / validação de ideia</a></li>
+<li><a href="#23-continuidade-entre-agentes-claude--codex--cursor">Continuidade entre agentes (Claude ↔ Codex ↔ Cursor)</a></li>
+<li><a href="#24-operação-diária">Operação diária</a></li>
+<li><a href="#25-checklist-por-feature--pr">Checklist por feature / PR</a></li>
+<li><a href="#26-antipadrões">Antipadrões</a></li>
+<li><a href="#27-quando-não-usar-o-harness">Quando NÃO usar o Harness</a></li>
+<li><a href="#28-referência-rápida">Referência rápida</a></li>
+<li><a href="#29-anexos--mapa-do-pacote">Anexos — mapa do pacote</a></li>
+</ol>
+<hr>
+<h2 id="0-quick-start-qual-cenario-sou-eu"><a class="toclink" href="#0-quick-start-qual-cenario-sou-eu">0. Quick Start — qual cenário sou eu?</a></h2>
+<blockquote>
+<p><strong>Tabela de decisão de 30 segundos.</strong> Encontre sua linha, dispare o comando.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Sou...</th>
+<th>Faço isso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Começando projeto novo do zero</strong></td>
+<td><code>/project-kickoff</code> → <code>/consultor-prd</code> → <code>/SDD-avancado</code> → <code>/agents-protocol</code> → loop</td>
+</tr>
+<tr>
+<td><strong>Tenho ideia para validar em &lt; 1 semana, sem produção</strong></td>
+<td>modo <strong>MVP Lite</strong> (§22). Só <code>TODO.md</code> + classe + commit + 1 teste no caminho crítico. Pule kickoff completo.</td>
+</tr>
+<tr>
+<td><strong>Entrando em projeto já iniciado, sem docs do Harness</strong></td>
+<td>Cenário B (§16) — gere <code>CURRENT_REALITY.md</code> antes de <code>/consultor-prd</code> retroativo</td>
+</tr>
+<tr>
+<td><strong>Trabalhando em projeto em produção</strong></td>
+<td>Cenário C (§17). Toda feature que toca prod = classe D (rollback + staging + smoke). Bug em prod sem domínios sensíveis: <code>/fast-fix</code>.</td>
+</tr>
+<tr>
+<td><strong>Projeto bagunçado, código duplicado, sem padrão</strong></td>
+<td>Cenário D (§18) — <code>/wiki lint</code> → CURRENT_REALITY → 0 código antes do diagnóstico</td>
+</tr>
+<tr>
+<td><strong>Bug urgente, cliente travado, &lt; 30 min</strong></td>
+<td><code>/fast-fix</code> (Prompt 0). Gates duros saem do modo se for C/D.</td>
+</tr>
+<tr>
+<td><strong>Cliente mandou 5 bugs, preciso priorizar</strong></td>
+<td><code>/triage-bugs</code> (lista colada) — devolve plano de ataque em &lt; 5 min</td>
+</tr>
+<tr>
+<td><strong>Vou desenvolver feature normal (CRUD, endpoint, tela)</strong></td>
+<td>Prompt 1 (início) → Prompt 2 (classe B/C com Feature Contract) → Prompt 3 (QA Validation Mode)</td>
+</tr>
+<tr>
+<td><strong>Acabaram tokens / vou continuar em Codex ou Cursor</strong></td>
+<td><code>/wiki context F-NNN</code> antes de fechar. Próximo agente lê <code>wiki/index.md</code> + <code>wiki/context/F-NNN.md</code></td>
+</tr>
+<tr>
+<td><strong>Vou subir migration / mudar env / deploy real</strong></td>
+<td>Classe D obrigatória. <code>/agents-protocol</code> Prompt 2 com cursor-brief + rollback + staging + smoke.</td>
+</tr>
+<tr>
+<td><strong>Decisão técnica grande aparecendo</strong></td>
+<td>ADR em <code>docs/decisions/adr/</code></td>
+</tr>
+<tr>
+<td><strong>Decisão pequena que provavelmente volta ao debate</strong></td>
+<td>linha em <code>docs/plans/DECISIONS_LOG.md</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="se-voce-so-tem-5-minutos-hoje-leia-isto"><a class="toclink" href="#se-voce-so-tem-5-minutos-hoje-leia-isto">Se você só tem 5 minutos hoje, leia isto</a></h3>
+<ol>
+<li>Existem <strong>8 skills</strong> — não precisa decorar. Você dispara pela frase ("/fast-fix", "/triage-bugs", etc) e o agente faz o resto.</li>
+<li>Existem <strong>4 prompts</strong> — Fast Fix (0), Início (1), Implementar (2), QA (3). Tudo em <code>skills/agents-protocol/references/prompts-cheatsheet.md</code>.</li>
+<li><strong>Toda feature B/C/D tem classe</strong>: A trivial, B normal, C crítico (auth/payment), D produção. Em dúvida, suba.</li>
+<li><strong>Wiki é memória viva</strong> mantida pela IA. Você não escreve à mão. <code>/wiki ingest</code> recebe print/log/decisão; <code>/wiki lint</code> audita; <code>/wiki repair</code> corrige.</li>
+<li>Se o agente disser <strong>BLOQUEADO</strong>, ele está te protegendo. Resolva a causa, não contorne.</li>
+</ol>
+<p>Pronto. Resto do manual é referência.</p>
+<hr>
+<h2 id="1-o-que-e-harness-v32-em-60-segundos"><a class="toclink" href="#1-o-que-e-harness-v32-em-60-segundos">1. O que é Harness v3.2 em 60 segundos</a></h2>
+<p><strong>Harness v3.2 = Harness v3.1 + Project Wiki + Fast Fix.</strong> A mesma leveza para dev solo (1 agente gerador, CI como avaliador, TODO.md + git como estado), agora com <strong>memória sintetizada viva</strong> entre fontes brutas e agentes, e <strong>modo Project Quick</strong> para bug urgente.</p>
+<p><strong>Project Wiki</strong> (camada 1 do v3.2):
+1. <strong><code>docs/wiki/</code></strong> — diretório de Markdown mantido pela IA via <code>/wiki ingest|context|lint|repair</code>.
+2. <strong><code>wiki/index.md</code></strong> — primeira leitura de qualquer agente.
+3. <strong><code>wiki/log.md</code></strong> — histórico cronológico vivo (ingests, releases, bugfixes, validações).
+4. <strong><code>wiki/overview.md</code></strong> + <strong><code>wiki/architecture.md</code></strong> — síntese do PRD/SPEC em formato escaneável.
+5. <strong><code>wiki/modules/</code></strong>, <strong><code>wiki/features/</code></strong>, <strong><code>wiki/runbooks/</code></strong>, <strong><code>wiki/context/</code></strong> — memória por área, por feature, runbooks operacionais, e Context Packs descartáveis para handoff entre agentes.</p>
+<blockquote>
+<p>A wiki é <strong>memória sintetizada</strong>, NUNCA fonte de verdade. PRD/SPEC/CONTRACTS/ADR continuam autoritativos.</p>
+</blockquote>
+<p><strong>Fast Fix</strong> (camada 2 do v3.2):
+6. <strong><code>/fast-fix</code></strong> — skill dedicada com Prompt 0 embutido. Bug urgente classe A/B sem auth/payment/db/env/deploy, &lt; 30 min. Gates objetivos. Sai do modo automaticamente se escala para C/D.</p>
+<p>Tudo o mais do v3.1 permanece: 1 agente gerador (Claude Code), Cursor Agent opcional só para infra/MCP (classe D), sem <code>state/</code>, sem <code>handoffs/</code>, sem <code>progress.jsonl</code>, sem <code>AGENT-BRIEFS/</code>, feature como unidade de trabalho, contratos em Zod, Anti-SPEC sagrada, classificação A/B/C/D, DoR, Feature Contract, Validation Mode, três estados (CONTINUE/PAUSE/BLOQUEADO).</p>
+<hr>
+<h2 id="2-principios-nao-negociaveis"><a class="toclink" href="#2-principios-nao-negociaveis">2. Princípios não-negociáveis</a></h2>
+<ol>
+<li><strong>Desenvolvedor solo.</strong> Um agente gerador principal: Claude Code.</li>
+<li><strong>Cursor Agent / Codex opcionais.</strong> Cursor para infra/MCP (classe D); Codex para continuidade quando Claude esgota tokens.</li>
+<li><strong>CI é o avaliador independente.</strong> Gerador ≠ avaliador.</li>
+<li><strong>Estado em <code>TODO.md</code> + <code>git log</code>.</strong> Sem <code>state/</code>, sem <code>progress.jsonl</code>, sem <code>handoffs/</code>, sem <code>AGENT-BRIEFS/</code>, sem JSON paralelo.</li>
+<li><strong>Feature é a unidade.</strong> Nunca task atômica.</li>
+<li><strong>Contrato é código.</strong> Zod em <code>packages/shared/types/</code> é fonte; <code>CONTRACTS.md</code> é espelho.</li>
+<li><strong>Anti-SPEC é sagrada.</strong> Não alterável por agente sem autorização humana.</li>
+<li><strong>CI verde é condição de merge.</strong> Sem exceção.</li>
+<li><strong>Produção exige staging, rollback e smoke test.</strong> Classe D, não negociável.</li>
+<li><strong>Wiki é memória sintetizada, NUNCA fonte de verdade.</strong> (v3.2)</li>
+<li><strong>Fast Fix é exceção justificada, não norma.</strong> (v3.2)</li>
+<li><strong>Toda feature B/C/D termina com 1 linha em <code>wiki/log.md</code>.</strong> (v3.2)</li>
+<li><strong>Sem burocracia desnecessária.</strong> Quando em dúvida, corte.</li>
+</ol>
+<hr>
+<h2 id="3-feed-forward-feedback-e-memoria"><a class="toclink" href="#3-feed-forward-feedback-e-memoria">3. Feed Forward, Feedback e Memória</a></h2>
+<table>
+<thead>
+<tr>
+<th>Feed Forward (antes da execução)</th>
+<th>Feedback (após a execução)</th>
+<th>Memória (v3.2)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>docs/wiki/index.md</code></td>
+<td>lint</td>
+<td><code>docs/wiki/log.md</code></td>
+</tr>
+<tr>
+<td><code>docs/wiki/context/&lt;F-NNN&gt;.md</code></td>
+<td>typecheck</td>
+<td><code>docs/wiki/runbooks/&lt;slug&gt;.md</code></td>
+</tr>
+<tr>
+<td>PRD</td>
+<td>unit tests</td>
+<td><code>docs/wiki/features/&lt;F-NNN&gt;.md</code> (após merge)</td>
+</tr>
+<tr>
+<td>SPEC + Anti-SPEC</td>
+<td>integration tests</td>
+<td><code>docs/wiki/modules/&lt;mod&gt;.md</code></td>
+</tr>
+<tr>
+<td>AGENTS.md</td>
+<td>contract tests</td>
+<td><code>docs/wiki/overview.md</code></td>
+</tr>
+<tr>
+<td>CLAUDE.md</td>
+<td>e2e tests</td>
+<td><code>docs/wiki/architecture.md</code></td>
+</tr>
+<tr>
+<td>TODO.md</td>
+<td>build</td>
+<td><code>docs/plans/DECISIONS_LOG.md</code></td>
+</tr>
+<tr>
+<td>contratos Zod</td>
+<td>smoke tests</td>
+<td>ADRs (<code>docs/decisions/adr/</code>)</td>
+</tr>
+<tr>
+<td>critérios de aceite</td>
+<td>CI por níveis N1/N2/N3</td>
+<td></td>
+</tr>
+<tr>
+<td>Definition of Ready</td>
+<td>Matriz de Validação</td>
+<td></td>
+</tr>
+<tr>
+<td>Feature Contract</td>
+<td>Validation Mode (B/C/D)</td>
+<td></td>
+</tr>
+<tr>
+<td>Classificação A/B/C/D</td>
+<td>Checagem de arquivos vs permitidos</td>
+<td></td>
+</tr>
+<tr>
+<td>CURRENT_REALITY.md</td>
+<td>Anti-SPEC explícita</td>
+<td></td>
+</tr>
+<tr>
+<td><code>wiki/log.md</code> recente</td>
+<td>Validação de staging/rollback/smoke (D)</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Quanto melhor o Feed Forward</strong>, mais previsível o output.
+<strong>Quanto melhor o Feedback</strong>, menor o risco de degradação acumulada.
+<strong>Quanto melhor a Memória</strong> (v3.2), menos retrabalho em sessões futuras e melhor continuidade entre agentes.</p>
+<hr>
+<h2 id="4-estrutura-padrao-do-projeto"><a class="toclink" href="#4-estrutura-padrao-do-projeto">4. Estrutura padrão do projeto</a></h2>
+<pre><code>projeto/
+├── AGENTS.md                         contrato com agentes (≤360 linhas, v3.2)
+├── CLAUDE.md                         ajustes específicos do Claude Code (≤140 linhas, v3.2)
+├── TODO.md                           estado vivo + Feature Contract inline (B/C/D)
+├── README.md
+├── docs/
+│   ├── product/PRD.md                o quê e por quê
+│   ├── specs/SPEC.md                 RFs + CAs + Anti-SPEC (§6 sagrada)
+│   ├── contracts/CONTRACTS.md        espelho legível de packages/shared/types/
+│   ├── plans/
+│   │   ├── PLAN.md                                ondas (opcional)
+│   │   ├── CURRENT_REALITY.md                     estado real (projetos existentes)
+│   │   ├── DECISIONS_LOG.md                       decisões operacionais (volta ao debate)
+│   │   ├── risk-classification.md                 A/B/C/D
+│   │   ├── FEATURE-CONTRACT-template.md           template local
+│   │   ├── VALIDATION-MATRIX-template.md          template local
+│   │   ├── skills-manifest.md                     output do /skill-scout (opcional)
+│   │   ├── cursor-brief.md                        brief de infra MCP (opcional)
+│   │   └── feature-contracts/F-NNN.md             contratos extensos (C/D)
+│   ├── wiki/                         PROJECT WIKI (v3.2 — memória sintetizada viva)
+│   │   ├── index.md                  mapa principal (lido primeiro por todo agente)
+│   │   ├── log.md                    histórico cronológico (≤ 200 linhas)
+│   │   ├── overview.md               projeto em 1 página
+│   │   ├── architecture.md           arquitetura técnica viva
+│   │   ├── modules/                  1 página por módulo (auth, db, payments, ...)
+│   │   ├── features/                 resumo curto após merge (C/D)
+│   │   ├── runbooks/                 deploy, rollback, smoke, bug recorrente
+│   │   └── context/                  Context Packs por tarefa (descartáveis)
+│   └── decisions/adr/                1 arquivo por decisão arquitetural
+├── apps/                             código das aplicações
+├── packages/shared/types/            FONTE DE VERDADE dos contratos (Zod/TS)
+├── tests/unit|integration|contract|e2e/
+├── infra/                            migrations, configs de deploy
+└── .github/workflows/ci.yml          N1 ativo + N2/N3 comentados
+</code></pre>
+<p><strong>Pastas que NUNCA existem:</strong> <code>state/</code>, <code>handoffs/</code>, <code>AGENT-BRIEFS/</code>, <code>progress.jsonl</code>, <code>scripts/</code> genérico na raiz.</p>
+<hr>
+<h2 id="5-as-8-skills"><a class="toclink" href="#5-as-8-skills">5. As 8 skills</a></h2>
+<p>Ordem canônica em projeto novo: <strong>1 → 2 → 3 → (4 opcional) → 5 → loop com 6/7/8 conforme cenário</strong>.</p>
+<h3 id="51-project-kickoff"><a class="toclink" href="#51-project-kickoff">5.1. <code>/project-kickoff</code></a></h3>
+<p>Cria estrutura padrão. Em v3.2, copia também <code>docs/wiki/</code> populada com <code>index.md</code>, <code>log.md</code>, <code>overview.md</code>, <code>architecture.md</code> + diretórios <code>modules/</code>, <code>features/</code>, <code>runbooks/</code>, <code>context/</code>.</p>
+<h3 id="52-consultor-prd"><a class="toclink" href="#52-consultor-prd">5.2. <code>/consultor-prd</code></a></h3>
+<p>16 etapas de discovery → <code>docs/product/PRD.md</code>. Em modo retroativo, lê <code>CURRENT_REALITY.md</code> primeiro.</p>
+<h3 id="53-sdd-avancado"><a class="toclink" href="#53-sdd-avancado">5.3. <code>/SDD-avancado</code></a></h3>
+<p>Com PRD aprovado, gera <code>SPEC.md</code> (Anti-SPEC sagrada) + <code>CONTRACTS.md</code> (espelho) + schemas Zod + <code>TODO.md</code> com features classificadas A/B/C/D, DoR embutida e Feature Contract inline para B/C/D.</p>
+<h3 id="54-skill-scout-opcional"><a class="toclink" href="#54-skill-scout-opcional">5.4. <code>/skill-scout</code> (opcional)</a></h3>
+<p>Gate de 3 níveis (nativo/MCP → skill existente → criar skill) + análise de risco operacional → <code>docs/plans/skills-manifest.md</code>.</p>
+<h3 id="55-agents-protocol"><a class="toclink" href="#55-agents-protocol">5.5. <code>/agents-protocol</code></a></h3>
+<p>Atualiza <code>AGENTS.md</code> com papéis + classificação + autonomia. Gera <code>cursor-brief.md</code> com Rollback obrigatório quando há classe D.</p>
+<h3 id="56-wiki-novo-v32"><a class="toclink" href="#56-wiki-novo-v32">5.6. <code>/wiki</code> (NOVO v3.2)</a></h3>
+<p>Mantém a Project Wiki. Modos: <code>ingest</code> (processa fonte bruta), <code>context</code> (cria Context Pack), <code>lint</code> (audita), <code>repair</code> (corrige). Detalhes em §12.</p>
+<h3 id="57-fast-fix-novo-v32"><a class="toclink" href="#57-fast-fix-novo-v32">5.7. <code>/fast-fix</code> (NOVO v3.2)</a></h3>
+<p>Modo Project Quick para bug urgente classe A/B sem auth/payment/db, &lt; 30 min. Detalhes em §13.</p>
+<h3 id="58-triage-bugs-novo-v32"><a class="toclink" href="#58-triage-bugs-novo-v32">5.8. <code>/triage-bugs</code> (NOVO v3.2)</a></h3>
+<p>Triagem em lote de bugs (cliente, suporte, equipe). Recebe lista colada, devolve em &lt; 5 min: classificação por bug + modo recomendado + prioridade + plano do dia + atualização estruturada do <code>TODO.md §5</code>. <strong>Nunca executa fix automaticamente</strong> — humano confirma o plano. Detalhes em §21.</p>
+<hr>
+<h2 id="6-os-4-prompts-do-dia-a-dia"><a class="toclink" href="#6-os-4-prompts-do-dia-a-dia">6. Os 4 prompts do dia a dia</a></h2>
+<blockquote>
+<p>Versão canônica em <code>skills/agents-protocol/references/prompts-cheatsheet.md</code>.</p>
+</blockquote>
+<h3 id="prompt-0-fast-fix-novo-v32"><a class="toclink" href="#prompt-0-fast-fix-novo-v32">Prompt 0 — Fast Fix (NOVO v3.2)</a></h3>
+<p>Bug urgente classe A/B. Lê <code>wiki/runbooks/</code> e <code>wiki/log.md</code> primeiro. Gates duros: auth/payment/db/env/deploy → SAIR. Diff &gt; 50 linhas → SAIR. Tempo &gt; 30 min → SAIR. Termina com 1 linha em <code>wiki/log.md</code> e runbook se bug capaz de voltar.</p>
+<h3 id="prompt-1-inicio-de-sessao"><a class="toclink" href="#prompt-1-inicio-de-sessao">Prompt 1 — Início de sessão</a></h3>
+<p>Lê <code>wiki/index.md</code> + <code>wiki/context/&lt;atual&gt;.md</code> + <code>TODO.md</code> + <code>AGENTS.md</code> + Feature Contract + <code>wiki/log.md</code> recente + <code>git status</code>. Reporta fase, classe, DoR, Feature Contract presente, wiki health, autonomia.</p>
+<h3 id="prompt-2-implementar-feature"><a class="toclink" href="#prompt-2-implementar-feature">Prompt 2 — Implementar feature</a></h3>
+<p>Valida DoR → reclassifica se necessário → cria Feature Contract para B/C/D → atualiza Zod primeiro → branch → teste falhando → implementação → CI no nível da classe → matriz de validação → docs → PR ou merge → atualiza TODO. <strong>Pós-merge (v3.2):</strong> linha em <code>wiki/log.md</code>, resumo em <code>wiki/features/</code> (C/D), atualização de <code>wiki/modules/</code> se aplicável, deleção do Context Pack consumido.</p>
+<h3 id="prompt-3-qa-do-pr-validation-mode"><a class="toclink" href="#prompt-3-qa-do-pr-validation-mode">Prompt 3 — QA do PR (Validation Mode)</a></h3>
+<p>Lê Feature Contract → <code>git diff</code> → arquivos alterados vs permitidos → contratos → Anti-SPEC → matriz CA→teste→tipo→<strong>status</strong>→<strong>evidência</strong> → tenta quebrar (Validation Mode) → CI → produção (D). Retorna <strong>APROVADO | MUDANÇAS_SOLICITADAS | BLOQUEADO</strong>. Nunca APROVADO sem evidência.</p>
+<hr>
+<h2 id="7-classificacao-de-risco-abcd"><a class="toclink" href="#7-classificacao-de-risco-abcd">7. Classificação de risco A/B/C/D</a></h2>
+<table>
+<thead>
+<tr>
+<th>Classe</th>
+<th>Exemplos</th>
+<th>Feed Forward</th>
+<th>CI alvo</th>
+<th>Feedback extra</th>
+<th>Modo recomendado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A</strong></td>
+<td>typo, layout, ajuste sem contrato</td>
+<td>item simples no TODO</td>
+<td>N1</td>
+<td>merge direto em <code>main</code> permitido</td>
+<td>Standard ou Fast Fix</td>
+</tr>
+<tr>
+<td><strong>B</strong></td>
+<td>CRUD simples, endpoint não crítico</td>
+<td>DoR + Feature Contract inline</td>
+<td>N1 + matriz</td>
+<td>branch <code>feat/*</code> obrigatória</td>
+<td>Standard ou Fast Fix</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td>auth, pagamento, permissões, dados sensíveis</td>
+<td>DoR + Feature Contract (detalhado) + Anti-SPEC revisada</td>
+<td>N2 (integration + contract + build)</td>
+<td>revisão humana sugerida</td>
+<td>Deep Work</td>
+</tr>
+<tr>
+<td><strong>D</strong></td>
+<td>migration, RLS, deploy, env, Stripe/MP</td>
+<td>DoR + Feature Contract + cursor-brief + rollback + feature flag</td>
+<td>N3 (e2e + smoke + migration validation)</td>
+<td>staging <strong>obrigatório</strong></td>
+<td>Production</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Desempates:</strong>
+1. Toca produção/banco real/envs → D.
+2. Envolve auth/dinheiro/permissões/dados sensíveis → C.
+3. Cria/altera contrato público → mínimo B.
+4. Código isolado sem contrato → A.
+5. Em dúvida, escolha a classe mais alta.</p>
+<p>Referência completa: <code>docs/plans/risk-classification.md</code>.</p>
+<hr>
+<h2 id="8-definition-of-ready"><a class="toclink" href="#8-definition-of-ready">8. Definition of Ready</a></h2>
+<p>Feature com DoR incompleta <strong>não entra em execução</strong>. No Prompt 2, se DoR está incompleta em domínio sensível (produção, banco, auth, pagamento, dados sensíveis) → <code>BLOQUEADO — DEFINITION OF READY INCOMPLETA</code>.</p>
+<p>Marque antes de começar:
+- [ ] RFs vinculados ou justificativa clara.
+- [ ] CAs claros e testáveis.
+- [ ] Escopo <strong>incluído</strong> descrito.
+- [ ] Escopo <strong>excluído</strong> descrito.
+- [ ] Classificação A/B/C/D confirmada.
+- [ ] Arquivos prováveis de alteração listados.
+- [ ] Testes esperados (unit / integration / contract / e2e / smoke).
+- [ ] Contratos Zod necessários ou decisão de que não precisa.
+- [ ] Dependências externas.
+- [ ] Impacto em banco.
+- [ ] Impacto em produção (staging, rollback, feature flag).</p>
+<p>Onde vive: <strong>inline no item do <code>TODO.md</code></strong>, junto com o Feature Contract.</p>
+<hr>
+<h2 id="9-feature-contract"><a class="toclink" href="#9-feature-contract">9. Feature Contract</a></h2>
+<p>Obrigatório para <strong>B, C, D</strong>. Opcional para A.</p>
+<p><strong>Campos:</strong>
+- ID + nome + risco + cobre RF(s) + branch + CI alvo
+- Objetivo (1–3 frases)
+- Definition of Ready (checklist acima)
+- Critérios de aceite
+- Escopo incluído / excluído
+- Arquivos <strong>que podem ser alterados</strong>
+- Arquivos <strong>que NÃO podem ser alterados</strong> (qualquer alteração exige pausa)
+- Contratos Zod (a usar/criar)
+- Testes obrigatórios (matriz teste → tipo → CA → arquivo)
+- Comandos obrigatórios (CI no nível alvo)
+- Infra/Produção (só C/D): migration, env, staging, feature flag, <strong>rollback plan</strong>
+- Anti-SPEC relevante (itens específicos)
+- Matriz de validação (preenchida no QA)
+- Gate de autonomia</p>
+<p><strong>Onde vive:</strong>
+1. <strong>Preferência:</strong> bloco inline dentro do item do <code>TODO.md</code>.
+2. Alternativa: <code>docs/plans/feature-contracts/F-NNN.md</code> se passar de ~40 linhas (típico C/D).</p>
+<p>Template completo: <code>docs/plans/FEATURE-CONTRACT-template.md</code>.</p>
+<hr>
+<h2 id="10-matriz-de-validacao"><a class="toclink" href="#10-matriz-de-validacao">10. Matriz de Validação</a></h2>
+<p><strong>Obrigatória no Prompt 3 (QA) para B/C/D.</strong> Sem evidência objetiva em algum CA → <code>MUDANÇAS_SOLICITADAS</code>. Nunca <code>APROVADO</code>.</p>
+<table>
+<thead>
+<tr>
+<th>CA</th>
+<th>Teste</th>
+<th>Tipo</th>
+<th>Status</th>
+<th>Evidência</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CA-001</td>
+<td><code>auth.login.test.ts::valid_credentials</code></td>
+<td>integration</td>
+<td>passou</td>
+<td><code>npm test -- auth.login</code> log</td>
+</tr>
+<tr>
+<td>CA-002</td>
+<td><code>auth.login.test.ts::invalid_password</code></td>
+<td>integration</td>
+<td>passou</td>
+<td>idem</td>
+</tr>
+<tr>
+<td>CA-003</td>
+<td><code>login.spec.ts::happy_path</code></td>
+<td>e2e</td>
+<td>passou</td>
+<td>Playwright report</td>
+</tr>
+<tr>
+<td>CA-004</td>
+<td>N/A</td>
+<td>não coberto</td>
+<td>falhou</td>
+<td>criar teste antes do merge</td>
+</tr>
+</tbody>
+</table>
+<p><strong>O que conta como evidência:</strong> saída de <code>npm test</code> com teste nomeado, Playwright report, CI log com <code>✔ passed</code>, migration aplicada em staging com <code>select</code>, script de smoke com exit code 0.</p>
+<p><strong>O que NÃO conta:</strong> afirmação do agente, "o código parece correto", teste com <code>.skip</code>/<code>.only</code>, cobertura genérica sem amarração ao CA.</p>
+<hr>
+<h2 id="11-ci-por-niveis"><a class="toclink" href="#11-ci-por-niveis">11. CI por níveis</a></h2>
+<table>
+<thead>
+<tr>
+<th>Nível</th>
+<th>Contém</th>
+<th>Obrigatório para</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>N1</strong></td>
+<td>lint + typecheck + unit (+ build se rápido)</td>
+<td>A, B, <strong>Fast Fix</strong></td>
+</tr>
+<tr>
+<td><strong>N2</strong></td>
+<td>N1 + integration + contract + db validation + build</td>
+<td>B relevante, C</td>
+</tr>
+<tr>
+<td><strong>N3</strong></td>
+<td>N2 + e2e + smoke + migration validation + preview deploy check</td>
+<td>C crítica, D</td>
+</tr>
+</tbody>
+</table>
+<p>Cada projeto mapeia os scripts reais. O que importa é o <strong>escopo do gate</strong>, não o comando.</p>
+<hr>
+<h2 id="12-project-wiki-memoria-sintetizada-viva"><a class="toclink" href="#12-project-wiki-memoria-sintetizada-viva">12. Project Wiki — memória sintetizada viva</a></h2>
+<p>A Project Wiki vive em <code>docs/wiki/</code>. É <strong>memória sintetizada</strong> entre fontes brutas (prints, logs, decisões, transcrições de Cursor/Codex) e os agentes (Claude Code, Codex, Cursor).</p>
+<p><strong>Princípio:</strong> a wiki <strong>nunca</strong> substitui PRD/SPEC/CONTRACTS/ADR. Sintetiza e linka.</p>
+<h3 id="121-estrutura"><a class="toclink" href="#121-estrutura">12.1. Estrutura</a></h3>
+<table>
+<thead>
+<tr>
+<th>Página</th>
+<th>Conteúdo</th>
+<th>Tamanho-alvo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>wiki/index.md</code></td>
+<td>mapa principal — primeira leitura</td>
+<td>≤ 80 linhas</td>
+</tr>
+<tr>
+<td><code>wiki/log.md</code></td>
+<td>histórico cronológico (ingest, releases, bug fixes, validações)</td>
+<td>≤ 200 linhas</td>
+</tr>
+<tr>
+<td><code>wiki/overview.md</code></td>
+<td>1 página com o projeto hoje (síntese do PRD)</td>
+<td>≤ 150 linhas</td>
+</tr>
+<tr>
+<td><code>wiki/architecture.md</code></td>
+<td>arquitetura técnica viva (síntese do SPEC + código real)</td>
+<td>≤ 150 linhas</td>
+</tr>
+<tr>
+<td><code>wiki/modules/&lt;mod&gt;.md</code></td>
+<td>memória por área (auth, db, payments, deploy)</td>
+<td>≤ 200 linhas</td>
+</tr>
+<tr>
+<td><code>wiki/features/&lt;F-NNN&gt;.md</code></td>
+<td>resumo de 1 parágrafo após merge (C/D)</td>
+<td>≤ 30 linhas</td>
+</tr>
+<tr>
+<td><code>wiki/runbooks/&lt;slug&gt;.md</code></td>
+<td>passos para deploy, rollback, smoke, bug recorrente</td>
+<td>≤ 150 linhas</td>
+</tr>
+<tr>
+<td><code>wiki/context/&lt;F-NNN&gt;.md</code></td>
+<td>Context Pack por tarefa (descartável)</td>
+<td>≤ 150 linhas</td>
+</tr>
+</tbody>
+</table>
+<h3 id="122-skill-wiki-4-modos"><a class="toclink" href="#122-skill-wiki-4-modos">12.2. Skill <code>/wiki</code> — 4 modos</a></h3>
+<table>
+<thead>
+<tr>
+<th>Modo</th>
+<th>Quando usar</th>
+<th>Saída</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>/wiki ingest &lt;fonte&gt;</code></strong></td>
+<td>usuário cola print/log/erro/transcript/decisão</td>
+<td>atualiza páginas relevantes + linha em <code>log.md</code> tipo <code>INGEST</code></td>
+</tr>
+<tr>
+<td><strong><code>/wiki context &lt;F-NNN&gt;</code></strong></td>
+<td>antes de feature significativa; ou para handoff entre agentes</td>
+<td>cria/atualiza <code>wiki/context/&lt;F-NNN&gt;.md</code></td>
+</tr>
+<tr>
+<td><strong><code>/wiki lint</code></strong></td>
+<td>início de projeto bagunçado; antes de refactor grande; antes de produção</td>
+<td>relatório curto (somente leitura)</td>
+</tr>
+<tr>
+<td><strong><code>/wiki repair</code></strong></td>
+<td>depois de lint, para aplicar correções</td>
+<td>edita páginas + arquiva log se inchado</td>
+</tr>
+</tbody>
+</table>
+<h3 id="123-quando-usar-a-wiki"><a class="toclink" href="#123-quando-usar-a-wiki">12.3. Quando usar a wiki</a></h3>
+<table>
+<thead>
+<tr>
+<th>Cenário</th>
+<th>Comece por</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Início de sessão</td>
+<td>ler <code>wiki/index.md</code> + <code>wiki/context/&lt;atual&gt;.md</code></td>
+</tr>
+<tr>
+<td>Bug urgente</td>
+<td><code>/fast-fix</code> (lê <code>wiki/runbooks/</code> + <code>wiki/log.md</code>)</td>
+</tr>
+<tr>
+<td>Nova feature B/C/D</td>
+<td><code>/wiki context F-NNN</code> antes do Prompt 2</td>
+</tr>
+<tr>
+<td>Continuar em outro agente</td>
+<td>abrir <code>wiki/index.md</code> + <code>wiki/context/&lt;atual&gt;.md</code></td>
+</tr>
+<tr>
+<td>Projeto bagunçado</td>
+<td><code>/wiki lint</code> → <code>/wiki repair</code> antes de codar</td>
+</tr>
+<tr>
+<td>Após merge C/D</td>
+<td>resumo curto em <code>wiki/features/F-NNN.md</code></td>
+</tr>
+<tr>
+<td>Bug recorrente (≥ 2 ocorrências)</td>
+<td>criar <code>wiki/runbooks/bug-&lt;slug&gt;.md</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="124-fonte-de-verdade-vs-wiki"><a class="toclink" href="#124-fonte-de-verdade-vs-wiki">12.4. Fonte de verdade vs. wiki</a></h3>
+<table>
+<thead>
+<tr>
+<th>Domínio</th>
+<th>Fonte de verdade</th>
+<th>Espelho na wiki</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Produto</td>
+<td><code>docs/product/PRD.md</code></td>
+<td><code>wiki/overview.md</code></td>
+</tr>
+<tr>
+<td>Comportamento + Anti-SPEC</td>
+<td><code>docs/specs/SPEC.md</code></td>
+<td><code>wiki/architecture.md</code> (resumo)</td>
+</tr>
+<tr>
+<td>Contratos</td>
+<td><code>packages/shared/types/</code> (Zod)</td>
+<td><code>docs/contracts/CONTRACTS.md</code> (legível)</td>
+</tr>
+<tr>
+<td>Decisão arquitetural</td>
+<td><code>docs/decisions/adr/ADR-NNN.md</code></td>
+<td>citada em <code>wiki/architecture.md</code></td>
+</tr>
+<tr>
+<td>Decisão operacional</td>
+<td><code>docs/plans/DECISIONS_LOG.md</code></td>
+<td>linha em <code>wiki/log.md</code> quando relevante</td>
+</tr>
+<tr>
+<td>Estado vivo</td>
+<td><code>TODO.md</code> + <code>git log</code></td>
+<td>resumo em <code>wiki/log.md</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="125-cadencia"><a class="toclink" href="#125-cadencia">12.5. Cadência</a></h3>
+<ul>
+<li><strong>Diariamente (em loop normal):</strong> linha em <code>wiki/log.md</code> por release/bugfix; Context Pack se a tarefa continua.</li>
+<li><strong>A cada 2-4 semanas, ou antes de release:</strong> rode <code>/wiki lint</code>. Se relatar amarelo/vermelho, <code>/wiki repair</code> na próxima janela.</li>
+<li><strong>NÃO use <code>/wiki lint</code> antes de cada microtarefa.</strong> É checkpoint, não cerimônia.</li>
+</ul>
+<hr>
+<h2 id="13-fast-fix-project-quick-para-bug-urgente"><a class="toclink" href="#13-fast-fix-project-quick-para-bug-urgente">13. Fast Fix — Project Quick para bug urgente</a></h2>
+<p><code>/fast-fix</code> é o <strong>modo Project Quick</strong>: bug urgente classe A/B sem auth/payment/dados sensíveis/banco/env/deploy, &lt; 30 min do diagnóstico ao PR.</p>
+<h3 id="131-quando-usar"><a class="toclink" href="#131-quando-usar">13.1. Quando USAR</a></h3>
+<p>Reúna <strong>TODOS</strong>:</p>
+<ul>
+<li>[ ] Bug confirmado (não suspeita).</li>
+<li>[ ] Classe A ou B.</li>
+<li>[ ] Não toca: auth, autorização, pagamento/billing, webhook financeiro, dados sensíveis/financeiros, RLS, migration, env vars, deploy, integração externa crítica.</li>
+<li>[ ] Estimativa &lt; 30 min.</li>
+<li>[ ] Você confirma a urgência (cliente travado, demo iminente, dev parado).</li>
+</ul>
+<h3 id="132-quando-nao-usar"><a class="toclink" href="#132-quando-nao-usar">13.2. Quando NÃO usar</a></h3>
+<ul>
+<li>Toca auth/payment/dados sensíveis → Standard/Deep Work.</li>
+<li>Exige migration/rollback/deploy → Production.</li>
+<li>"Acho que é fácil" sem diagnóstico → Standard.</li>
+<li>Sem teste reproduzindo → Standard (escreva teste primeiro).</li>
+<li>Bug recorrente (≥ 2 ocorrências passadas) → Deep Work.</li>
+</ul>
+<h3 id="133-processo-resumido-prompt-0"><a class="toclink" href="#133-processo-resumido-prompt-0">13.3. Processo (resumido — Prompt 0)</a></h3>
+<ol>
+<li><strong>Screen</strong> (60s) — <code>wiki/index.md</code>, <code>wiki/runbooks/</code>, <code>wiki/log.md</code> últimos 30 dias, <code>TODO.md §5</code>. Se runbook existe, <strong>siga o runbook</strong>.</li>
+<li><strong>Gate de classe</strong> (30s) — confirmar A/B sem domínios sensíveis. Se não, SAIR.</li>
+<li><strong>Reprodução</strong> (5 min) — UM teste falha do jeito esperado.</li>
+<li><strong>Fix</strong> (10–15 min) — diff mínimo, ≤ 3 arquivos, ≤ 50 linhas.</li>
+<li><strong>Validação</strong> (3 min) — CI N1 verde.</li>
+<li><strong>Wiki memory</strong> (1 min) — linha em <code>wiki/log.md</code> tipo <code>BUGFIX</code>. Runbook se bug capaz de voltar.</li>
+<li><strong>PR/Commit</strong> — A: commit em main; B: branch + PR + CI verde.</li>
+<li><strong>Fechamento</strong> (30s) — TODO.md §5 → Resolvido.</li>
+</ol>
+<h3 id="134-gates-duros-saida-automatica-do-modo"><a class="toclink" href="#134-gates-duros-saida-automatica-do-modo">13.4. Gates duros (saída automática do modo)</a></h3>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Se falha</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Toca auth/payment/dados sensíveis</td>
+<td>SAIR — escalar para Standard/Deep Work</td>
+</tr>
+<tr>
+<td>Diff &gt; 50 linhas ou &gt; 3 arquivos</td>
+<td>SAIR</td>
+</tr>
+<tr>
+<td>Tempo &gt; 30 min</td>
+<td>SAIR</td>
+</tr>
+<tr>
+<td>Migration/env/deploy aparecem</td>
+<td>SAIR — escalar para Production</td>
+</tr>
+<tr>
+<td>Sem teste reproduzindo</td>
+<td>SAIR — escrever teste via Standard</td>
+</tr>
+<tr>
+<td>≥ 2 ocorrências passadas</td>
+<td>SAIR — Deep Work (bug com causa profunda)</td>
+</tr>
+</tbody>
+</table>
+<p>Detalhes completos em <code>skills/fast-fix/SKILL.md</code>. Antipadrões em <code>skills/fast-fix/references/anti-patterns.md</code>.</p>
+<hr>
+<h2 id="14-modos-de-rigor"><a class="toclink" href="#14-modos-de-rigor">14. Modos de rigor</a></h2>
+<p>Escala de cerimônia. Comece pelo modo do tamanho do risco. Em dúvida, suba.</p>
+<table>
+<thead>
+<tr>
+<th>Modo</th>
+<th>Quando</th>
+<th>Cerimônia</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MVP Lite</strong> (NOVO v3.2)</td>
+<td>validação de ideia, hackathon, protótipo &lt; 1 semana, <strong>sem produção, sem dinheiro real, sem dados sensíveis</strong></td>
+<td>só <code>TODO.md</code> + classe + branch + 1 teste no caminho crítico + commit + linha em <code>wiki/log.md</code>. Sem PRD/SPEC/Feature Contract obrigatórios.</td>
+</tr>
+<tr>
+<td><strong>Fast Fix</strong></td>
+<td>bug urgente A/B sem domínios sensíveis, &lt; 30 min</td>
+<td><code>/fast-fix</code> (Prompt 0) — gates duros, sai do modo se escala</td>
+</tr>
+<tr>
+<td><strong>Standard</strong></td>
+<td>feature B</td>
+<td>Feature Contract inline + matriz + Validation Mode no QA</td>
+</tr>
+<tr>
+<td><strong>Deep Work</strong></td>
+<td>feature C</td>
+<td>Feature Contract detalhado + Validation Mode forte + revisão humana sugerida</td>
+</tr>
+<tr>
+<td><strong>Production</strong></td>
+<td>classe D (migration/deploy/env)</td>
+<td>Feature Contract + cursor-brief + rollback + staging + smoke + e2e</td>
+</tr>
+<tr>
+<td><strong>Project Reorg</strong></td>
+<td>projeto bagunçado</td>
+<td><code>/wiki lint</code> + CURRENT_REALITY + 0 código até autorização</td>
+</tr>
+</tbody>
+</table>
+<h3 id="145-mvp-lite-quando-e-como-novo-v32"><a class="toclink" href="#145-mvp-lite-quando-e-como-novo-v32">14.5. MVP Lite — quando e como (NOVO v3.2)</a></h3>
+<p>Resolve o gap entre "pular o Harness inteiro" (que era a única opção em v3.1) e "Standard com Feature Contract" (que é overkill para validar ideia em 3 dias).</p>
+<p><strong>Use MVP Lite quando TODOS os critérios baterem:</strong></p>
+<ul>
+<li>[ ] Vida estimada do projeto/módulo &lt; 1 semana <strong>OU</strong> propósito é validar ideia antes de decidir se vira projeto.</li>
+<li>[ ] Não vai para produção real (cliente real / dinheiro real / dados sensíveis).</li>
+<li>[ ] Sem auth crítica, sem payment, sem webhook financeiro, sem RLS.</li>
+<li>[ ] Você aceita jogar o código fora se a hipótese falhar.</li>
+</ul>
+<p><strong>Cerimônia mínima do MVP Lite:</strong></p>
+<ol>
+<li><code>/project-kickoff</code> cria a estrutura (mas você ignora a maioria dos templates).</li>
+<li>Anote a hipótese em <code>TODO.md</code>:
+   <code>## Hipótese MVP
+   - O que valido: [ex: usuários convertem mais com onboarding em 1 step vs 3 steps]
+   - Como sei que validou: [ex: ≥ 30% conversão em 50 sessões]
+   - Prazo: [ex: 4 dias]
+   - Critério de promoção a Standard: [ex: hipótese validada → migrar para PRD/SPEC retroativos]</code></li>
+<li>Loop:
+   - Crie branch <code>mvp/&lt;slug&gt;</code>.
+   - Implemente o caminho crítico.
+   - <strong>1 teste no caminho crítico</strong> (não 5, não nenhum — exatamente 1 que prova que o fluxo principal funciona).
+   - Commit.
+   - 1 linha em <code>wiki/log.md</code> tipo <code>[MVP]</code>.</li>
+<li>Sem PRD/SPEC/CONTRACTS/Feature Contract/matriz obrigatórios.</li>
+<li>Wiki só recebe o <code>log.md</code> (sem overview/architecture/runbooks até virar Standard).</li>
+</ol>
+<p><strong>Quando MVP Lite vira obrigatoriamente Standard:</strong></p>
+<ul>
+<li>O MVP foi validado e vai virar produto. <strong>Migre antes da próxima feature relevante:</strong>
+  1. Cenário B (§16) — gere <code>CURRENT_REALITY.md</code> do que existe.
+  2. <code>/consultor-prd</code> retroativo → PRD.
+  3. <code>/SDD-avancado</code> retroativo → SPEC + Anti-SPEC + Zod.
+  4. <code>/agents-protocol</code> → AGENTS.md + cursor-brief se houver D.</li>
+<li>O MVP começou a tocar produção, auth, payment ou dados sensíveis. <strong>Pare imediatamente:</strong> abra Feature Contract para a próxima feature ANTES de continuar.</li>
+<li>O MVP passou de 1 semana de uso real (mesmo interno).</li>
+</ul>
+<p><strong>Antipadrões do MVP Lite:</strong></p>
+<ul>
+<li>"Vou usar MVP Lite porque é mais rápido" para algo que vai a produção. <strong>Não.</strong> MVP Lite é para validação descartável.</li>
+<li>Ficar &gt; 2 semanas em MVP Lite. <strong>Migre ou descarte.</strong> Cada dia extra acumula dívida invisível.</li>
+<li>MVP Lite com auth real ou conexão a banco de produção. <strong>Não.</strong> Use Standard.</li>
+</ul>
+<hr>
+<h2 id="15-cenario-a-projeto-novo"><a class="toclink" href="#15-cenario-a-projeto-novo">15. Cenário A — Projeto novo</a></h2>
+<hr>
+<h2 id="15-cenario-a-projeto-novo_1"><a class="toclink" href="#15-cenario-a-projeto-novo_1">15. Cenário A — Projeto novo</a></h2>
+<ol>
+<li><code>mkdir meu-saas &amp;&amp; cd meu-saas</code></li>
+<li><code>/project-kickoff</code> — estrutura + templates v3.2 em <code>docs/plans/</code> e <code>docs/wiki/</code>.</li>
+<li><code>/consultor-prd</code> — 16 etapas → PRD.md.</li>
+<li><code>/SDD-avancado</code> — SPEC + CONTRACTS + Zod + TODO com A/B/C/D + Feature Contract inline.</li>
+<li><strong>(NOVO v3.2)</strong> Peça ao agente:
+   - "atualize <code>docs/wiki/overview.md</code> a partir do PRD"
+   - "atualize <code>docs/wiki/architecture.md</code> a partir do SPEC"</li>
+<li><code>/skill-scout</code> opcional.</li>
+<li><code>/agents-protocol</code> — AGENTS.md + cursor-brief.md se houver D.</li>
+<li>Loop de features: Prompt 1 → Prompt 2 → Prompt 3.</li>
+<li><strong>Pós-merge (v3.2):</strong> linha em <code>wiki/log.md</code>, resumo em <code>wiki/features/</code> (C/D), <code>/wiki context F-NNN+1</code> se quiser preparar a próxima.</li>
+</ol>
+<hr>
+<h2 id="16-cenario-b-projeto-ja-iniciado"><a class="toclink" href="#16-cenario-b-projeto-ja-iniciado">16. Cenário B — Projeto já iniciado</a></h2>
+<ol>
+<li><strong>Diagnóstico</strong> — <code>/wiki lint</code> antes de tudo (ainda sem wiki, vai dar vermelho — esperado).</li>
+<li><strong>Espinha mínima:</strong> copie <code>AGENTS.md</code> v3.2, <code>TODO.md</code>, <code>CLAUDE.md</code> v3.2, <code>ci.yml</code>, ADR template + pastas <code>docs/plans/</code>, <code>docs/wiki/</code>, <code>packages/shared/types/</code>.</li>
+<li><strong>Obrigatório: <code>docs/plans/CURRENT_REALITY.md</code></strong> — gere antes de PRD/SPEC retroativos.</li>
+<li><strong>(NOVO v3.2)</strong> <code>/wiki ingest &lt;CURRENT_REALITY&gt;</code> — sintetiza para <code>wiki/overview.md</code> e <code>wiki/architecture.md</code>.</li>
+<li><strong>PRD retroativo</strong> — <code>/consultor-prd</code> em modo retroativo, respeitando CURRENT_REALITY.</li>
+<li><strong>SPEC retroativo a partir do código</strong> — <code>/SDD-avancado</code>, extraindo RFs do que existe.</li>
+<li><code>/agents-protocol</code>.</li>
+<li>Próxima feature nasce v3.2 (Standard/Deep Work conforme classe).</li>
+</ol>
+<p><strong>Regra de ouro:</strong> não traga o código antigo à conformidade num big-bang. Refactor por oportunidade, dentro de Feature Contract.</p>
+<hr>
+<h2 id="17-cenario-c-projeto-em-producao"><a class="toclink" href="#17-cenario-c-projeto-em-producao">17. Cenário C — Projeto em produção</a></h2>
+<p>Diferença vs. B: <strong>adoção gradual, sem tocar no que funciona. Nenhum refactor preventivo.</strong></p>
+<p>Regras:
+- Nenhum refactor preventivo.
+- Nenhuma migration preventiva.
+- Paridade de testes antes de refatorar rota.
+- Feature flag se muda contrato público.</p>
+<p>Sequência:
+1. Diagnóstico + <strong>CURRENT_REALITY.md</strong>.
+2. <strong>(NOVO v3.2)</strong> Wiki bootstrapping: <code>wiki/overview.md</code> + <code>wiki/architecture.md</code> + <code>wiki/runbooks/</code> para deploys/rollbacks já existentes.
+3. Espinha mínima priorizando <strong>CI verde primeiro</strong>.
+4. PRD retroativo com seção "Restrições de produção" (tabelas/endpoints intocáveis).
+5. SPEC <strong>parcial</strong> — só para a próxima feature.
+6. <code>CONTRACTS.md</code> só para os tipos da feature nova.
+7. Anti-SPEC crítica: "não mexer em tabela X sem migration plan", "não alterar <code>/v1/*</code>".
+8. ADRs retroativos para decisões já tomadas.
+9. <code>/agents-protocol</code> — toda operação D em produção exige Rollback + staging + smoke.</p>
+<p>Features de produção → <strong>classe D</strong>. Sem exceção quando toca banco/env/deploy real.</p>
+<p><strong>Bug em produção?</strong> → cenário F (<code>/fast-fix</code>) se A/B sem domínios sensíveis. Senão, Production.</p>
+<hr>
+<h2 id="18-cenario-d-projeto-baguncado"><a class="toclink" href="#18-cenario-d-projeto-baguncado">18. Cenário D — Projeto bagunçado</a></h2>
+<p><strong>Objetivo:</strong> chegar à estrutura padrão sem quebrar nada, em incrementos auditáveis.</p>
+<h3 id="fases"><a class="toclink" href="#fases">Fases</a></h3>
+<p><strong>Fase 0 (NOVO v3.2) — Wiki First</strong>
+- <code>/project-kickoff</code> (cria <code>docs/wiki/</code>).
+- <code>/wiki lint</code> — relata vermelho (esperado).
+- Gere <code>docs/plans/CURRENT_REALITY.md</code> (template).
+- <code>/wiki ingest &lt;CURRENT_REALITY&gt;</code> para popular <code>overview.md</code> e <code>architecture.md</code>.
+- <strong>Zero código até esta fase fechar.</strong></p>
+<p><strong>Fase 1 — Inventário</strong> (→ <code>docs/plans/inventario.md</code>).</p>
+<p><strong>Fase 2 — Alvo</strong> (→ <code>docs/plans/target-structure.md</code> com MOVE_PARA/MESCLA/ARQUIVAR/MANTER).</p>
+<p><strong>Fase 3 — Plano em ondas</strong> (→ <code>docs/plans/PLAN.md</code> com ondas R-1..R-5).</p>
+<p><strong>Fase 4 — Execução</strong> — cada item é feature classe B ou C, com Feature Contract.</p>
+<p><strong>Fase 5 — Consolidação</strong> — PRD/SPEC retroativo (cenário B com CURRENT_REALITY).</p>
+<hr>
+<h2 id="19-cenario-e-migracao-v2-v31-v32"><a class="toclink" href="#19-cenario-e-migracao-v2-v31-v32">19. Cenário E — Migração v2 / v3.1 → v3.2</a></h2>
+<h3 id="de-v2-tradicional"><a class="toclink" href="#de-v2-tradicional">De v2 tradicional</a></h3>
+<p>Tabela de conversão (preservada do v3.1):</p>
+<table>
+<thead>
+<tr>
+<th>v2</th>
+<th>v3.2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>state/project-state.json</code></td>
+<td>excluir → <code>TODO.md</code></td>
+</tr>
+<tr>
+<td><code>state/progress.jsonl</code></td>
+<td>excluir → <code>git log</code> + <code>wiki/log.md</code></td>
+</tr>
+<tr>
+<td><code>state/handoffs/*.json</code></td>
+<td>excluir → <code>wiki/context/&lt;F-NNN&gt;.md</code></td>
+</tr>
+<tr>
+<td><code>state/bugs/*.json</code></td>
+<td>excluir → <code>TODO.md §5</code> + <code>wiki/runbooks/</code> se recorrente</td>
+</tr>
+<tr>
+<td><code>WAVE-PLAN.md</code> por task</td>
+<td><code>PLAN.md</code> por feature (ou remover se ≤6 features)</td>
+</tr>
+<tr>
+<td><code>AGENT-BRIEFS/*</code></td>
+<td>excluir / mover cursor-brief para <code>docs/plans/cursor-brief.md</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="de-v31-v32-mais-simples"><a class="toclink" href="#de-v31-v32-mais-simples">De v3.1 → v3.2 (mais simples)</a></h3>
+<ol>
+<li>Substituir <code>AGENTS.md</code> v3.1 → v3.2 (preserva tudo, adiciona §21 e §22).</li>
+<li>Substituir <code>CLAUDE.md</code> v3.1 → v3.2 (preserva tudo, adiciona wiki/index na leitura inicial).</li>
+<li>Criar <code>docs/wiki/</code> com <code>index.md</code>, <code>log.md</code>, <code>overview.md</code>, <code>architecture.md</code> (gere a partir de PRD/SPEC já existentes).</li>
+<li>Criar diretórios vazios <code>wiki/modules/</code>, <code>wiki/features/</code>, <code>wiki/runbooks/</code>, <code>wiki/context/</code>.</li>
+<li>Instalar skills <code>/wiki</code> e <code>/fast-fix</code>.</li>
+<li>Atualizar <code>prompts-cheatsheet.md</code> (adicionar Prompt 0).</li>
+<li>Próxima feature já usa fluxo v3.2.</li>
+</ol>
+<p><strong>Não precisa migrar histórico passado.</strong> O <code>wiki/log.md</code> começa do zero e cresce a partir de agora.</p>
+<hr>
+<h2 id="20-cenario-f-bug-urgente-project-quick"><a class="toclink" href="#20-cenario-f-bug-urgente-project-quick">20. Cenário F — Bug urgente / Project Quick</a></h2>
+<blockquote>
+<p><strong>Foco extra do v3.2.</strong> Cenário mais comum em projetos em produção, em desenvolvimento com prazo, ou demo iminente.</p>
+</blockquote>
+<h3 id="201-diagnostico-em-60-segundos"><a class="toclink" href="#201-diagnostico-em-60-segundos">20.1. Diagnóstico em 60 segundos</a></h3>
+<p>Antes de tocar código:</p>
+<ol>
+<li><strong>Bug confirmado?</strong> Tem repro? Se "acho que é..." → Standard, não Fast Fix.</li>
+<li><strong>Que classe?</strong> Toca auth/payment/dados sensíveis → C; banco/migration/env/deploy → D. <strong>Se C ou D, NÃO use Fast Fix.</strong></li>
+<li><strong>Já apareceu?</strong> Cheque <code>wiki/log.md</code> últimos 30 dias e <code>wiki/runbooks/</code>. Se runbook existe, siga. Se ≥ 2 ocorrências, é Deep Work.</li>
+<li><strong>Tempo disponível?</strong> &lt; 30 min até o PR? Se não, é Standard.</li>
+</ol>
+<h3 id="202-execucao-prompt-0"><a class="toclink" href="#202-execucao-prompt-0">20.2. Execução (Prompt 0)</a></h3>
+<p>Cole o Prompt 0 de <code>skills/agents-protocol/references/prompts-cheatsheet.md §0</code> no Claude Code. O agente executa:</p>
+<pre><code>SCREEN → GATE → REPRO → FIX → VALIDAÇÃO → WIKI MEMORY → PR → FECHAMENTO
+</code></pre>
+<p>Cada passo tem tempo-alvo e gate de saída. Se algo cresce, o próprio agente sai do modo e escala.</p>
+<h3 id="203-apos-o-fast-fix"><a class="toclink" href="#203-apos-o-fast-fix">20.3. Após o fast-fix</a></h3>
+<ul>
+<li>Se o bug <strong>vai voltar</strong> (p. ex. ambiente flaky, integração instável): runbook em <code>wiki/runbooks/bug-&lt;slug&gt;.md</code>.</li>
+<li>Se o bug <strong>revelou design ruim</strong>: abrir feature de Deep Work no <code>TODO.md §2 Backlog</code> para refactor consciente.</li>
+<li>Se o bug <strong>mostrou lacuna em monitoring</strong>: ADR ou DECISIONS_LOG.</li>
+</ul>
+<h3 id="204-quando-o-fast-fix-falha"><a class="toclink" href="#204-quando-o-fast-fix-falha">20.4. Quando o Fast Fix falha</a></h3>
+<table>
+<thead>
+<tr>
+<th>Sintoma</th>
+<th>Próximo passo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Diagnóstico revelou auth/payment afetado</td>
+<td>escale para Deep Work (Prompt 2 classe C)</td>
+</tr>
+<tr>
+<td>Diagnóstico revelou migration/env necessária</td>
+<td>escale para Production (Prompt 2 classe D)</td>
+</tr>
+<tr>
+<td>Causa raiz não está no diff inicial</td>
+<td>escale para Standard com investigação de teste primeiro</td>
+</tr>
+<tr>
+<td>Bug é o 3º+ no mesmo módulo</td>
+<td>abra ADR ou refactor em Deep Work</td>
+</tr>
+<tr>
+<td>Tempo passou de 30 min sem terminar</td>
+<td>pause; vire Standard com Feature Contract</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Não force Fast Fix em algo que cresceu. Falhar nesse modo é indicador de que o problema é maior do que parece.</strong></p>
+<h3 id="205-lista-de-fast-fixes-tipicos-vs-nao-fast-fixes"><a class="toclink" href="#205-lista-de-fast-fixes-tipicos-vs-nao-fast-fixes">20.5. Lista de fast-fixes típicos vs. NÃO-fast-fixes</a></h3>
+<table>
+<thead>
+<tr>
+<th>✅ Fast Fix</th>
+<th>❌ NÃO Fast Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Typo em label de UI</td>
+<td>Renomear chave do JWT</td>
+</tr>
+<tr>
+<td>Off-by-one em paginação</td>
+<td>Mudar política de RLS</td>
+</tr>
+<tr>
+<td>Null check faltando em endpoint não crítico</td>
+<td>Mudar fluxo de auth</td>
+</tr>
+<tr>
+<td>Validação Zod faltante em campo público</td>
+<td>Adicionar campo em payload de pagamento</td>
+</tr>
+<tr>
+<td>Cor errada no botão</td>
+<td>Mudar copy de termo de uso (jurídico)</td>
+</tr>
+<tr>
+<td>Layout quebrado em mobile</td>
+<td>Migration de schema</td>
+</tr>
+<tr>
+<td>Trocar string de erro genérica</td>
+<td>Trocar provider de e-mail</td>
+</tr>
+<tr>
+<td>Lógica isolada de formatação</td>
+<td>Adicionar dependência de runtime</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="21-cenario-g-triagem-de-bugs-em-lote"><a class="toclink" href="#21-cenario-g-triagem-de-bugs-em-lote">21. Cenário G — Triagem de bugs em lote</a></h2>
+<blockquote>
+<p><strong>Cenário comum:</strong> o cliente / suporte / equipe te enviou ≥ 2 bugs na mesma janela. Antes de atacar, decida o quê, em que ordem e em qual modo.</p>
+</blockquote>
+<h3 id="211-quando-usar-triage-bugs"><a class="toclink" href="#211-quando-usar-triage-bugs">21.1. Quando usar <code>/triage-bugs</code></a></h3>
+<ul>
+<li>≥ 2 bugs reportados no mesmo dia/turno.</li>
+<li>Você precisa caber o que dá no tempo disponível e parquear o resto.</li>
+<li>Mistura provável de classes A/B/C/D e modos diferentes.</li>
+</ul>
+<h3 id="212-como-usar-resumo-prompt-4-dentro-da-skill"><a class="toclink" href="#212-como-usar-resumo-prompt-4-dentro-da-skill">21.2. Como usar (resumo — Prompt 4 dentro da skill)</a></h3>
+<p>Cole no Claude Code:</p>
+<pre><code>/triage-bugs
+
+Lista (texto livre, 1 bug por bloco, pode vir de Slack/e-mail/GitHub):
+&lt;&lt;&lt;
+[BUG 1] ...
+[BUG 2] ...
+[BUG 3] ...
+&gt;&gt;&gt;
+
+Tempo disponível hoje: [ex: 4 horas]
+Prioridade declarada: [ex: BUG 1 é P0 | &quot;todos&quot; = sem prioridade declarada]
+</code></pre>
+<p>A skill devolve em &lt; 5 min:</p>
+<ul>
+<li><strong>Tabela:</strong> ID + bug + classe + domínio + urgência + impacto + esforço + modo + recorrência + score.</li>
+<li><strong>Plano de hoje:</strong> lista ordenada com comando exato para cada bug que cabe.</li>
+<li><strong>Backlog:</strong> o que não cabe hoje, ordenado.</li>
+<li><strong>Escalations:</strong> classe D, vulnerabilidade, recorrência ≥ 3 — atenção humana antes de tocar.</li>
+<li><strong>Wiki updates:</strong> acrescenta linhas em <code>TODO.md §5</code>, 1 linha em <code>wiki/log.md</code> tipo <code>[INGEST]</code>, stubs de runbook se recorrência detectada.</li>
+<li><strong>Próxima ação imediata:</strong> comando exato para começar agora.</li>
+</ul>
+<h3 id="213-regras-importantes"><a class="toclink" href="#213-regras-importantes">21.3. Regras importantes</a></h3>
+<ul>
+<li><strong>Triagem nunca executa fix sozinha.</strong> Devolve plano, espera você confirmar.</li>
+<li><strong>Bugs financeiros / payment / webhook</strong> = quase sempre classe D, mesmo que o cliente diga "pode esperar".</li>
+<li><strong>Vulnerabilidade ativa de auth</strong> = P0-emergência, mesmo que o tempo declarado pelo usuário seja curto. O agente reporta; o humano decide a janela.</li>
+<li><strong>Recorrência ≥ 3</strong> do mesmo padrão = pare de aplicar fast-fix; vá para Deep Work com refator.</li>
+<li><strong>Pedido de feature disfarçado de bug</strong> = marca como NÃO É BUG, abre como feature em <code>TODO §2 Backlog</code>. Não infla §5.</li>
+<li><strong>Lista com ≥ 8 bugs</strong> = dev solo perde qualidade. Quebre em 2 sessões.</li>
+</ul>
+<h3 id="214-todomd-5-estendido-apos-triagem"><a class="toclink" href="#214-todomd-5-estendido-apos-triagem">21.4. TODO.md §5 estendido (após triagem)</a></h3>
+<p>A tabela de bugs ganha colunas extras:</p>
+<pre><code>| ID | Descrição | Repro | Classe | Domínio | Urgência | Impacto | Esforço | Modo | Status | Notas |
+| BUG-NNN | ... | ... | C | auth | P0 | crítico | &lt; 30min | standard | TRIADO | recorrência? runbook? |
+</code></pre>
+<p><code>Status</code> evolui: <code>TRIADO → EM FIX → EM QA → RESOLVIDO</code> (com SHA/PR).</p>
+<h3 id="215-exemplos-completos"><a class="toclink" href="#215-exemplos-completos">21.5. Exemplos completos</a></h3>
+<p>Em <code>skills/triage-bugs/references/triage-examples.md</code> — 5 casos reais (lista in → plano out), incluindo recorrência detectada e vulnerabilidade ativa.</p>
+<hr>
+<h2 id="22-cenario-h-mvp-validacao-de-ideia"><a class="toclink" href="#22-cenario-h-mvp-validacao-de-ideia">22. Cenário H — MVP / validação de ideia</a></h2>
+<blockquote>
+<p><strong>Cenário comum:</strong> você teve uma ideia e quer testar em 3-7 dias antes de decidir se vira projeto. Standard é overkill; pular o Harness inteiro deixa você sem nada.</p>
+</blockquote>
+<h3 id="221-use-modo-mvp-lite-145"><a class="toclink" href="#221-use-modo-mvp-lite-145">22.1. Use modo MVP Lite (§14.5)</a></h3>
+<p>Critérios obrigatórios para MVP Lite:</p>
+<ul>
+<li>[ ] Vida estimada &lt; 1 semana <strong>ou</strong> propósito é validar hipótese.</li>
+<li>[ ] Sem produção real, sem dinheiro real, sem dados sensíveis.</li>
+<li>[ ] Sem auth crítica / payment / webhook financeiro / RLS.</li>
+<li>[ ] Você aceita jogar o código fora se a hipótese falhar.</li>
+</ul>
+<h3 id="222-cerimonia-minima"><a class="toclink" href="#222-cerimonia-minima">22.2. Cerimônia mínima</a></h3>
+<ol>
+<li><code>/project-kickoff</code> (ignora a maioria dos templates por enquanto).</li>
+<li>Anote a hipótese no topo do <code>TODO.md</code>:
+   <code>## Hipótese MVP
+   - O que valido: [...]
+   - Como sei que validou: [...]
+   - Prazo: [...]
+   - Critério de promoção a Standard: [...]</code></li>
+<li>Loop:
+   - Branch <code>mvp/&lt;slug&gt;</code>.
+   - Implementa caminho crítico.
+   - <strong>1 teste no caminho crítico</strong> (não 5, não nenhum).
+   - Commit.
+   - 1 linha em <code>wiki/log.md</code> tipo <code>[MVP]</code>.</li>
+<li><strong>Sem</strong> PRD/SPEC/CONTRACTS/Feature Contract/matriz obrigatórios.</li>
+<li>Wiki só recebe <code>log.md</code> por enquanto.</li>
+</ol>
+<h3 id="223-quando-mvp-lite-vira-obrigatoriamente-standard"><a class="toclink" href="#223-quando-mvp-lite-vira-obrigatoriamente-standard">22.3. Quando MVP Lite vira obrigatoriamente Standard</a></h3>
+<ul>
+<li>Hipótese validada → vai virar produto. Migre para Standard ANTES da próxima feature relevante (cenário B retroativo).</li>
+<li>MVP começou a tocar produção, auth, payment, dados sensíveis. <strong>Pare imediatamente</strong> e abra Feature Contract.</li>
+<li>MVP passou de 1 semana de uso real (mesmo interno).</li>
+</ul>
+<h3 id="224-antipadroes"><a class="toclink" href="#224-antipadroes">22.4. Antipadrões</a></h3>
+<ul>
+<li>"Vou usar MVP Lite porque é mais rápido" para algo que vai a produção. <strong>Não.</strong></li>
+<li>Ficar &gt; 2 semanas em MVP Lite sem migrar nem descartar. <strong>Acumula dívida invisível.</strong></li>
+<li>MVP Lite com banco de produção, env real, ou auth de cliente real. <strong>Não.</strong></li>
+</ul>
+<hr>
+<h2 id="23-continuidade-entre-agentes-claude-codex-cursor"><a class="toclink" href="#23-continuidade-entre-agentes-claude-codex-cursor">23. Continuidade entre agentes (Claude ↔ Codex ↔ Cursor)</a></h2>
+<blockquote>
+<p><strong>Cenário comum:</strong> Claude esgotou tokens / você quer trabalhar offline com Codex / vai operar infra com Cursor Agent.</p>
+</blockquote>
+<h3 id="231-antes-de-fechar-a-sessao-atual"><a class="toclink" href="#231-antes-de-fechar-a-sessao-atual">23.1. Antes de fechar a sessão atual</a></h3>
+<pre><code>/wiki context F-NNN
+</code></pre>
+<p>O agente cria/atualiza <code>docs/wiki/context/F-NNN.md</code> com:
+- Estado atual (o que está feito, o que falta)
+- Arquivos relevantes
+- Restrições da tarefa
+- Próximos passos concretos
+- Decisões abertas
+- Handoff: "última ação", "o que NÃO fiz e o próximo deveria evitar"</p>
+<h3 id="232-no-proximo-agente"><a class="toclink" href="#232-no-proximo-agente">23.2. No próximo agente</a></h3>
+<p>Abra Codex/Cursor. Cole isto:</p>
+<pre><code>[CONTINUAR TAREFA]
+
+Leia, nesta ordem:
+1. docs/wiki/index.md
+2. docs/wiki/context/F-NNN.md
+3. AGENTS.md (regras universais)
+4. TODO.md (item F-NNN)
+5. Feature Contract (inline em TODO ou em docs/plans/feature-contracts/)
+
+Depois execute o passo &quot;PRÓXIMOS PASSOS CONCRETOS&quot; do context pack, respeitando as restrições e o handoff.
+
+Quando terminar (ou pausar): atualize wiki/context/F-NNN.md com o novo handoff.
+</code></pre>
+<p>O próximo agente tem contexto completo sem precisar reler o repositório inteiro.</p>
+<h3 id="233-ao-fim-da-feature"><a class="toclink" href="#233-ao-fim-da-feature">23.3. Ao fim da feature</a></h3>
+<ul>
+<li>Resumo de ≤ 5 linhas em <code>wiki/features/F-NNN.md</code> (C/D).</li>
+<li>Linha em <code>wiki/log.md</code> tipo <code>RELEASE</code>.</li>
+<li><strong>Delete</strong> <code>wiki/context/F-NNN.md</code> (Context Pack consumido).</li>
+</ul>
+<h3 id="234-por-que-isso-funciona"><a class="toclink" href="#234-por-que-isso-funciona">23.4. Por que isso funciona</a></h3>
+<ul>
+<li><code>AGENTS.md</code> é o contrato comum entre todos os agentes — não precisa duplicar regras.</li>
+<li><code>wiki/index.md</code> é o mapa que qualquer agente entende em &lt; 1 min.</li>
+<li><code>wiki/context/F-NNN.md</code> é o estado da tarefa, atualizado pelo último agente que tocou.</li>
+<li>Estado real do código continua em <code>git</code> + <code>TODO.md</code>. A wiki é síntese, não cópia.</li>
+</ul>
+<hr>
+<h2 id="24-operacao-diaria"><a class="toclink" href="#24-operacao-diaria">24. Operação diária</a></h2>
+<p><strong>Máximo 10 itens. 5 minutos no total.</strong></p>
+<h3 id="abrir-o-dia"><a class="toclink" href="#abrir-o-dia">Abrir o dia</a></h3>
+<ul>
+<li><code>git pull</code>.</li>
+<li>Abrir Claude Code. Cole <strong>Prompt 1</strong>.</li>
+<li>Decidir: continuar feature, iniciar próxima, resolver bloqueio, ou bug urgente (<code>/fast-fix</code>).</li>
+<li>Checar classe + DoR + autonomia + wiki health antes de começar.</li>
+</ul>
+<h3 id="durante"><a class="toclink" href="#durante">Durante</a></h3>
+<ul>
+<li>Uma branch por vez.</li>
+<li>Teste primeiro, implementação depois.</li>
+<li>Ideias/bugs → <code>TODO.md</code> agora.</li>
+<li>Feature cresceu? Pause, reclassifique, talvez divida.</li>
+</ul>
+<h3 id="fechar"><a class="toclink" href="#fechar">Fechar</a></h3>
+<ul>
+<li>Atualizar <code>TODO.md</code> com matriz preenchida se há item em QA.</li>
+<li>PR aberto? <strong>Prompt 3</strong> → APROVADO com evidência → merge.</li>
+<li><strong>Update memory:</strong> linha em <code>wiki/log.md</code>. Se tarefa continua, <code>/wiki context F-NNN</code>.</li>
+<li><code>git push</code>.</li>
+</ul>
+<h3 id="cadencia-semanalquinzenal"><a class="toclink" href="#cadencia-semanalquinzenal">Cadência semanal/quinzenal</a></h3>
+<ul>
+<li>A cada 2-4 semanas, ou antes de release: <code>/wiki lint</code>. Repair se preciso.</li>
+</ul>
+<hr>
+<h2 id="25-checklist-por-feature-pr"><a class="toclink" href="#25-checklist-por-feature-pr">25. Checklist por feature / PR</a></h2>
+<p>Ver <code>skills/agents-protocol/references/feature-pr.md</code> (v3.2 — checklist por classe + Update Memory).</p>
+<hr>
+<h2 id="26-antipadroes"><a class="toclink" href="#26-antipadroes">26. Antipadrões</a></h2>
+<ul>
+<li><strong>"TODO.md só na cabeça hoje"</strong> → não.</li>
+<li><strong>"Refactor rápido sem PRD/SPEC"</strong> → sem Feature Contract vira dívida invisível.</li>
+<li><strong>"CI vermelho mas teste passa local, vou mergear"</strong> → nunca.</li>
+<li><strong>"Vou rodar 3 sessões paralelas"</strong> → se atropelam.</li>
+<li><strong>"Feature cresceu mas vou terminar logo"</strong> → pause, reclassifique.</li>
+<li><strong>"Classe B mas começou a tocar banco"</strong> → reclassifique para C ou D <strong>antes</strong> de continuar.</li>
+<li><strong>"Classe D sem rollback, só dessa vez"</strong> → bloqueia no Prompt 3.</li>
+<li><strong>"Aprovar PR sem matriz"</strong> → proibido para B/C/D.</li>
+<li><strong>"Editar PRD/SPEC/Anti-SPEC para caber a feature"</strong> → pause e confirme com humano.</li>
+<li><strong>"Validation Mode é chato, só rodei o happy path"</strong> → em C/D, isso é <code>MUDANÇAS_SOLICITADAS</code>.</li>
+<li><strong>"DoR faltou um campo mas tá perto"</strong> (em domínio sensível) → <code>BLOQUEADO</code>.</li>
+<li><strong>"Mexi num arquivo fora da lista porque estava no caminho"</strong> → sem justificativa, <code>BLOQUEADO</code>.</li>
+<li><strong>"Vou usar Fast Fix nesse bug de auth, é só 2 linhas"</strong> (NOVO v3.2) → não, escale.</li>
+<li><strong>"Esqueci de atualizar <code>wiki/log.md</code>"</strong> (NOVO v3.2) → feature B/C/D não fecha sem isso.</li>
+<li><strong>"<code>/wiki lint</code> antes de cada microtarefa"</strong> (NOVO v3.2) → não, é checkpoint quinzenal/pre-release.</li>
+<li><strong>"Edito <code>wiki/architecture.md</code> para <code>caber</code> a feature"</strong> (NOVO v3.2) → ajuste o SPEC primeiro; wiki é espelho.</li>
+<li><strong>"Wiki virou diário"</strong> (NOVO v3.2) → revise, arquive, corte.</li>
+</ul>
+<hr>
+<h2 id="27-quando-nao-usar-o-harness"><a class="toclink" href="#27-quando-nao-usar-o-harness">27. Quando NÃO usar o Harness</a></h2>
+<p>Pule o framework inteiro se:</p>
+<ul>
+<li><strong>Script descartável de 1 arquivo</strong> que vai rodar 3 vezes.</li>
+<li><strong>Protótipo de 2 horas</strong> para validar UI.</li>
+<li><strong>Spike técnico</strong> ("essa lib aguenta 10k req/s?") — crie só o mínimo para medir.</li>
+<li><strong>Time de 2+ devs.</strong> Provavelmente quer o Harness v2 tradicional ou um meio-termo.</li>
+</ul>
+<p>Regra: se o projeto não dura nem 1 semana ou você não liga de perder o código, pule.</p>
+<hr>
+<h2 id="28-referencia-rapida"><a class="toclink" href="#28-referencia-rapida">28. Referência rápida</a></h2>
+<h3 id="comandos-do-claude-code"><a class="toclink" href="#comandos-do-claude-code">Comandos do Claude Code</a></h3>
+<table>
+<thead>
+<tr>
+<th>Comando</th>
+<th>Quando</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/project-kickoff</code></td>
+<td>repo novo</td>
+</tr>
+<tr>
+<td><code>/consultor-prd</code></td>
+<td>depois do kickoff</td>
+</tr>
+<tr>
+<td><code>/SDD-avancado</code></td>
+<td>com PRD aprovado</td>
+</tr>
+<tr>
+<td><code>/skill-scout</code></td>
+<td>integrações não triviais (opcional)</td>
+</tr>
+<tr>
+<td><code>/agents-protocol</code></td>
+<td>antes de começar execução</td>
+</tr>
+<tr>
+<td><code>/wiki ingest \| context \| lint \| repair</code></td>
+<td>manter memória sintetizada (v3.2)</td>
+</tr>
+<tr>
+<td><code>/fast-fix</code></td>
+<td>bug urgente A/B sem auth/payment/db (v3.2)</td>
+</tr>
+<tr>
+<td><code>/triage-bugs</code></td>
+<td>≥ 2 bugs do cliente para priorizar (v3.2)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="prompts-de-bolso"><a class="toclink" href="#prompts-de-bolso">Prompts de bolso</a></h3>
+<table>
+<thead>
+<tr>
+<th>Prompt</th>
+<th>Quando</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prompt 0</td>
+<td>bug urgente (v3.2)</td>
+</tr>
+<tr>
+<td>Prompt 1</td>
+<td>toda abertura do Claude Code</td>
+</tr>
+<tr>
+<td>Prompt 2</td>
+<td>toda nova feature B/C/D</td>
+</tr>
+<tr>
+<td>Prompt 3</td>
+<td>antes de todo merge (B/C/D)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="localizacao-dos-artefatos"><a class="toclink" href="#localizacao-dos-artefatos">Localização dos artefatos</a></h3>
+<table>
+<thead>
+<tr>
+<th>Preciso de...</th>
+<th>Vai em...</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mapa da memória sintetizada</td>
+<td><code>docs/wiki/index.md</code> (v3.2)</td>
+</tr>
+<tr>
+<td>Histórico cronológico</td>
+<td><code>docs/wiki/log.md</code> (v3.2)</td>
+</tr>
+<tr>
+<td>Contexto reusável entre agentes</td>
+<td><code>docs/wiki/context/F-NNN.md</code> (v3.2)</td>
+</tr>
+<tr>
+<td>Receita operacional / bug recorrente</td>
+<td><code>docs/wiki/runbooks/&lt;slug&gt;.md</code> (v3.2)</td>
+</tr>
+<tr>
+<td>Resumo da feature após merge</td>
+<td><code>docs/wiki/features/F-NNN.md</code> (v3.2)</td>
+</tr>
+<tr>
+<td>Estado atual + Feature Contract inline</td>
+<td><code>TODO.md</code> (raiz)</td>
+</tr>
+<tr>
+<td>O quê e por quê</td>
+<td><code>docs/product/PRD.md</code></td>
+</tr>
+<tr>
+<td>O que o sistema faz</td>
+<td><code>docs/specs/SPEC.md</code> (Anti-SPEC §6)</td>
+</tr>
+<tr>
+<td>Contratos legíveis</td>
+<td><code>docs/contracts/CONTRACTS.md</code></td>
+</tr>
+<tr>
+<td><strong>Contratos executáveis</strong></td>
+<td><code>packages/shared/types/*.ts</code></td>
+</tr>
+<tr>
+<td>Estado real do repo</td>
+<td><code>docs/plans/CURRENT_REALITY.md</code></td>
+</tr>
+<tr>
+<td>Decisão arquitetural</td>
+<td><code>docs/decisions/adr/ADR-NNN-*.md</code></td>
+</tr>
+<tr>
+<td>Decisão operacional recorrente</td>
+<td><code>docs/plans/DECISIONS_LOG.md</code></td>
+</tr>
+<tr>
+<td>Regras para agentes</td>
+<td><code>AGENTS.md</code> (raiz)</td>
+</tr>
+<tr>
+<td>Ajustes do Claude Code</td>
+<td><code>CLAUDE.md</code> (raiz)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="principios-nao-negociaveis-resumo"><a class="toclink" href="#principios-nao-negociaveis-resumo">Princípios não-negociáveis (resumo)</a></h3>
+<ol>
+<li>Gerador ↔ Avaliador é estrutural (CI).</li>
+<li>Contrato é código (Zod).</li>
+<li>Anti-SPEC é sagrada.</li>
+<li>Estado único (TODO.md + git log).</li>
+<li>CI verde no nível da classe = merge.</li>
+<li>Feature é a unidade.</li>
+<li>Classificação A/B/C/D obrigatória.</li>
+<li>Matriz de validação obrigatória (B/C/D).</li>
+<li>Produção exige staging + rollback + smoke (D).</li>
+<li>Validation Mode no QA (B/C/D).</li>
+<li>Sem evidência, nunca APROVADO.</li>
+<li>BLOQUEADO é retorno legítimo.</li>
+<li>Suba a classe, nunca desça.</li>
+<li>Teste fake não conta.</li>
+<li><strong>Wiki é memória sintetizada, NUNCA fonte de verdade. (v3.2)</strong></li>
+<li><strong>Fast Fix é exceção, não norma. Em dúvida, escale. (v3.2)</strong></li>
+<li><strong>Toda feature B/C/D termina com 1 linha em <code>wiki/log.md</code>. (v3.2)</strong></li>
+</ol>
+<hr>
+<h2 id="29-anexos-mapa-do-pacote"><a class="toclink" href="#29-anexos-mapa-do-pacote">29. Anexos — mapa do pacote</a></h2>
+<p>Este manual é o <strong>documento único</strong> do Harness v3.2. Tudo o mais é skill self-contained ou utilitário para o mantenedor.</p>
+<h3 id="pacote-enxuto-o-que-vai-para-o-seu-repo"><a class="toclink" href="#pacote-enxuto-o-que-vai-para-o-seu-repo">Pacote enxuto — o que vai para o seu repo</a></h3>
+<pre><code>skills/                          ← copie para ~/.claude/skills/ ou .claude/skills/
+harness-v3.2-manual.html         ← solte na raiz do projeto (referência humana única)
+</code></pre>
+<p>Mais nada é necessário. Cada skill carrega seus próprios templates em <code>assets/</code>.</p>
+<h3 id="skills-skills"><a class="toclink" href="#skills-skills">Skills (<code>skills/</code>)</a></h3>
+<table>
+<thead>
+<tr>
+<th>Skill</th>
+<th>Conteúdo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/project-kickoff</code></td>
+<td>cria estrutura + escreve AGENTS.md/CLAUDE.md/TODO.md/CI/wiki/etc.; assets em <code>skills/project-kickoff/assets/</code> (incluindo <code>assets/wiki/</code> para Project Wiki)</td>
+</tr>
+<tr>
+<td><code>/consultor-prd</code></td>
+<td>16 etapas → PRD.md (modo retroativo lê <code>CURRENT_REALITY.md</code>)</td>
+</tr>
+<tr>
+<td><code>/SDD-avancado</code></td>
+<td>SPEC + Anti-SPEC + CONTRACTS + Zod + TODO com classe + DoR + Feature Contract inline</td>
+</tr>
+<tr>
+<td><code>/skill-scout</code></td>
+<td>catálogo de capacidades + análise de risco operacional (opcional)</td>
+</tr>
+<tr>
+<td><code>/agents-protocol</code></td>
+<td>AGENTS, cursor-brief, <strong>prompts-cheatsheet</strong> (4 prompts), <strong>daily-ops</strong>, <strong>feature-pr</strong> — em <code>references/</code></td>
+</tr>
+<tr>
+<td><code>/wiki</code> (v3.2)</td>
+<td><code>ingest \| context \| lint \| repair</code></td>
+</tr>
+<tr>
+<td><code>/fast-fix</code> (v3.2)</td>
+<td>Project Quick com Prompt 0 embutido</td>
+</tr>
+<tr>
+<td><code>/triage-bugs</code> (v3.2)</td>
+<td>Triagem em lote — devolve plano de ataque + atualiza TODO §5</td>
+</tr>
+</tbody>
+</table>
+<h3 id="templates-dentro-das-skills"><a class="toclink" href="#templates-dentro-das-skills">Templates dentro das skills</a></h3>
+<ul>
+<li><code>skills/project-kickoff/assets/</code> — todos os templates da raiz do projeto + <code>assets/wiki/</code> (6 templates da Project Wiki).</li>
+<li><code>skills/agents-protocol/assets/</code> — AGENTS-template, cursor-brief, FEATURE-CONTRACT, VALIDATION-MATRIX, DECISIONS_LOG, risk-classification, PR template.</li>
+<li><code>skills/SDD-avancado/assets/</code> — PRD/SPEC/CONTRACTS/PLAN/TODO templates + Zod example + risk-classification.</li>
+<li><code>skills/consultor-prd/assets/</code> — CURRENT_REALITY template + completeness checklist + prd_template.</li>
+<li><code>skills/skill-scout/assets/</code> — skills-manifest-template.</li>
+<li><code>skills/wiki/references/wiki-flows.md</code> — 6 fluxos de exemplo (ingest, context, lint, repair).</li>
+<li><code>skills/fast-fix/references/anti-patterns.md</code> — 10 armadilhas de fast-fix.</li>
+<li><code>skills/agents-protocol/references/prompts-cheatsheet.md</code> — <strong>fonte canônica dos 4 prompts (0/1/2/3)</strong>.</li>
+<li><code>skills/agents-protocol/references/daily-ops.md</code> — rotina diária.</li>
+<li><code>skills/agents-protocol/references/feature-pr.md</code> — checklist por feature/PR.</li>
+</ul>
+<h3 id="pacote-raiz-mantenedor"><a class="toclink" href="#pacote-raiz-mantenedor">Pacote raiz (mantenedor)</a></h3>
+<ul>
+<li><code>README.md</code> — instruções de deploy.</li>
+<li><code>CHANGELOG-v3.2.md</code> — diff v3.1 → v3.2.</li>
+<li><code>harness-v3.2-manual.md</code> — <strong>este arquivo, fonte do HTML.</strong></li>
+<li><code>harness-v3.2-manual.html</code> — manual offline para soltar no projeto.</li>
+<li><code>_build_html.py</code> — <code>python _build_html.py</code> regera o HTML quando o MD muda.</li>
+<li><code>legacy/</code> — <code>harness-v3.1-manual.md</code> + <code>CHANGELOG-v3.1.md</code> (não vai para deploy).</li>
+</ul>
+<hr>
+<p><em>Última atualização: 2026-05-08 — Harness v3.2 · Project Wiki + Fast Fix · documento único consolidado.</em></p>
+  </main>
+</div>
+<script>
+
+(function(){
+  // 1) Sidebar TOC active highlight on scroll.
+  const headings = Array.from(document.querySelectorAll('main h1, main h2, main h3'));
+  const links = Array.from(document.querySelectorAll('aside .toc a'));
+  const linkByHref = new Map(links.map(a => [a.getAttribute('href'), a]));
+  function setActive() {
+    const scrollTop = window.scrollY + 80;
+    let current = null;
+    for (const h of headings) {
+      if (h.offsetTop <= scrollTop) current = h;
+      else break;
+    }
+    if (current && current.id) {
+      links.forEach(a => a.classList.remove('active'));
+      const link = linkByHref.get('#' + current.id);
+      if (link) link.classList.add('active');
+    }
+  }
+  setActive();
+  let ticking = false;
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      window.requestAnimationFrame(() => { setActive(); ticking = false; });
+      ticking = true;
+    }
+  });
+
+  // 2) Sidebar search (filters TOC entries).
+  const searchInput = document.getElementById('toc-search');
+  const tocItems = Array.from(document.querySelectorAll('aside .toc li'));
+  const noResult = document.getElementById('no-result');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      let anyVisible = false;
+      tocItems.forEach(li => {
+        const text = li.textContent.toLowerCase();
+        const match = !q || text.includes(q);
+        li.style.display = match ? '' : 'none';
+        if (match) anyVisible = true;
+      });
+      if (noResult) noResult.style.display = (q && !anyVisible) ? 'block' : 'none';
+    });
+  }
+
+  // 3) Smooth scroll for anchor links inside the sidebar.
+  links.forEach(a => {
+    a.addEventListener('click', (e) => {
+      const href = a.getAttribute('href');
+      if (href && href.startsWith('#')) {
+        const target = document.getElementById(href.slice(1));
+        if (target) {
+          e.preventDefault();
+          target.scrollIntoView({behavior: 'smooth', block: 'start'});
+          history.replaceState(null, '', href);
+        }
+      }
+    });
+  });
+})();
+
+</script>
+</body>
+</html>
