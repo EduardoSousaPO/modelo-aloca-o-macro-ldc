@@ -136,4 +136,114 @@ Regras completas de autonomia em `AGENTS.md §9`.
 
 ---
 
+## Exemplos concretos **deste projeto** (estrategia-macro-ldc-dados)
+
+> Adicionado em 2026-10-10 por `/SDD-avancado`. A tabela mestre acima é genérica (SaaS/web); aqui ela é
+> traduzida para um projeto de **dados/quant que roda local**. Direção vinda de `AGENTS.md §2`.
+>
+> **O risco dominante aqui não é "derrubar o site": é entregar número errado ao Comitê.** O modo de
+> falha é **silencioso** — um trimestre desalinhado, um retorno acumulado errado, um IPCA aplicado duas
+> vezes passam sem levantar exceção e contaminam todo o modelo a jusante. Por isso a classe **C** é
+> deliberadamente ampla: tudo que toca a camada canônica é C, mesmo que pareça pequeno.
+
+### Classe A — Trivial (neste projeto)
+
+- Ajuste de texto em `README.md`, `docs/wiki/*` ou docstring.
+- Renomear célula de notebook, reordenar import, corrigir typo de legenda.
+- Melhorar título/cor de uma figura **sem mudar o número** nem a métrica plotada.
+- Criar `docs/plans/DECISIONS_LOG.md` a partir do template e registrar substituição já decidida (F-032).
+- Acrescentar entrada `status: a_confirmar` ou `descartada` ao catálogo **sem** nenhum extrator passar a
+  usá-la.
+
+**Vira B na hora em que:** o valor de qualquer output muda, ou uma série passa a ser consumida.
+
+### Classe B — Normal (neste projeto)
+
+- **Novo extrator de fonte** (SGS, SIDRA, ANBIMA S3, API B3, Tesouro, Yahoo/MSCI, Focus, Teva, FRED):
+  F-002 a F-012.
+- Infra de extração: cliente HTTP com UA, retry, validação de shape, normalizador de número pt-BR,
+  cache por `ETag` (F-001, F-030).
+- Job diário de arquivamento idempotente (F-009).
+- **Agregação mensal → trimestral de uma série nova** que ainda não entrou no canônico.
+- Figura/tabela nova construída **sobre** números já validados (heatmap F-023, ranking F-024,
+  timeline F-025, página de limitações F-028, notebook F-027).
+- Teste de contrato com valor-canário (F-030).
+
+**Validação extra obrigatória (B):** amostra conferida contra a fonte — nº de linhas, `min`/`max` de data,
+% de nulos por coluna crítica e **3 valores conferidos** com print/link.
+
+### Classe C — Crítica (neste projeto) — **a classe mais larga**
+
+Qualquer uma destas, isoladamente, já é C:
+
+- **Schema do dataset canônico** (`raw_series`, `macro_quarterly`, `asset_returns_quarterly`, `regimes`,
+  `regime_neighbors`, `series_catalog` materializado) — F-013, F-015.
+- **Regras de alinhamento temporal**: calendário de dias úteis, fim de trimestre, lag de divulgação,
+  limite de forward-fill — F-014.
+- **Cálculo de retorno**: acumulação geométrica, excesso sobre CDI, deflação por IPCA, anualização,
+  conversão a BRL — F-017.
+- **Construção de série derivada que alimenta regime**: interpolação de vértices e inclinação da curva —
+  F-016.
+- **Definição ou classificação de regime macro** (V1, V2, V3) e a janela de 20 anos — F-019, F-020, F-021.
+- **Métricas por regime × ativo** que vão ao heatmap — F-022.
+- **Regra anti-look-ahead** e as materializações `asof`/`revised` — F-018.
+- **Bloco internacional** (retornos por regime, `stress_flag`, faixa de alocação) — F-026.
+- **Orquestrador do pipeline** e a garantia de idempotência/hash — F-029.
+
+**Validação extra obrigatória (C), além do CI N2:**
+1. **Reconstrução completa** de `data/canonical/` a partir de zero.
+2. **Diff numérico** vs. a versão anterior do canônico, com **cada** divergência explicada (não basta
+   "mudou porque melhorou").
+3. **Revisão numérica independente** — quem calculou **não** confere.
+4. Checagem explícita da **Anti-SPEC** (`SPEC.md §10`), item por item, no QA.
+5. ADR se houve trade-off arquitetural; `DECISIONS_LOG` se houve troca de fonte.
+
+### Classe D — Publicação / credencial (neste projeto)
+
+- **Enviar qualquer número ao Alexandre ou ao Comitê** (relatório, planilha, figura, mensagem com
+  número) — F-031.
+- Usar **credencial ou API paga** (ANBIMA Feed, Bloomberg, Comdinheiro, MacroMicro, Cbonds) — hoje nada
+  no caminho crítico depende disso; se L4 virar "contratar o Feed", **F-016 sobe de C para D**.
+- **Alterar número já apresentado** ao Comitê (correção pós-envio).
+- Congelar/versionar o dataset entregue.
+
+**Validação extra obrigatória (D), além do CI N3:** revisão humana do número pelo Edu com 3 valores
+conferidos por série · dataset **congelado** (versão + hash) · linha em `docs/wiki/log.md` ·
+**Rollback** escrito em `docs/plans/infra-ops.md` · comunicação escrita das substituições de fonte ·
+nenhum segredo no repositório.
+
+> **Não existe "A/B" para publicação.** Mandar um print de heatmap por WhatsApp para o Alexandre é
+> classe D tanto quanto enviar o pacote completo.
+
+### Gatilhos de reclassificação observados neste projeto
+
+| De → Para | Gatilho concreto |
+|---|---|
+| A → B | a mudança passa a alterar valor de output ou liga uma série nova no pipeline |
+| B → C | o extrator começa a **agregar para trimestral dentro do canônico**, a mexer no calendário, a calcular retorno, deflacionar, ou a virar feature de regime |
+| B → C | "só um ajustinho" no `ffill`, no limiar de ΔSelic, no `k` da V3 ou na média móvel de 20 trimestres |
+| C → D | o resultado vai para o Alexandre/Comitê, ou passa a exigir credencial/fonte paga |
+| qualquer → D | alguém pede "me manda só esse número do heatmap" |
+
+### "Teste fake" na versão dados — padrões que o QA rejeita aqui
+
+Além dos padrões genéricos listados acima:
+
+- Teste que afirma `len(df) > 0` sem checar **contagem mínima esperada** (não pega truncamento
+  silencioso: 20.000 linhas do Olinda, `range=max` do Yahoo, `fredgraph.csv` sem `cosd`).
+- Teste que mocka a **resposta da fonte com dado sintético plausível** e não usa a fixture gravada.
+- Teste de extrator que não exercita o **caminho de erro com HTTP 200** (corpo de erro do SGS).
+- Teste de retorno que compara o resultado com **a própria fórmula reimplementada no teste** (tautologia)
+  em vez de um valor conhecido da fonte (ex.: CDI 2006 = 15,0271%).
+- Teste de alinhamento que usa só trimestres "fáceis" e nenhum caso-armadilha (feriado, 31/12 em fim de
+  semana, série que começa depois de 2006).
+- Teste de schema que valida um DataFrame **construído no próprio teste** com as colunas certas, sem
+  nunca passar o output real do pipeline.
+- Comparação de float com `==` onde a tolerância importa — ou, pior, tolerância tão larga
+  (`abs < 0.1`) que qualquer erro de escala passa.
+- Marcar com `@pytest.mark.network` um teste que **deveria** rodar sobre fixture, só para ele não rodar
+  no CI.
+
+---
+
 *Esta referência é espelhada em `harness-v3-manual.md §7`. Em caso de divergência, prevalece este arquivo.*

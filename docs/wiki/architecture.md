@@ -6,118 +6,140 @@
 > Esta página existe para que qualquer agente entenda a topologia em < 5 min sem ler todo o SPEC.
 
 **Última revisão:** 2026-10-10
-**Versão do SPEC refletida:** nenhuma — SPEC ainda não existe (a ser gerado por `/SDD-avancado`).
-**Status:** esqueleto do kickoff. As seções marcadas `[a definir]` são preenchidas após o SPEC.
+**Versão do SPEC refletida:** **v1.0** (52 RFs → 128 CAs + Anti-SPEC §10, sagrada)
+**Status do código:** contratos escritos (`packages/shared/schemas/`, 6 módulos + catálogo de 132 séries).
+**Nenhum extrator implementado ainda** — execução começa pela Onda 0 de `docs/plans/PLAN.md`.
 
 ---
 
-## 1. Topologia em 1 diagrama (ASCII)
+## 1. Topologia
 
 ```
-  FONTES PÚBLICAS                    EXTRAÇÃO            NORMALIZAÇÃO         CAMADA CANÔNICA        ANÁLISE
-  ───────────────                    ─────────           ────────────         ───────────────        ───────
-  BCB / SGS  (IPCA 433, Selic 11,
-             IBC-Br, CDI 12)   ──┐
-  BCB / Focus (expectativas)     ──┤
-  IBGE / SIDRA (IPCA, PIB)       ──┤    apps/pipeline/      apps/pipeline/      data/canonical/      apps/analysis/
-  ANBIMA (IMA-B, IRF-M, ETTJ)    ──┼──►  extract    ──►     transform    ──►   dataset-base    ──►  regimes macro
-  B3 (IBOV, IDIV, SMLL, INDX,    ──┤    data/raw/<fonte>/   data/processed/     trimestral           + performance
-     ICON, IMAT, IEE, IMOB,        │    (cru, imutável)     (limpo, tipado,     (macro + ativos      por classe/setor
-     IFNC, IFIX)                 ──┤                         freq. nativa)       alinhados)           + relatório
-  Tesouro Direto                 ──┘          │                   │                   │                   │
-  [internacional: a definir]     ──┘          └── pandera ────────┴── pandera ────────┘                   ▼
-                                                    (packages/shared/schemas/)                      Comitê (classe D)
+  FONTES (12, todas gratuitas)        EXTRAÇÃO (B)        NORMALIZAÇÃO        CANÔNICO (C)        ANÁLISE
+  ────────────────────────────        ────────────        ────────────        ────────────        ───────
+  BCB SGS      433·13522·11·1178·432
+               ·12·4389·24364·1·10813 ─┐
+  BCB Olinda   Focus (5 EntitySets)   ─┤
+  IBGE SIDRA   t/1737 · t/1621        ─┤  apps/pipeline/   apps/pipeline/     data/canonical/    apps/analysis/
+  Tesouro CKAN precotaxatesouro.csv   ─┼─► extract    ──►  transform    ──►   raw_series         notebook
+  ANBIMA S3    IMAB·IRFM·IMAS (8)     ─┤  data/raw/<f>/    data/processed/    macro_quarterly     heatmap
+  ANBIMA web   Msec·CZ (job diário)   ─┤  (cru, imutável)  (freq. nativa)     asset_returns_q.    timeline
+  B3 API       IBOV·IDIV·SMLL·…·IFIX  ─┤                                      regimes             ranking
+  Teva GCS     FII por segmento       ─┤        │                 │           regime_neighbors        │
+  Yahoo        ^GSPC·^VIX·^TNX        ─┤        │                 │           series_catalog          │
+  MSCI         892400 NETR            ─┤        └─ pandera ───────┴─ pandera ──────┘                  ▼
+  FRED         DGS10·VIXCLS·DFF       ─┤           (packages/shared/schemas/)              Comitê (classe D)
+  Ipeadata     GM366_IBVSP366 · …     ─┘
 ```
 
-Fluxo unidirecional. Cada seta é um comando reprodutível: rodar duas vezes a partir do mesmo `raw/`
-produz o mesmo output (hash igual). Nada volta para a esquerda.
+Fluxo **unidirecional**. Cada seta é um comando reprodutível: rodar duas vezes a partir do mesmo `raw/`
+produz o mesmo **hash** (RF-048). Nada volta para a esquerda. Persistência: **Parquet por camada**,
+**DuckDB derivado** e descartável (ADR-006).
 
 ## 2. Stack
 
-| Camada | Tech | Versão | Notas |
-|---|---|---|---|
-| Linguagem | Python | ≥ 3.11 | ambiente local via `uv` (preferido) ou `venv` |
-| Dados em memória | pandas + pyarrow | pandas ≥ 2.2 | `DatetimeIndex`; trimestre = fim de período |
-| Extração HTTP | requests / httpx | — | escolha final por fonte; registrar em ADR |
-| Contratos | pydantic (config/payload) + pandera (DataFrame) | pydantic ≥ 2.7 | fonte de verdade em `packages/shared/schemas/` |
-| Armazenamento local | Parquet e/ou DuckDB | duckdb ≥ 1.0 | decisão pendente de ADR-001 |
-| Análise | Jupyter | — | notebooks em `apps/analysis/`, sem lógica de negócio |
-| Qualidade | pytest + ruff | pytest ≥ 8.2 | N1 = ruff + pytest unit |
-| Execução | local (máquina do Edu) | — | **sem** servidor, deploy, auth ou cloud |
-
-## 3. Módulos
-
-> Cada módulo ganha sua página em `wiki/modules/` quando passar a existir de verdade.
-> **Não criar módulo vazio.** Hoje nenhum está implementado.
-
-| Módulo (previsto) | Responsabilidade | Página |
+| Camada | Tech | Notas |
 |---|---|---|
-| `sgs` | séries do BCB (IPCA 433, Selic 11, CDI 12, IBC-Br) + Focus | `modules/sgs.md` |
-| `sidra` | IPCA e PIB do IBGE via SIDRA | `modules/sidra.md` |
-| `anbima` | IMA-B / IRF-M / ETTJ (inclinação da curva) | `modules/anbima.md` |
-| `b3` | índices amplos, setoriais e IFIX | `modules/b3.md` |
-| `tesouro` | taxas de títulos públicos | `modules/tesouro.md` |
-| `internacional` | proxy para o tamanho da alocação internacional — **escopo a definir** | `modules/internacional.md` |
-| `canonical` | alinhamento temporal, agregação trimestral, cálculo de retornos | `modules/canonical.md` |
-| `regimes` | classificação de regimes macro + performance por regime | `modules/regimes.md` |
+| Linguagem | Python ≥ 3.11 | `uv` ou venv local; nunca global |
+| Dados | pandas ≥ 2.2 + pyarrow | datas ISO-8601, `DatetimeIndex` tz-naive, trimestre = **último dia útil** |
+| HTTP | requests / httpx | **UA de browser sempre**, retry com backoff, cache por `ETag` |
+| Contratos | pydantic ≥ 2.7 (catálogo/config) + pandera ≥ 0.20 (DataFrame) | fonte de verdade em `packages/shared/schemas/` |
+| Armazenamento | Parquet (fonte) + DuckDB (consulta) | ADR-006; `data/` **não versionado** e reconstruível |
+| Análise | Jupyter | notebook **sem lógica de negócio** — importa de `apps/pipeline/` |
+| Qualidade | pytest + ruff (line-length 100) | N1 lint+unit · N2 +integration/contract+build canônico · N3 +e2e+hash |
+| Execução | local (Windows, máquina do Edu) | **sem** servidor, deploy, auth, cloud |
 
-`canonical` e `regimes` são o coração do risco: tudo que entra neles é **classe C** (ver `AGENTS.md §2`).
+## 3. Módulos (previstos; nenhum implementado)
 
-## 4. Fronteiras (boundaries)
+| Módulo | Responsabilidade | Classe | Features |
+|---|---|---|---|
+| `extract/http`, `parsing` | UA, retry, shape, número pt-BR, magic bytes, encoding | B | F-001 |
+| `extract/bcb_sgs`, `bcb_focus` | SGS (IPCA, Selic, CDI, IBC-Br, PTAX) + Focus | B | F-003, F-010 |
+| `extract/ibge_sidra` | IPCA nº-índice, PIB trimestral | B | F-004 |
+| `extract/anbima_s3`, `anbima_diario` | índices IMA; arquivamento de janela rolante | B | F-002, F-009 |
+| `extract/tesouro_direto` | taxas e PUs de títulos públicos | B | F-005 |
+| `extract/b3_indices` | índices amplos, setoriais e IFIX | B | F-006 |
+| `extract/yahoo`, `msci`, `fred` | bloco internacional | B | F-007, F-011 |
+| `extract/teva` | FII por segmento (2019+) | B | F-012 |
+| `transform/calendario`, `alinhamento` | dias úteis, fim de trimestre, ffill ≤ 5 d.u. | **C** | F-008, F-014 |
+| `transform/curva` | vértices interpolados + inclinação | **C** | F-016 |
+| `transform/retornos` | `ret_tri`, excesso CDI, real (sempre razão) | **C** | F-017 |
+| `transform/macro_quarterly`, `asof` | 83 trimestres + anti-look-ahead | **C** | F-015, F-018 |
+| `load/raw_series`, `catalog` | camada canônica + catálogo materializado | **C** | F-013 |
+| `analysis/regimes_v1|v2|v3` | V1 quadrantes, V2 ciclo Selic, V3 vizinhos | **C** | F-019..021 |
+| `analysis/metricas_regime` | métricas por regime × ativo | **C** | F-022 |
+| `analysis/figuras`, `tabelas`, `internacional` | heatmap, timeline, ranking, risk-off | B / **C** | F-023..026 |
+| `pipeline` (CLI), `deliver/pacote` | um comando + pacote do Comitê | **C** / **D** | F-029, F-031 |
 
-Onde a validação de schema **deve** estar:
+`transform/`, `load/` e `analysis/regimes*` são o coração do risco: **classe C** (`AGENTS.md §2`).
 
-- **Saída de cada extrator** (`apps/pipeline/extract/*`) → schema pandera da forma crua esperada.
-- **Entrada e saída de `data/canonical/`** → schema pandera do dataset-base. Obrigatório, sem exceção.
-- **Config e env** (`.env`, parâmetros de janela/frequência) → modelo pydantic.
-- **Payload de resposta das APIs** (SGS, SIDRA) → modelo pydantic antes de virar DataFrame.
+## 4. Fronteiras de validação (onde o pandera **tem** que estar)
 
-Regra: se vai documentar um contrato em `docs/contracts/CONTRACTS.md`, **primeiro** crie o schema em
+| Fronteira | Schema |
+|---|---|
+| saída de cada extrator → `data/processed/` | `ProcessedSeriesSchema` |
+| `data/processed/` → `data/canonical/` | `RawSeriesSchema` + schema da tabela destino |
+| entrada/saída de `data/canonical/` | `MacroQuarterlySchema`, `AssetReturnsQuarterlySchema`, `RegimeAssetMetricsSchema`, `RegimesSchema`, `RegimeNeighborsSchema`, `SeriesCatalogSchema` |
+| config de extrator / janela | `ExtractorConfig` (pydantic) |
+| catálogo de séries | `SeriesCatalogEntry` (pydantic) + `series_catalog_data.py` (132 séries) |
+
+**Regra:** para documentar um contrato em `docs/contracts/CONTRACTS.md`, **primeiro** crie o schema em
 `packages/shared/schemas/`. O CONTRACTS.md é espelho legível, não fonte.
 
-## 5. Decisões arquiteturais (ADRs ativos)
+Invariantes que os schemas impõem (e que nenhum código contorna): 83 trimestres exatos ·
+≥ 18 ativos · nenhuma linha antes do início real da série · `n_obs` nunca nulo ·
+`ffill ≤ 5 d.u.` · `strict=True` (sem coluna ad hoc) · `date ≤ collected_at` ·
+`a_confirmar` ⇒ `status = a_confirmar`.
+
+## 5. Decisões arquiteturais (ADRs)
 
 | ADR | Decisão | Status |
 |---|---|---|
-| ADR-001 | Armazenamento local: DuckDB vs. Parquet puro | **pendente** |
-| ADR-002 | Cliente HTTP: requests vs. httpx (retry/backoff, cache de resposta) | **pendente** |
-| ADR-003 | Convenção de período: fim de trimestre, data de referência vs. data de divulgação (lag) | **pendente** |
+| ADR-001 | lente de regime oficial (V1 + V3 + V2 secundária) e eixos da V1 (aceleração) — D1+D3 | **Proposta** |
+| ADR-002 | métrica primária do heatmap = **excesso sobre CDI** — D5 | **Proposta** |
+| ADR-003 | internacional = piso 16-20% + banda tática 15-35% por regime — D6 | **Proposta** |
+| ADR-004 | inclinação da curva via **Tesouro Direto** (não ETTJ ANBIMA paga) — L4 | **Proposta** |
+| ADR-005 | janelas próprias por ativo + FII segmentado via Teva — L1+L2+D12 | **Proposta** |
+| ADR-006 | **Parquet por camada + DuckDB para consulta** e convenção de retornos/alinhamento | **Proposta** |
 
-→ Documentos completos em [`docs/decisions/adr/`](../decisions/adr/).
-Trocas de fonte e convenções operacionais vão para [`DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md), não para ADR.
+ADR-006 substitui os três ADRs "pendentes" do kickoff (armazenamento, cliente HTTP, convenção de período).
+**ADR-001 é gate de publicação:** enquanto estiver em Proposta, `regimes.especificacao_congelada = False`
+e nenhum número vai ao Comitê (RF-031 / CA-090).
+Trocas de fonte e convenções operacionais vão para `docs/plans/DECISIONS_LOG.md`, não para ADR.
 
-## 6. Restrições arquiteturais ativas (base da Anti-SPEC)
+## 6. Restrições arquiteturais ativas (resumo da Anti-SPEC — `SPEC.md §10`)
 
-- **NÃO inventar dado.** Lacuna sem substituto acordado → `BLOQUEADO — FONTE INDISPONÍVEL`.
-- **NÃO inventar colunas de DataFrame** fora de `packages/shared/schemas/`.
-- **NÃO editar `data/` à mão.** Todo dado vem de script reprodutível e versionado.
-- **NÃO commitar dado** (bruto > 5 MB, `*.parquet`, `*.duckdb`) nem credencial.
-- **NÃO chamar fonte externa em teste** — só fixture gravada; rede apenas sob `@pytest.mark.network`.
-- **NÃO alterar schema canônico, alinhamento temporal ou cálculo de retorno** sem Feature Contract classe C
-  com diff numérico vs. versão anterior.
+- **NÃO inventar, interpolar ou estimar dado.** Lacuna sem substituto → `BLOQUEADO — FONTE INDISPONÍVEL`.
+- **NÃO** tratar fonte de janela rolante como backfill; **NÃO** usar série descontinuada como se viva.
+- **NÃO** classificar T com dado divulgado após o fim de T **sem a flag `asof`**.
+- **NÃO** calcular excesso sobre CDI / retorno real por subtração — sempre razão.
+- **NÃO** comparar total return com price return sem `is_total_return`.
+- **NÃO** publicar célula com `n < 5` como conclusão; `n` em **toda** célula.
+- **NÃO** ajustar a especificação de regime depois de ver os retornos (só V1.1, reportando as duas).
+- **NÃO** usar fonte paga/credencial no caminho crítico; **NÃO** fazer backtest na entrega de 14/10.
+- **NÃO** alterar schema canônico, alinhamento ou retorno fora de feature **classe C**.
+- **NÃO** enviar número ao Comitê fora do fluxo **classe D**; **NÃO** substituir fonte em silêncio.
+- **NÃO** commitar dado/credencial, editar `data/` à mão, chamar rede em teste de CI ou confiar no
+  encoding default do locale.
 
 ## 7. O que NÃO faz parte da arquitetura
 
-> Coisas que parecem mas não são. Reduz alucinação do agente.
-
-- Não há frontend, API HTTP própria, login, sessão, usuário ou multi-tenant.
-- Não há banco de dados servidor, Supabase, RLS ou migration — armazenamento é arquivo local.
-- Não há deploy, Vercel, Docker em produção nem ambiente de staging.
-- Não há pagamento, Stripe, webhook ou e-mail transacional.
-- Não há fila, cron ou orquestrador (Airflow/Dagster): o pipeline roda por comando manual.
-- Não há cache distribuído; cache, se houver, é arquivo local em `data/raw/`.
-- Não há TypeScript, Node, npm, Zod ou ESLint neste repo.
+Sem frontend, API própria, login, multi-tenant · sem banco servidor, Supabase, RLS ou migration ·
+sem deploy, Vercel, Docker em produção, staging · sem pagamento ou e-mail transacional ·
+sem fila, cron ou orquestrador (Airflow/Dagster) — o pipeline roda **por comando manual** ·
+sem cache distribuído (cache = arquivo local em `data/raw/`) · sem TypeScript, Node, Zod, ESLint.
 
 ---
 
 ## Links
 
-- SPEC completo (a criar) → [`docs/specs/SPEC.md`](../specs/SPEC.md)
+- SPEC + Anti-SPEC → [`docs/specs/SPEC.md`](../specs/SPEC.md)
+- Contratos (espelho) → [`docs/contracts/CONTRACTS.md`](../contracts/CONTRACTS.md) ·
+  fonte → [`packages/shared/schemas/`](../../packages/shared/schemas/)
+- Plano de ondas → [`docs/plans/PLAN.md`](../plans/PLAN.md) ·
+  risco A/B/C/D → [`docs/plans/risk-classification.md`](../plans/risk-classification.md)
 - Escopo de origem → [`docs/product/ESCOPO-EMAIL-ALEXANDRE.md`](../product/ESCOPO-EMAIL-ALEXANDRE.md)
-- Pesquisa de fontes → [`docs/research/`](../research/)
-- Contratos → [`docs/contracts/CONTRACTS.md`](../contracts/CONTRACTS.md)
-- Realidade do código → [`docs/plans/CURRENT_REALITY.md`](../plans/CURRENT_REALITY.md)
-- Decisões → [`docs/decisions/adr/`](../decisions/adr/) · [`DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md)
+- Pesquisa de fontes → [`docs/research/`](../research/) · ADRs → [`docs/decisions/adr/`](../decisions/adr/)
 
 ---
 
