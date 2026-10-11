@@ -199,3 +199,41 @@ class MacroQuarterlyProvenanceSchema(pa.DataFrameModel):
     def _lag_homogeneo(cls, df: object) -> bool:  # noqa: N805
         """Uma materialização de procedência não mistura `asof` e `revised`."""
         return int(df["lag_adjusted"].nunique()) == 1  # type: ignore[index]
+
+
+class MacroQuarterlyAsofProvenanceSchema(MacroQuarterlyProvenanceSchema):
+    """Procedência da materialização **`asof`** (F-018) — a de `revised` **mais** duas colunas.
+
+    Acréscimo, nunca alteração (`AGENTS.md §7`): `MacroQuarterlyProvenanceSchema` segue valendo
+    palavra por palavra para `macro_quarterly_provenance.parquet` (F-015), e esta subclasse
+    acrescenta o que **só** a `asof` tem a dizer:
+
+    - **`date_obs`** — na `asof` a célula de `T` pode vir de uma observação **anterior** a `T`
+      (o PIB de `T-1`, o IPCA do penúltimo mês de `T`). Sem esta coluna, "qual observação foi
+      usada?" só tem resposta no código — e é exatamente a pergunta de CA-072.
+    - **`lag_dias`** — o `lag_divulgacao_dias` que **manda** na célula (o maior entre os insumos
+      da coluna). É o que torna `date_obs + lag_dias <= quarter_end` verificável **no dado**.
+
+    Com as duas, a regra anti-look-ahead deixa de ser uma afirmação do relatório e passa a ser um
+    teste sobre o Parquet publicado: nenhuma linha pode ter `date_obs + lag_dias` depois do fim do
+    trimestre a que pertence.
+    """
+
+    date_obs: Series[pa.DateTime] = pa.Field(
+        nullable=True,
+        description="Última observação efetivamente consumida pela célula (data de referência).",
+    )
+    lag_dias: Series[int] = pa.Field(
+        nullable=False,
+        ge=0,
+        le=400,
+        description="`lag_divulgacao_dias` que manda na célula (máximo entre os insumos).",
+    )
+
+    class Config:
+        """Configuração do schema."""
+
+        name = "macro_quarterly_asof_provenance"
+        strict = True
+        coerce = True
+        unique = ["quarter", "column"]
