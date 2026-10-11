@@ -5,15 +5,15 @@ Organização, e o motivo de cada bloco:
 | Bloco | O que trava | CA |
 |---|---|---|
 | 1 | a paleta divergente: derivada, centrada em 0, simétrica, sem verde | CA-095 |
-| 2 | a grade: 24 ativos por classe × colunas na ordem do enum, **sem buraco** | CA-095 |
+| 2 | a grade: 23 ativos por classe × colunas na ordem do enum, **sem buraco** | CA-095 |
 | 3 | os três estados de confiança: `n >= 8`, `5 <= n < 8`, `n < 5` | CA-096, CA-108/109 |
 | 4 | o desenho: célula, `n`, cabeçalho, título, e **nada preditivo** | CA-095, §10.2.10 |
 | 5 | o rodapé: `data_inicio` de **cada** série e a métrica **nomeada** | CA-097 |
 | 6 | o gate: rodapé e marca d'água com `especificacao_congelada=False` | CA-090 |
 | 7 | determinismo: 2 rodadas, mesmos bytes; dados == Parquet; tooltip no SVG | CA-121 |
-| 8 | **acervo real** — 24 × (4+1), valores idênticos ao Parquet de F-022 | todos |
+| 8 | **acervo real** — 23 × (4+1), valores idênticos ao Parquet de F-022 | todos |
 
-Os blocos 1-7 rodam sobre uma **fixture sintética** de 24 ativos × 5 colunas, nomeada como
+Os blocos 1-7 rodam sobre uma **fixture sintética** de 23 ativos × 5 colunas, nomeada como
 sintética (Anti-SPEC §10.1.2), e **nunca pulam**: rodam no CI sem `data/`. O bloco 8 segue o
 padrão `Acervo` de `test_figura_timeline_regimes.py §7` — entra por acréscimo quando os Parquets
 existem em disco e é desligado por `LDC_IGNORAR_DATA=1`.
@@ -119,7 +119,7 @@ def dados_sinteticos(*, com_v3: bool = True) -> pd.DataFrame:
 
 @pytest.fixture
 def dados() -> pd.DataFrame:
-    """Dados plotados sintéticos da vista principal (24 ativos × 5 colunas)."""
+    """Dados plotados sintéticos da vista principal (23 ativos × 5 colunas)."""
     return dados_sinteticos()
 
 
@@ -260,14 +260,18 @@ def test_cinza_de_supressao_nao_e_o_neutro_da_escala() -> None:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 2 — A grade: 24 ativos por classe × colunas na ordem do enum, sem buraco
+# 2 — A grade: 23 ativos por classe × colunas na ordem do enum, sem buraco
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-def test_sao_24_ativos_sem_repeticao_e_acima_do_minimo_do_contrato() -> None:
-    """RF-033 pede >= 18 linhas; o acervo tem 24 e nenhuma linha aparece duas vezes."""
-    assert len(H.ORDEM_DOS_ATIVOS) == 24
-    assert len(set(H.ORDEM_DOS_ATIVOS)) == 24
+def test_sao_23_ativos_sem_repeticao_e_acima_do_minimo_do_contrato() -> None:
+    """RF-033 pede >= 18 linhas; a figura tem 23 e nenhuma linha aparece duas vezes.
+
+    São os **24** de `asset_returns_quarterly` menos o `SP500_USD`, que sai por **D-z** (retorno
+    em USD contra CDI em BRL mistura moedas). 23 >= 18 continua cumprindo RF-033.
+    """
+    assert len(H.ORDEM_DOS_ATIVOS) == 23
+    assert len(set(H.ORDEM_DOS_ATIVOS)) == 23
 
 
 def test_ordem_das_linhas_e_por_classe_na_ordem_declarada() -> None:
@@ -323,7 +327,7 @@ def test_vista_asof_nao_ganha_coluna_v3() -> None:
 
 
 def test_grade_tem_uma_celula_por_ativo_e_coluna(dados: pd.DataFrame) -> None:
-    """**CA-095:** 24 × 5 = 120 células, nenhuma faltando, nenhuma repetida."""
+    """**CA-095:** 23 × 5 = 115 células, nenhuma faltando, nenhuma repetida."""
     assert len(dados) == len(H.ORDEM_DOS_ATIVOS) * len(N_POR_COLUNA)
     assert not dados.duplicated(subset=["asset_id", "coluna"]).any()
     H.exigir_grade_completa(dados, n_colunas=len(N_POR_COLUNA))
@@ -589,7 +593,7 @@ def test_vista_sem_linha_nos_dados_falha(
 def test_rodape_lista_data_inicio_de_cada_serie(
     dados: pd.DataFrame, colunas: tuple[H.ColunaDoHeatmap, ...]
 ) -> None:
-    """**CA-097 literal:** `data_inicio` de **cada** uma das 24 séries está no rodapé."""
+    """**CA-097 literal:** `data_inicio` de **cada** uma das 23 séries está no rodapé."""
     figura = figura_sintetica(dados, colunas)
     rodape = " ".join(textos_da_figura(figura))
     inicios = H.inicio_das_series(dados)
@@ -643,15 +647,22 @@ def test_rodape_traz_versao_build_e_hash_dos_insumos(
     assert FONTE_VERSAO_SINTETICA[:12] in rodape
 
 
-def test_rodape_declara_a_mistura_de_moeda(
+def test_rodape_nomeia_o_ativo_que_d_z_tirou_da_figura(
     dados: pd.DataFrame, colunas: tuple[H.ColunaDoHeatmap, ...]
 ) -> None:
-    """`SP500_USD` é retorno em USD contra CDI em BRL — declarado, não escondido nem apagado."""
+    """**D-z:** `SP500_USD` sai da figura do Comitê (retorno em USD contra CDI em BRL mistura
+    moedas), mas a exclusão é **nomeada no rodapé** — não é apagamento silencioso. E a linha
+    continua existindo no dado de F-022, o que o teste de grade abaixo trava.
+    """
     figura = figura_sintetica(dados, colunas)
     rodape = " ".join(textos_da_figura(figura))
-    for ativo in H.ATIVOS_FORA_DA_MOEDA:
+    assert H.ATIVOS_FORA_DA_FIGURA == ("SP500_USD",)
+    for ativo in H.ATIVOS_FORA_DA_FIGURA:
         assert ativo in rodape
+        assert ativo not in H.ORDEM_DOS_ATIVOS
     assert "mistura moedas" in rodape
+    assert "D-z" in rodape
+    assert "regime_asset_metrics" in rodape
 
 
 def test_rodape_da_vista_asof_repete_o_achado_de_ca_074() -> None:
@@ -773,14 +784,14 @@ def test_nomes_dos_arquivos_por_vista(
     assert nomes == {
         f"heatmap_{slug}.{formato}" for slug in H.VISTAS for formato in _comum.FORMATOS
     }
-    assert set(H.VISTAS) == {"v1_revised", "v1_asof", "v3_t1"}
+    assert set(H.VISTAS) == {"v1_revised", "v1_asof", "horizonte_cruzado"}
 
 
 # ═════════════════════════════════════════════════════════════════════════════
 # 8 — Acervo real `data/canonical/` (padrão `Acervo`; desligado por LDC_IGNORAR_DATA=1)
 # ═════════════════════════════════════════════════════════════════════════════
 
-N_ATIVOS_REAIS = 24
+N_ATIVOS_REAIS = 23  # os 24 da tabela menos o SP500_USD (D-z)
 N_COLUNAS_PRINCIPAL = 5
 N_SUPRIMIDAS_PRINCIPAL = 2  # IFIX e IMOB na V3, n = 4 (F-022 §7.1)
 N_ALERTA_PRINCIPAL = 1  # ICON na V3, n = 6
@@ -821,13 +832,26 @@ def resultado_real():  # noqa: ANN201 - ResultadoHeatmap
 
 
 @acervo_real
-def test_acervo_vista_principal_e_24_por_5(resultado_real) -> None:  # noqa: ANN001
-    """**CA-095 no dado real:** 24 ativos × (4 quadrantes V1 + 1 coluna V3) = 120 células."""
+def test_acervo_vista_principal_e_23_por_5(resultado_real) -> None:  # noqa: ANN001
+    """**CA-095 no dado real:** 23 ativos × (4 quadrantes V1 + 1 coluna V3) = 115 células."""
     bloco = resultado_real.dados[resultado_real.dados["vista"] == H.VISTA_PRINCIPAL.slug]
     assert bloco["asset_id"].nunique() == N_ATIVOS_REAIS
     assert bloco["coluna"].nunique() == N_COLUNAS_PRINCIPAL
     assert len(bloco) == N_ATIVOS_REAIS * N_COLUNAS_PRINCIPAL
     assert bloco["n_obs"].notna().all()
+
+
+@acervo_real
+def test_acervo_sp500_usd_sai_da_figura_mas_continua_na_tabela_de_f022(resultado_real) -> None:  # noqa: ANN001
+    """**D-z nas duas pontas:** a linha sai da figura do Comitê **e** continua no dado.
+
+    Se alguém "resolvesse" a mistura de moedas apagando o ativo de F-022, a segunda metade deste
+    teste cairia — e seria perda de dado, não decisão de apresentação.
+    """
+    assert "SP500_USD" not in set(resultado_real.dados["asset_id"])
+    for vista in H.VISTAS.values():
+        origem = pd.read_parquet(caminho_canonical(vista.tabela.nome_arquivo))
+        assert "SP500_USD" in set(origem["asset_id"]), vista.tabela.nome_arquivo
 
 
 @acervo_real
@@ -907,7 +931,9 @@ def test_acervo_tres_vistas_com_as_tabelas_certas(resultado_real) -> None:  # no
     assert set(por_vista) == set(H.VISTAS)
     assert por_vista["v1_revised"]["tabela"] == "regime_asset_metrics.parquet"
     assert por_vista["v1_asof"]["tabela"] == "regime_asset_metrics_asof.parquet"
-    assert por_vista["v3_t1"]["tabela"] == "regime_asset_metrics_horizonte_cruzado.parquet"
+    assert (
+        por_vista["horizonte_cruzado"]["tabela"] == "regime_asset_metrics_horizonte_cruzado.parquet"
+    )
     assert por_vista["v1_asof"]["materializacao"] == "asof"
     assert len(por_vista["v1_asof"]["colunas"]) == 4
 

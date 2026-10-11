@@ -100,6 +100,8 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
+from apps.analysis import _linguagem
+from apps.analysis.figuras import _comum
 from apps.pipeline.canonical.build_raw_series import caminhos_dos_componentes
 from apps.pipeline.canonical.build_raw_series import versao_build as _hash_dos_componentes
 from apps.pipeline.canonical.regimes_v1 import (
@@ -135,15 +137,19 @@ NOME_REGIMES_POR_MATERIALIZACAO: dict[str, str] = {
 }
 
 #: Subpasta de `data/canonical/` onde as figuras e os dados plotados vivem.
-SUBPASTA_FIGURAS = "figuras"
+#: **Vem de `_comum`** (F-023 pendência 4, resolvida em **D-z**): a camada de análise tem **uma**
+#: definição de onde grava e em que formatos, não uma por figura.
+SUBPASTA_FIGURAS = _comum.SUBPASTA_FIGURAS
 NOME_DADOS_PLOTADOS = "timeline_regimes_dados.parquet"
-FORMATOS: tuple[str, ...] = ("png", "svg")
-DPI_PNG = 150
+FORMATOS: tuple[str, ...] = _comum.FORMATOS
+DPI_PNG = _comum.DPI_PNG
 
 #: Os módulos que determinam o conteúdo da figura, **nesta ordem** — base de `versao_build`.
 #: O schema entra porque o enum dos 4 rótulos e os nomes das colunas moram lá.
 MODULOS_DA_TIMELINE: tuple[str, ...] = (
     "apps.analysis.figuras.timeline_regimes",
+    "apps.analysis._linguagem",
+    "apps.analysis.figuras._comum",
     "packages.shared.schemas.regimes",
 )
 
@@ -180,13 +186,16 @@ HACHURA_INDETERMINADO = "///"
 ROTULO_INDETERMINADO = StatusRegimeV1.INDETERMINADO.value
 
 #: Cromo do gráfico (superfície, tintas, grade) — os papéis de `dataviz/references/palette.md`.
-SUPERFICIE = "#fcfcfb"
-TINTA_PRIMARIA = "#0b0b0b"
-TINTA_SECUNDARIA = "#52514e"
-TINTA_MUTED = "#898781"
-COR_GRADE = "#e1e0d9"
-COR_EIXO = "#c3c2b7"
-COR_CRITICO = "#d03b3b"
+#: **Importado de `_comum`**, não redeclarado (F-023 pendência 4, resolvida em **D-z**): duas
+#: figuras do mesmo pacote com dois cinzas de grade é o jeito de o cromo divergir em silêncio.
+#: Os nomes locais ficam porque são a interface que o resto deste módulo e os testes usam.
+SUPERFICIE = _comum.SUPERFICIE
+TINTA_PRIMARIA = _comum.TINTA_PRIMARIA
+TINTA_SECUNDARIA = _comum.TINTA_SECUNDARIA
+TINTA_MUTED = _comum.TINTA_MUTED
+COR_GRADE = _comum.COR_GRADE
+COR_EIXO = _comum.COR_EIXO
+COR_CRITICO = _comum.COR_CRITICO
 
 #: Opacidade da lavagem de fundo (`dataviz`: área é lavagem, "nunca um bloco saturado").
 ALPHA_LAVAGEM = 0.14
@@ -225,7 +234,7 @@ ENTRELINHA_RODAPE = 0.021
 #: Semente fixa dos `id` do SVG: sem ela o SVG muda de bytes entre processos (determinismo).
 SALGA_SVG = "ldc-f025-timeline-regimes"
 
-MARCA_NAO_CONGELADA = "ESPECIFICAÇÃO NÃO CONGELADA — não publicável"
+MARCA_NAO_CONGELADA = _comum.MARCA_NAO_CONGELADA
 """CA-090 por escrito, na figura. Enquanto ADR-001 estiver em `Proposta`, é obrigatória."""
 
 LEITURA_DESCRITIVA = (
@@ -707,6 +716,25 @@ def _rodape(
         )
 
 
+def _conferir_linguagem_da_figura(figura: Figure, *, origem: str) -> None:
+    """Passa **todo** texto da figura pela guarda única da camada (Anti-SPEC §10.2.10).
+
+    Antes de **D-z/P2-1** esta verificação existia só no **teste** desta figura, com uma lista de
+    5 termos própria. Agora ela roda **no desenho**: o texto que não passa não chega a virar PNG.
+    A fonte da verdade é `apps/analysis/_linguagem.py`, a mesma de F-023, F-024 e F-028.
+    """
+    textos = [t.get_text() for t in figura.texts]
+    for eixo in figura.axes:
+        textos += [t.get_text() for t in eixo.texts]
+        textos += [t.get_text() for t in eixo.get_xticklabels()]
+        textos += [t.get_text() for t in eixo.get_yticklabels()]
+        if eixo.get_title():
+            textos.append(eixo.get_title())
+    for legenda in figura.legends:
+        textos += [t.get_text() for t in legenda.get_texts()]
+    _linguagem.conferir_textos([t for t in textos if t], origem=origem)
+
+
 def desenhar(
     dados: pd.DataFrame,
     *,
@@ -802,6 +830,7 @@ def desenhar(
         ),
         congelada=congelada,
     )
+    _conferir_linguagem_da_figura(figura, origem=f"timeline_regimes_{chave}")
     return figura
 
 

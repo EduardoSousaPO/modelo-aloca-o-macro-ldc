@@ -1,7 +1,8 @@
 """F-023 — Heatmap regime × ativo: o **entregável visual central**. RF-033 / CA-095..097.
 
 Uma frase: *em cada regime macro, quanto cada ativo rendeu **acima ou abaixo do CDI**, com o `n`
-na própria célula*. Linhas = os **24** ativos de `asset_returns_quarterly`, agrupados por classe;
+na própria célula*. Linhas = **23** dos 24 ativos de `asset_returns_quarterly` (o `SP500_USD` sai
+por **D-z**, §`ATIVOS_FORA_DA_FIGURA`), agrupados por classe;
 colunas = os 4 quadrantes da V1 **mais** a coluna dos vizinhos da V3; célula = `excesso_cdi`
 (ADR-002 / **D5 provisório**), em escala divergente centrada em zero.
 
@@ -11,26 +12,25 @@ colunas = os 4 quadrantes da V1 **mais** a coluna dos vizinhos da V3; célula = 
 |---|---|---|
 | **`v1_revised`** | `regime_asset_metrics.parquet` | V1 `revised` em T0 (4 col.) + V3 em T+1 |
 | `v1_asof` | `regime_asset_metrics_asof.parquet` | V1 `asof` em T0 — só V1 (a V3 não tem `asof`) |
-| `v3_t1` | `regime_asset_metrics_horizonte_cruzado.parquet` | V1 em T+1 + V3 contemporânea |
+| `horizonte_cruzado` | `regime_asset_metrics_horizonte_cruzado.parquet` | V1 em T+1 + V3 em T0 |
 
 A janela e o `n` de cada regime saem de `regimes_v1{,_asof}.parquet` (F-019), lidos e validados
 pela função **importada** de F-025 — não recalculados aqui.
 
-> ⚠️ **Dívida de nome, para o orquestrador.** O slug `v3_t1` vem do briefing desta feature, mas a
-> vista que ele nomeia é o **horizonte cruzado**, em que a V1 é medida em T+1 e a V3 é
-> **contemporânea (T0)** — ou seja, o slug sugere o oposto do horizonte da V3 naquela figura.
-> O título, o cabeçalho de cada coluna e o Parquet de dados plotados dizem o horizonte correto em
-> todos os casos; só o **nome do arquivo** é infeliz. Renomear para `heatmap_horizonte_cruzado` é
-> trocar uma constante (`VISTAS`) e re-rodar.
+> **Nome da terceira vista (D-z, 2026-10-11).** O briefing de F-023 chamava a vista de `v3_t1`, o
+> que sugeria o oposto do que ela mostra: nela a V1 é medida em T+1 e a V3 é **contemporânea
+> (T0)**. O orquestrador renomeou o slug para **`horizonte_cruzado`**, que é o que a vista é —
+> mesmo nome da tabela de F-022 que a alimenta. Arquivos antigos `heatmap_v3_t1.{png,svg}` de
+> rodadas anteriores a D-z não são mais gerados.
 
-Saída em `data/canonical/figuras/`: `heatmap_{v1_revised,v1_asof,v3_t1}.{png,svg}` +
+Saída em `data/canonical/figuras/`: `heatmap_{v1_revised,v1_asof,horizonte_cruzado}.{png,svg}` +
 `heatmap_dados.parquet` — **os dados exatamente como plotados**, para que a figura seja conferível
 célula a célula em vez de acreditada.
 
 ## As decisões de forma, e por que nenhuma é de gosto
 
 1. **Heatmap, e não 24 barras agrupadas.** A pergunta é "esta classe, neste regime" — uma matriz
-   de identidade × identidade com um valor contínuo dentro. Barra agrupada com 24 × 5 = 120
+   de identidade × identidade com um valor contínuo dentro. Barra agrupada com 23 × 5 = 115
    barras não é lida por ninguém; a matriz é.
 2. **Escala divergente simétrica, centrada em zero** (`dataviz`, ADR-002 §3): azul = bateu o CDI,
    vermelho = perdeu do CDI, cinza = empatou. A simetria (`-extremo .. +extremo`) é o que faz o
@@ -75,9 +75,10 @@ célula a célula em vez de acreditada.
 - **Gate de publicação** (CA-090): `especificacao_congelada=False` ⇒ marca d'água diagonal + linha
   de rodapé `ESPECIFICAÇÃO NÃO CONGELADA — não publicável`. A figura é gerada (desenvolver é
   liberado), mas nasce **não publicável**.
-- **`SP500_USD` é retorno em USD** e o excesso dele contra o CDI em BRL mistura moedas. A linha
-  fica (é dado real da tabela), com asterisco de moeda no rótulo e nota no rodapé — declarada, não
-  escondida nem apagada.
+- **`SP500_USD` sai da figura (D-z)**: é retorno em USD e o excesso dele contra o CDI em BRL
+  mistura moedas (Anti-SPEC §10.2.12), o que deixa a célula sem leitura. A linha **não** foi
+  apagada do dado — segue em `regime_asset_metrics*.parquet` (F-022) — e a exclusão é **nomeada
+  no rodapé**, nunca silenciosa. A exposição internacional em BRL fica em `SP500_BRL`/`ACWI_BRL`.
 
 ## Determinismo
 
@@ -114,6 +115,7 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, Rectangle
 
+from apps.analysis import _linguagem
 from apps.analysis.figuras import _comum
 from apps.analysis.figuras.timeline_regimes import ler_regimes
 from apps.pipeline.canonical.metricas_regime import (
@@ -181,13 +183,13 @@ VISTA_ASOF = Vista(
 )
 
 VISTA_HORIZONTE_CRUZADO = Vista(
-    slug="v3_t1",
+    slug="horizonte_cruzado",
     tabela=TABELA_HORIZONTE_CRUZADO,
     titulo="horizonte cruzado — V1 em T+1, V3 contemporânea (T0)",
     ressalva=(
         "Vista de CONTROLE: cruza os horizontes para isolar o efeito do HORIZONTE do efeito da "
-        "LENTE. O slug do arquivo (`v3_t1`) vem do briefing de F-023 e e enganoso - aqui a V3 e "
-        "medida em T0; o horizonte correto de cada coluna esta no cabecalho dela."
+        "LENTE. Aqui a V1 e medida em T+1 e a V3 e contemporanea (T0) - o horizonte de cada "
+        "coluna esta no cabecalho dela. Slug renomeado de `v3_t1` para `horizonte_cruzado` em D-z."
     ),
 )
 
@@ -202,6 +204,7 @@ NOME_DADOS_PLOTADOS = "heatmap_dados.parquet"
 #: lá; o schema entra porque a lista de ativos e o contrato das colunas moram nele.
 MODULOS_DO_HEATMAP: tuple[str, ...] = (
     "apps.analysis.figuras.heatmap_regime_ativo",
+    "apps.analysis._linguagem",
     "apps.analysis.figuras._comum",
     "apps.pipeline.canonical.metricas_regime",
     "packages.shared.schemas.asset_returns_quarterly",
@@ -211,7 +214,7 @@ MODULOS_DO_HEATMAP: tuple[str, ...] = (
 SALGA_SVG = "ldc-f023-heatmap-regime-ativo"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# As linhas: 24 ativos, agrupados por classe, em ordem **declarada**
+# As linhas: 23 ativos (24 menos o `SP500_USD` de D-z), por classe, em ordem **declarada**
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -234,16 +237,23 @@ GRUPOS: tuple[Grupo, ...] = (
     Grupo("Acoes — indices amplos", ("IBOV", "IDIV", "SMLL")),
     Grupo("Acoes — setoriais B3", ("INDX", "ICON", "IMAT", "IEEX", "IMOB", "IFNC", "UTIL")),
     Grupo("Fundos imobiliarios", ("IFIX",)),
-    Grupo("Internacional (em BRL)", ("SP500_BRL", "ACWI_BRL", "SP500_USD")),
+    Grupo("Internacional (em BRL)", ("SP500_BRL", "ACWI_BRL")),
     Grupo("Cambio", ("USDBRL",)),
     Grupo("Referencia da metrica", ("CDI",)),
 )
 
 ORDEM_DOS_ATIVOS: tuple[str, ...] = tuple(ativo for grupo in GRUPOS for ativo in grupo.ativos)
 
-#: Ativos cuja unidade **não** é retorno em BRL: o excesso contra o CDI em BRL mistura moedas.
-#: Ficam na figura (é dado real), marcados, nunca apagados em silêncio.
-ATIVOS_FORA_DA_MOEDA: tuple[str, ...] = ("SP500_USD",)
+#: Ativos cuja unidade **não** é retorno em BRL e que, por **D-z**, saem da figura do Comitê:
+#: o excesso de um retorno em USD contra o CDI em BRL mistura moedas (Anti-SPEC §10.2.12) e a
+#: célula não tem leitura. **Não** foram apagados do dado: as linhas continuam em
+#: `regime_asset_metrics*.parquet` (F-022) e a exclusão é **nomeada no rodapé** desta figura.
+ATIVOS_FORA_DA_FIGURA: tuple[str, ...] = ("SP500_USD",)
+
+#: Ativos que ficam na figura marcados por unidade ≠ BRL. Vazio desde **D-z** (o único caso,
+#: `SP500_USD`, passou a ser exclusão). A constante e a marca ficam porque o mecanismo de dois
+#: canais — marca no rótulo + nota no rodapé — é o que um ativo futuro em outra moeda herda.
+ATIVOS_FORA_DA_MOEDA: tuple[str, ...] = ()
 MARCA_MOEDA = " ‡"
 
 #: Rótulo legível de cada regime da V1 — na ordem de declaração do enum, igual a F-025.
@@ -303,26 +313,10 @@ LEITURA_DESCRITIVA = (
 NOME_DA_METRICA = "excesso sobre CDI medio trimestral"
 """CA-097: a métrica é **nomeada**, não insinuada."""
 
-#: Construções **afirmativamente** preditivas — nenhuma pode aparecer em texto da figura
-#: (§10.2.10). A lista é de frases, não de radicais: a própria figura diz "Nada aqui e projecao",
-#: e banir o radical `projec` proibiria a ressalva junto com o que ela ressalva.
-VOCABULARIO_PREDITIVO: tuple[str, ...] = (
-    "vai render",
-    "vai subir",
-    "vai cair",
-    "deve render",
-    "deve subir",
-    "deve cair",
-    "retorno esperado",
-    "esperado para",
-    "previsao de",
-    "projecao de",
-    "projetamos",
-    "estimamos",
-    "recomenda",
-    "tende a",
-    "e o melhor",
-)
+#: As construções preditivas são as da guarda **única** da camada (`apps/analysis/_linguagem.py`),
+#: não uma lista própria desta figura (P2-1 do QA da Onda 4). O nome fica porque o teste varre por
+#: ele; a fonte da verdade é uma só, para as três features.
+VOCABULARIO_PREDITIVO: tuple[str, ...] = _linguagem.FORMAS_PREDITIVAS_PROIBIDAS
 
 # ─────────────────────────────────────────────────────────────────────────────
 # O contrato de colunas dos dados plotados
@@ -966,8 +960,15 @@ def _linhas_do_rodape(
         f"ativo (CA-093).",
         faixa_erro,
         vista.ressalva,
-        f"‡ {', '.join(ATIVOS_FORA_DA_MOEDA)}: retorno em USD. O excesso contra o CDI em BRL "
-        f"mistura moedas - a linha fica porque e dado real da tabela, declarada e nao apagada.",
+        f"FORA desta figura (D-z): {', '.join(ATIVOS_FORA_DA_FIGURA)} - retorno em USD, e o "
+        f"excesso contra o CDI em BRL mistura moedas (Anti-SPEC 10.2.12), celula sem leitura. "
+        f"A linha NAO foi apagada do dado: segue em regime_asset_metrics*.parquet (F-022). "
+        f"A exposicao internacional em BRL esta em SP500_BRL e ACWI_BRL."
+        + (
+            f" ‡ {', '.join(ATIVOS_FORA_DA_MOEDA)}: unidade diferente de BRL, marcado no rotulo."
+            if ATIVOS_FORA_DA_MOEDA
+            else ""
+        ),
         f"data_inicio de cada serie (CA-097), {len(inicios)} ativos:",
         *blocos,
         f"versao_build {versao[:12]} | sha256 dos insumos lidos nesta rodada:",
@@ -978,6 +979,25 @@ def _linhas_do_rodape(
         f"{str(dados['fonte_versao'].iloc[0])[:12]}.",
     ]
     return linhas
+
+
+def _conferir_linguagem_da_figura(figura: Figure, *, origem: str) -> None:
+    """Passa **todo** texto da figura pela guarda única da camada (Anti-SPEC §10.2.10).
+
+    Antes de **D-z/P2-1** esta verificação existia só no **teste** desta figura, com uma lista de
+    5 termos própria. Agora ela roda **no desenho**: o texto que não passa não chega a virar PNG.
+    A fonte da verdade é `apps/analysis/_linguagem.py`, a mesma de F-023, F-024 e F-028.
+    """
+    textos = [t.get_text() for t in figura.texts]
+    for eixo in figura.axes:
+        textos += [t.get_text() for t in eixo.texts]
+        textos += [t.get_text() for t in eixo.get_xticklabels()]
+        textos += [t.get_text() for t in eixo.get_yticklabels()]
+        if eixo.get_title():
+            textos.append(eixo.get_title())
+    for legenda in figura.legends:
+        textos += [t.get_text() for t in legenda.get_texts()]
+    _linguagem.conferir_textos([t for t in textos if t], origem=origem)
 
 
 def desenhar(
@@ -1061,6 +1081,7 @@ def desenhar(
         y_topo=Y_TOPO_DO_RODAPE,
         entrelinha=ENTRELINHA_RODAPE,
     )
+    _conferir_linguagem_da_figura(figura, origem=f"heatmap_{vista.slug}")
     return figura
 
 
@@ -1274,7 +1295,8 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m apps.analysis.figuras.heatmap_regime_ativo",
         description=(
-            "Gera data/canonical/figuras/heatmap_{v1_revised,v1_asof,v3_t1}.{png,svg} + o Parquet "
+            "Gera data/canonical/figuras/heatmap_{v1_revised,v1_asof,horizonte_cruzado}"
+            ".{png,svg} + o Parquet "
             "dos dados plotados, a partir das 3 tabelas regime_asset_metrics de F-022 e de "
             "regimes_v1 (F-019). Celula = excesso sobre CDI medio trimestral, escala divergente "
             "centrada em 0, n em toda celula. Nunca toca a rede. Enquanto ADR-001 estiver em "
@@ -1285,7 +1307,7 @@ def _parser() -> argparse.ArgumentParser:
         "--vista",
         choices=[*VISTAS, ESCOLHA_TODAS],
         default=ESCOLHA_TODAS,
-        help="v1_revised (principal), v1_asof, v3_t1 (horizonte cruzado) ou todas (default).",
+        help="v1_revised (principal), v1_asof, horizonte_cruzado ou todas (default).",
     )
     return parser
 

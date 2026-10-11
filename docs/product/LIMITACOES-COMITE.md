@@ -113,6 +113,13 @@ spread, imposto nem custo de rebalanceamento em nenhum número: **nada aqui é r
 ou de uma carteira real**, e Sharpe de índice **não** é Sharpe implementável — a diferença é material
 justamente nas linhas mais ilíquidas (small caps, FII, setoriais estreitos).
 
+### 3.1 A parte internacional: três limitações próprias
+
+- **A regra de "trimestre de stress" não é avaliável em 14 dos 83 trimestres.** O gatilho é queda forte da inclinação da curva de juros **ou** alta do dólar acima de 10% no trimestre; o primeiro ramo não pode ser avaliado em 2006Q1-2008Q1 (janela de referência ainda se formando) nem em 2020Q3-2021Q3 (buraco na inclinação de 5−3 anos). Nesses 14 o ramo do dólar continua valendo, e a página de números os **nomeia um por um** — *trimestre não avaliável não é trimestre sem stress*. O terceiro ramo previsto (risco-país) está **declaradamente fora**: a série morreu em julho de 2024 e tem **zero** valores no período. Com os dois ramos que existem, **20 dos 83** trimestres são de stress, e **9 dos 10 piores trimestres do IBOV** estão entre eles — conferido **depois** de a regra ser fixada, não usado para calibrá-la.
+- **O tamanho do internacional muda de 10,4% para 19,7% por causa de uma restrição de apresentação.** O cálculo de menor variância aponta **15,9% a 23,6%** por regime limitando cada ativo a 40% da carteira; **sem esse limite**, a média da janela inteira cai de **19,7% para 10,4%**. Número que quase dobra conforme uma escolha de apresentação **não é um número** — por isso a entrega é uma **faixa** (piso estrutural 16-20% + banda tática 15-35%), nunca um ponto, com 13 a 19 observações por regime.
+- **Três ativos pedidos não têm fonte** — ouro em reais, Treasury de 10 anos em retorno total e S&P com hedge cambial — e saem como indisponíveis, **sem substituto**. E *com hedge* × *sem hedge* são **categorias diferentes**: as referências de 2,5-7% tratam de global hedgeado; as de 16-35%, de exposição cambial.
+> **Nota sobre o mapa de calor (regime × ativo):** o S&P em **dólar** foi **retirado** da figura do Comitê — comparar retorno em dólar com o CDI em reais mistura duas moedas na mesma célula, e a célula deixa de ter leitura. O internacional aparece pelas linhas **em reais**. A linha retirada **não** foi apagada do dado: continua na tabela de números, e a figura **diz no rodapé** que foi retirada e por quê.
+
 ## 4. Convenções que mudam o número — e que o Comitê deveria conhecer
 
 Nenhuma destas é opinião disfarçada: cada uma está medida e publicada no dado.
@@ -218,7 +225,7 @@ coluna da direita diz o preço.
 | **L4** | Curva oficial da ANBIMA é paga | não contratar; usar a curva do Tesouro Direto | contratar o produto pago dá a curva oficial, recalcula a inclinação histórica e muda o tratamento de risco do projeto (passa a envolver credencial) |
 | **D-i** | Qual inclinação é a variável de regime | **5 anos − 3 anos** (95,25% de cobertura) | voltar à 5a−1a devolve uma variável com **60,53%** de cobertura: ~40% dos trimestres cairiam num dia sem valor |
 | **D-s** | Nível trimestral do IBC-Br | média dos 3 meses | voltar ao último mês devolve a distribuição anterior e **7 trimestres** mudam de quadrante de volta |
-| **D-t** | Movimento de 25 pb na Selic | é ciclo (corte/alta) | com a regra estrita, os cortes reais de 25 pb de 2024 voltam a ser classificados como "parada" |
+| **D-t** | Movimento de 25 pb na Selic | é ciclo (corte/alta), **nos dois sentidos** | com a regra estrita, os **7** movimentos de exatamente 25 pb do período voltam a ser classificados como "parada" — e são **5 cortes e 2 altas**, entre elas a alta de setembro de 2024 que abriu o ciclo de aperto |
 | **D-u** | Eixo de crescimento da lente de "momentos semelhantes" | expectativa de PIB do Focus | sem o Focus, a lente **não tem vetor para 2026Q3** — exatamente o trimestre da pergunta do Comitê — e perde 2006-2009 |
 
 **Atalho:** responder "aceito as recomendações" destrava tudo de uma vez, muda o status dos ADRs de "Proposta" para "Aceito" e torna os números publicáveis pelo fluxo formal de entrega.
@@ -229,15 +236,8 @@ Nada neste pacote foi digitado à mão: todo número sai de script versionado, e
 arquivado com data, URL e impressão digital (`sha256`) da coleta. **Ambiente:** `uv sync --extra dev` —
 nenhuma credencial é necessária, todas as fontes do caminho crítico são públicas e gratuitas.
 
-- **Reconstrução, na ordem obrigatória:** curva → base bruta → alinhamento trimestral → variáveis macro
-  → versão defasada → retornos → regimes. O **comando único** que encadeia tudo está em desenvolvimento
-  (F-029); até ele existir a sequência está em `docs/wiki/runbooks/reconstruir-dataset.md`, e cada etapa
-  roda **sem rede** a partir do bruto. **Reprodutibilidade verificada:** duas execuções sobre o mesmo
-  bruto produzem **arquivos idênticos** (medido nos 53 arquivos da camada intermediária).
-- **Como citar uma versão:** cada tabela publica a sua impressão digital no relatório da própria rodada —
-  nesta: macro `bcb31e92…`, versão defasada `85e8ec67…`, retornos `c055ac81…`, regimes V1 `b74f8d67…`,
-  "momentos semelhantes" `5241f275…` (campo `sha256` de cada `relatorio_*.json`). **Hash diferente =
-  outro dataset:** nunca comparar números de rodadas diferentes sem conferir.
+- **Reconstrução com UM comando** (F-029): `python -m apps.pipeline run --offline` encadeia as 13 etapas na ordem obrigatória — curva → base bruta → alinhamento trimestral → variáveis macro → versão defasada → retornos → regimes → métricas por regime → internacional → figuras → tabelas —, cada uma **sem rede**, a partir do bruto arquivado; a sequência etapa por etapa está em `docs/wiki/runbooks/reconstruir-dataset.md`. `python -m apps.pipeline verify` recalcula a impressão digital de **todos** os arquivos publicados e **sai com erro** se um só byte divergir. **Reprodutibilidade verificada:** duas execuções consecutivas produziram os **47 arquivos byte a byte idênticos**, com o mesmo identificador de conjunto.
+- **Como citar uma versão:** cada tabela publica a sua impressão digital no relatório da própria rodada — nesta: macro `2b8b65f4…`, versão defasada `5c4854f2…`, retornos `2798b5c1…`, regimes V1 `76512d8d…`, "momentos semelhantes" `a17d9288…` (campo `sha256` de cada `relatorio_*.json`), e o conjunto inteiro tem um identificador único no arquivo `MANIFEST.json`. **Hash diferente = outro dataset:** nunca comparar números de rodadas diferentes sem conferir.
 
 **Rastreabilidade:** escopo → `docs/product/ESCOPO-EMAIL-ALEXANDRE.md` · substituições de fonte com
 os 4 campos obrigatórios → `docs/plans/DECISIONS_LOG.md §1` · decisões e aceites pendentes →

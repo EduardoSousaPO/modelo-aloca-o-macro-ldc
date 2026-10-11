@@ -23,16 +23,77 @@
 | `relatorio_macro.json` · `relatorio_retornos.json` · `relatorio_asof.json` | — | `versao_build 6367b761…` / `707438bc…` / `ced73173…` · nulos **por coluna com motivo**, unidades, canários, anti-look-ahead, `bases_por_trimestre`, lag por coluna, % de troca |
 | `calendario_dias_uteis` (grade de dias úteis) | `calendario.py` | 10.957 dias, 2001→2030 (F-008) |
 
-Os **cinco** builds, **nesta ordem** e nenhum deles lendo o relógio (idempotentes, CA-121):
-`build_raw_series` (F-013) → `alinhamento` (F-014) → `macro_quarterly` (F-015) → `asof` (F-018) →
-`retornos` (F-017), todos `python -m apps.pipeline.canonical.<módulo> --offline`. `curva` (F-016)
-escreve em `data/processed/` e por isso roda **antes** do primeiro; `regimes_v1`/`regimes_v3`
-(F-019/F-021, `modules/regimes.md`) rodam **depois**. Rebuild de árvore limpa de 2026-10-11,
-**2 rodadas com hashes idênticos**: `raw_series 0d23df7a…` · `series_catalog f56f207e…` ·
-`alinhado c66f09a5…` · `macro bcb31e92…` + `provenance aa8d427a…` · `asof 85e8ec67…` +
-`asof_provenance a5b2eaef…` · `asset_returns c055ac81…`.
+## UM comando reconstrói a camada (F-029)
 
-> **Por que todo hash mudou neste rebuild, sem o dado se mover.** Duas causas, as duas declaradas:
+```bash
+python -m apps.pipeline run --offline     # 13 etapas na ordem; sem rede, de data/processed/
+python -m apps.pipeline verify            # recalcula todo sha256 x MANIFEST.json; rc != 0 se divergir
+python -m apps.pipeline freeze --tag comite-2026-10-14   # MANIFEST.json + FROZEN.txt
+python -m apps.pipeline run --offline --listar-etapas    # a ordem, sem rodar
+python -m apps.pipeline run --offline --so regimes_v3    # retoma uma etapa
+python -m apps.pipeline run --offline --sem-duckdb       # diretório 100% determinístico
+```
+
+**A ordem é o contrato da feature**, fixada por teste: `curva` (F-016, escreve em
+`data/processed/`) → `build_raw_series` → `alinhamento` → `macro_quarterly` → `asof` → `retornos` →
+`regimes_v1` → `regimes_v1_asof` → `regimes_v3` → `metricas_regime` (F-022) → `internacional`
+(F-026) → `figuras` (F-023/F-025) → `tabelas` (F-024). As 4 últimas são **opcionais**: pulam com
+aviso se o módulo não existir — mas falha **dentro** de um `construir()` **para** o pipeline.
+`figuras` e `tabelas` descobrem submódulos por `pkgutil` (nome com `_` é privado e não é varrido),
+então figura ou tabela nova entra sem tocar `run.py`.
+**Nenhuma etapa reimplementa cálculo:** cada uma chama o `construir(raiz=...)` da feature dona — se
+um número está errado, o bug é da feature dona.
+
+> ⚠️ **As etapas `internacional` e `tabelas` faltavam até 2026-10-11** (P1-2 do QA da Onda 4): o
+> manifesto tinha 30 artefatos e o diretório, 44, e "um comando" entregava ~2/3 do canônico com
+> `rc = 0`. Hoje são **48** conferidos.
+
+### `MANIFEST.json` e `FROZEN.txt` — o que o gate da classe D consulta
+
+Todo `run` grava o `MANIFEST.json`: por artefato, `sha256` + bytes + linhas + colunas + coluna de
+data com min/max + **% de nulos por coluna** (CA-118), mais `versao_build` de cada relatório,
+`data_do_dado` e o **agregado**. O agregado é no formato `sha256sum` — `sha256` do corpo
+`"<sha256>  <arquivo>\n"` dos artefatos determinísticos, ordenados por nome, terminador LF —, logo
+**reproduzível na linha de comando** (`infra-ops.md §1.2`). Nome no manifesto é caminho relativo
+POSIX (`figuras/heatmap_dados.parquet`), para a ordem ser a mesma no Windows e no Linux.
+
+Dois campos que mudam o que vai ao Comitê:
+
+- **`determinista: false`** — só o `ldc.duckdb`: **medido** que em diretório criado do zero duas
+  escritas dão o mesmo tamanho (274.432 B) e `sha256` **diferente** (reescrita sobre arquivo
+  existente sai idêntica). Ele entra no manifesto com `sha256: null` e o motivo escrito, fica
+  **fora** do agregado e o `verify` o reporta como `INFO` — é derivado e descartável
+  (**ADR-006 §(a).2**: *views* sobre o Parquet). **Congele o pacote da classe D com
+  `--sem-duckdb`**: aí `data/canonical/` é integralmente determinístico.
+- **`publicavel: false`** (**D-af**) — artefato que é construído e conferido, mas **não vai ao
+  Comitê**. Hoje: `internacional_pesos.parquet` (variância mínima, Anti-SPEC §10.3.16/§10.5 →
+  F-035). O `FROZEN.txt` abre a seção `EXCLUIDOS DO PACOTE DE ENTREGA` e **F-031 lê esse campo**,
+  não o nome do arquivo. Ele **continua** no `DATASET_SHA256`, de propósito: o agregado descreve o
+  que foi **construído**, e tirá-lo confundiria reprodutibilidade com publicabilidade.
+
+`verify` detecta byte alterado, artefato ausente, artefato novo não listado, agregado divergente
+**e Parquet ilegível** — este último desde 2026-10-11 (P1-1 do QA da Onda 4: antes, `pd.read_parquet`
+estourava `OSError`/`ArrowInvalid` **dentro** do inventário, isto é, antes de qualquer comparação, e
+a saída era um traceback que não nomeava arquivo nem agregado; hoje o perfil sai vazio com
+`ilegivel` e a divergência é reportada com `rc = 1`). `freeze` **não executa git**: o commit vem de
+`.git/HEAD` + `refs/` por leitura pura, e a tag continua ato humano.
+
+**Rebuild final da Onda 4 (2026-10-11), 2 rodadas byte-idênticas, `verify` rc 0, 47 artefatos
+determinísticos:** `DATASET_SHA256 = fc2331183b9355e6424f223085fd501683678d73fc50a9cf2b570376750f17ef`.
+`raw_series 0d23df7a…` · `series_catalog f56f207e…` ·
+`alinhado c66f09a5…` · `macro 2b8b65f4…` +
+`provenance f3068b98…` ·
+`asof 5c4854f2…` +
+`asof_provenance 319312fb…` ·
+`asset_returns 2798b5c1…`.
+
+> **Por que todo hash mudou nos rebuilds das Ondas 3 e 4, sem o dado se mover.** `versao_build` é
+> o `sha256` do **conjunto de módulos** de cada feature, e tanto o fechamento da Onda 3 quanto o da
+> Onda 4 editaram módulos e schemas: na Onda 4, `packages/shared/schemas/{asset_returns_quarterly,
+> regimes}.py` (**D-ac**, a guarda de não-nulidade nas flags `bool`) e
+> `apps/pipeline/canonical/{macro_quarterly,metricas_regime}.py` (**D-y** P1-3 e **D-ab**).
+> `raw_series` e `series_catalog` seguiram byte-idênticos nas duas ondas. As duas causas da Onda 3,
+> as duas declaradas:
 > **(1) D-v (b)** — `versao_build` passou a **normalizar o fim de linha** antes de hashear
 > (`normalizar_fim_de_linha`, P1-4 do QA: o mesmo commit dava `fonte_versao` diferente num checkout
 > CRLF e num LF, e 2 dos 7 módulos já estavam em LF no disco). Isso move `fonte_versao` de **toda**

@@ -860,10 +860,22 @@ def test_guarda_recusa_frase_preditiva(frase: str) -> None:
         "Não é previsão de retorno, não é backtest e não é recomendação de alocação.",
         "Nenhuma projeção, nenhuma extrapolação: só o que aconteceu, com n.",
         "Descritivo ≠ preditivo: nada aqui é projeção.",
+        # As 4 frases REAIS que o QA da Onda 4 (P2-1) mediu sendo reprovadas pela guarda antiga,
+        # cuja janela de negação só olhava para trás e só via `não`/`nunca` colados ao termo.
+        "Nada aqui e projecao: a figura descreve o passado, com n em toda celula.",
+        'O que este levantamento sustenta: "rendeu X, n = Y". Nunca "quanto vai render".',
+        "Backtest, otimizacao ou fronteira eficiente - nada disso esta neste pacote.",
+        "A recomendacao de alocacao e do Alexandre; este levantamento nao a faz.",
     ],
 )
 def test_guarda_aceita_o_substantivo_sob_negacao(frase: str) -> None:
-    """O bloco D **precisa** dizer o que a página não é: sob negação, o termo é permitido."""
+    """O bloco D **precisa** dizer o que a página não é: sob negação, o termo é permitido.
+
+    As 4 últimas frases são as **reais** que o QA da Onda 4 (**P2-1**) pegou sendo reprovadas: a
+    guarda desta feature, aplicada aos textos das figuras e de `LIMITACOES-COMITE.md`, recusava
+    negação legítima. A guarda única (`apps/analysis/_linguagem.py`) olha a janela nos **dois**
+    sentidos e reconhece `nada … é` e cabeçalho de seção negada.
+    """
     T.conferir_linguagem_descritiva(frase)
 
 

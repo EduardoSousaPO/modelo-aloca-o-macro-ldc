@@ -178,3 +178,22 @@ class RegimeAssetMetricsSchema(pa.DataFrameModel):
         strict = True
         coerce = True
         unique = ["lente", "regime", "asset_id"]
+
+    # ── Acréscimo de D-ac: `nullable=False` em coluna `bool` NÃO recusa `None` ──────────
+    # Achado de F-022 §8.3, medido: com `coerce=True` o pandera faz `astype(bool)` **antes**
+    # de rodar qualquer check, e em pandas `None → False` / `NaN → True`. Resultado: uma flag
+    # ausente entrava como "não há alerta" com o selo do schema. O par abaixo fecha o buraco
+    # **por acréscimo**, sem tocar nenhuma declaração de coluna:
+    #   - o *parser* roda ANTES da coerção (medido) e converte a coluna para o dtype nulável
+    #     `boolean`; se houver `None`/`NaN`/`pd.NA`, a coerção para `bool` passa a FALHAR;
+    #   - o *check* é a declaração de intenção de D-ac e cobre o caminho em que a coerção
+    #     estiver desligada.
+    @pa.parser("alerta_n_baixo", "conclusao_suprimida")
+    def _flag_nula_nao_vira_false(cls, serie: object) -> object:  # noqa: N805
+        """Impede que `None` em flag booleana seja coagido a `False` em silêncio (D-ac)."""
+        return serie.astype("boolean")  # type: ignore[attr-defined]
+
+    @pa.check("alerta_n_baixo", "conclusao_suprimida", name="flag_bool_sem_nulo")
+    def _flags_sem_nulo(cls, serie: object) -> bool:  # noqa: N805
+        """`nullable=False` explicitado como check — flag ausente é erro, não `False`."""
+        return bool(serie.notna().all())  # type: ignore[attr-defined]

@@ -115,6 +115,26 @@ class RegimesSchema(pa.DataFrameModel):
         """Os 4 quadrantes da V1 existem na amostra (CA-078/080)."""
         return int(df["regime_v1"].nunique()) == len(RegimeV1)  # type: ignore[index]
 
+    # ── Acréscimo de D-ac: `nullable=False` em coluna `bool` NÃO recusa `None` ──────────
+    # Achado de F-022 §8.3, medido: com `coerce=True` o pandera faz `astype(bool)` **antes**
+    # dos checks, e em pandas `None → False`. O caso que isso deixava passar era grave:
+    # `stress_flag = None` nos 83 trimestres validava como "nenhum trimestre dos 20 anos foi
+    # de stress" — dado inventado com o selo do schema. O parser roda **antes** da coerção
+    # (medido) e converte para o dtype nulável `boolean`, de modo que `None`/`NaN`/`pd.NA`
+    # fazem a coerção para `bool` FALHAR; o check é a declaração de intenção e cobre o
+    # caminho sem coerção. Nenhuma declaração de coluna foi alterada — é acréscimo.
+    # `lag_adjusted` também é `bool` + `nullable=False` e NÃO está aqui: D-ac nomeia as 3
+    # colunas do achado de F-022 §8.3; a 4ª está na lista de dívidas de `TODO.md §6`.
+    @pa.parser("stress_flag", "alerta_n_baixo", "especificacao_congelada")
+    def _flag_nula_nao_vira_false(cls, serie: object) -> object:  # noqa: N805
+        """Impede que `None` em flag booleana seja coagido a `False` em silêncio (D-ac)."""
+        return serie.astype("boolean")  # type: ignore[attr-defined]
+
+    @pa.check("stress_flag", "alerta_n_baixo", "especificacao_congelada", name="flag_bool_sem_nulo")
+    def _flags_sem_nulo(cls, serie: object) -> bool:  # noqa: N805
+        """`nullable=False` explicitado como check — flag ausente é erro, não `False`."""
+        return bool(serie.notna().all())  # type: ignore[attr-defined]
+
 
 class RegimeNeighborsSchema(pa.DataFrameModel):
     """Saída da V3: os k trimestres mais parecidos. PK: (quarter_ref, rank, metrica)."""

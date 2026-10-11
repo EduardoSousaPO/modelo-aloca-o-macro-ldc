@@ -62,62 +62,88 @@ qualquer mudança na camada canônica — ver `AGENTS.md §2`.
 
 > Máximo 2 itens simultâneos. Se tiver mais, você está dispersando.
 
-**Onda 3 parte 1 IMPLEMENTADA, QA pendente (2026-10-11).** A **Onda 2 está completa e aprovada**:
-QA independente em dois lotes (`docs/plans/qa/ONDA-2-QA-A.md` = F-014/F-015,
-`ONDA-2-QA-B.md` = F-016/F-017), **0 × P0**, com a revisão numérica reconstruindo as camadas por
-fora e achando **igualdade exata em float64**. As 6 features da Onda 2 estão registradas em
-**§3 Concluído**; o Feature Contract de cada uma fica em §2 como referência de CAs e testes. As **3** features da Onda 3 parte 1 estão **implementadas e aguardando QA**:
+**ONDA 4 IMPLEMENTADA, QA pendente — fechamento de 2026-10-11.** A Onda 3 parte 1 (F-018, F-019,
+F-021) teve **QA independente com revisão numérica** (`docs/plans/qa/ONDA-3-QA.md`): **0 × P0** e
+**0 divergência numérica** em 5 colunas × 83 × 2 materializações, 83 × 2 rótulos, `rho` + 16
+distâncias e 24 médias de ativo — os **5 P1 eram de declaração** e estão aplicados em **D-y**. A
+Onda 4 (F-022..F-029, menos F-027) está **implementada**, com o QA da Onda 4
+(`docs/plans/qa/ONDA-4-QA.md`) já rodado sobre um snapshot: **0 × P0**, **120 células × 17 métricas
+reconferidas com dif 0,0**, e os **3 P1 + 6 P2** aplicados neste fechamento.
 
 | Feature | O que entregou | Estado |
 |---|---|---|
-| **F-018** | `macro_quarterly_asof` **83 × 42** + `macro_quarterly_asof_provenance` (**2.552**, com `date_obs`/`lag_dias`) + `relatorio_asof.json` | QA + **revisão numérica** pendentes · acréscimo de schema (**D-w**) |
-| **F-019** | `regimes_v1{,_asof}.parquet` **83 × 18**, 67 classificados, 16 `INDETERMINADO` | QA + **revisão numérica** pendentes · **D-r**, **D-s** |
-| **F-021** | `regime_neighbors_v3.parquet` **9.692 × 21** + `regime_neighbors.parquet` **5.500 × 11** | QA + **revisão numérica** pendentes · **D-u** |
+| **F-022** | `regime_asset_metrics{,_asof,_horizonte_cruzado}.parquet` **120/96/120** + `relatorio_metricas.json`; a junção de D-r implementada e **bloqueada** | QA aprovado com condição · **D-ab**: `regimes.parquet` segue não gravado, agora por **um** motivo (`regime_v1` não anulável) |
+| **F-023** | heatmap em 3 vistas, **23 × 5 = 115** células na principal + `heatmap_dados.parquet` **322 × 32** | QA aprovado com condição · **D-z**: `v3_t1` → `horizonte_cruzado`, `SP500_USD` fora da figura |
+| **F-024** | `ranking_regime_atual.{parquet,csv,md}` **72** linhas + `concordancia_lentes.*` | QA aprovado com condição · **D-aa**: CA-098 "V1 e V2" → V1 `revised` + V1 `asof` + V3 |
+| **F-025** | timeline das 2 materializações, **166 × 14** dados plotados | **QA APROVADO** · bytes das figuras mudaram em **D-z** (só `versao_build`) |
+| **F-026** | `internacional_por_regime.parquet` **54 × 18**, `internacional_pesos.parquet` **624 × 13**, `relatorio_internacional.json` | mudanças aplicadas · **D-ab** (D6-a..d) e **D-af** (não publicável no manifesto) |
+| **F-028** | `docs/product/LIMITACOES-COMITE.md`, **8 blocos**, 249 linhas | **QA APROVADO** · §3.1 acrescentada com os achados de F-026 |
+| **F-029** | `python -m apps.pipeline run\|verify\|freeze`, **13** etapas, `MANIFEST.json` + `FROZEN.txt` | mudanças aplicadas · **P1-1** (`verify` em Parquet ilegível), **P1-2** (etapas `internacional` e `tabelas`), **D-af** |
+| **F-030** | — | **CORTADA da v1**: canários, fixtures e a primitiva de cache condicional já existem distribuídos pelas features de extração (justificativa no bloco F-030) |
 
-**Os 5 P1 dos QAs da Onda 2 foram absorvidos neste fechamento** (todos em **D-s/D-t/D-v**):
-QA-A P1-1 (IBC-Br média do trimestre → **D-s**, 7 quadrantes trocam) · QA-A P1-2 (borda do limiar
-da Selic → **D-t**, 7 trimestres) · QA-A P1-3 (`exigir_series` cego a `alinhado_trimestral` →
-corrigido + teste) · QA-A P1-4 (`versao_build` dependia do fim de linha → normalizado + 2 testes) ·
-QA-B P1-1 (janela do CDI ≠ caminho do ativo → **limitação declarada**, cálculo intacto). QA-A P1-5
-(`macro_quarterly` reescrito durante o QA) está resolvido: o rebuild abaixo é de **árvore limpa**.
+**Os 8 P1 dos dois QAs foram absorvidos neste fechamento.** Onda 3: `CONTRACTS §5.2a` reescrita com
+as 21 colunas reais · a frase de **D-t** corrigida (**2024Q3 é ALTA**, não corte) · "Jaccard 1,0"
+substituído pela distribuição (mediana **0,455** em 58 referências) · **N2 e N3 habilitados** no
+`ci.yml` e executados nesta máquina · safra `revised` da V3 declarada. Onda 4: `verify` **não
+estoura mais** em Parquet ilegível (reporta `rc = 1` nomeando o arquivo) · `run` ganhou as etapas
+`internacional` e `tabelas` (antes "um comando" entregava ~2/3 do canônico com `rc = 0`) ·
+`MANIFEST.json` ganhou **`publicavel`** e o `freeze` a seção `EXCLUIDOS DO PACOTE DE ENTREGA`.
+Dos P2: guarda de linguagem **única** em `apps/analysis/_linguagem.py` (as 3 divergiam e a de F-024
+reprovava negação legítima das outras) · `n = 20` do contrato de F-028 corrigido para **19**
+(nenhum regime tem 20) · `relatorio_metricas.json` deixou de declarar `stress_flag` bloqueado.
 
-**Próximo passo: F-022** (métricas regime × ativo + a junção em `RegimesSchema`, que **D-r**
-delegou) e a **Onda 4** (F-020 V2, F-023 heatmap, F-024 ranking, F-028 limitações). Os insumos de
-F-022 são `regime_neighbors_v3.parquet` (lente principal, **D-u**), `regimes_v1.parquet` e
-`asset_returns_quarterly.parquet`; ver `docs/wiki/modules/regimes.md`.
+**`data/canonical/` depois do rebuild final de 2026-10-11** — `python -m apps.pipeline run
+--offline` **duas vezes**, **47 artefatos determinísticos byte-idênticos**, `verify` **rc 0**:
 
-**`data/canonical/` depois do rebuild encadeado de árvore limpa de 2026-10-11** (ordem obrigatória,
-todos `--offline`: `build_raw_series` → `alinhamento` → `macro_quarterly` → `asof` → `retornos` →
-`regimes_v1` (revised **e** asof) → `regimes_v3`; `curva` roda **antes de tudo**, porque escreve em
-`data/processed/`), **2 rodadas com hashes idênticos nos 20 artefatos**:
+**`DATASET_SHA256 = fc2331183b9355e6424f223085fd501683678d73fc50a9cf2b570376750f17ef`**
 
 | Artefato | Estado medido | `sha256` |
 |---|---|---|
-| `raw_series.parquet` | **278.439** linhas · **62** séries · 1979-12-31 → 2026-10-10 · **7** tabelas excluídas (D-k) | `0d23df7a…` *(inalterado)* |
-| `series_catalog.parquet` | **138 × 26** · 62 presentes · 59 cobrem 1T2006 | `f56f207e…` *(inalterado)* |
-| `alinhado_trimestral.parquet` | **4.038** linhas · 49 séries · 83 trimestres · 215 ffill · 7 nulos | `c66f09a5…` |
-| `macro_quarterly.parquet` | **83 × 42** · `revised` · 5 colunas 100% nulas · 16 nulos em `ibcbr_gap` · **D-s** | `bcb31e92…` |
-| `macro_quarterly_provenance.parquet` | **2.548** linhas · 32 colunas · 20 séries | `aa8d427a…` |
-| `macro_quarterly_asof.parquet` | **83 × 42** · `asof` · 27 colunas idênticas / 10 mudam | `85e8ec67…` |
-| `macro_quarterly_asof_provenance.parquet` | **2.552** linhas · 32 colunas · `date_obs`+`lag_dias` em todas · **0** com look-ahead | `a5b2eaef…` |
-| `asset_returns_quarterly.parquet` | **1.963** linhas · **24** ativos · 83 trimestres | `c055ac81…` |
-| `regimes_v1.parquet` | **83 × 18** · `revised` · 67 classificados · REC 19 · EXP 19 · EST 16 · DES 13 | `b74f8d67…` |
-| `regimes_v1_asof.parquet` | **83 × 18** · `asof` · 67 classificados · EXP 21 · REC 17 · EST 16 · DES 13 | `6e922165…` |
-| `regime_neighbors_v3.parquet` | **9.692 × 21** · 77 referências · lente principal (**D-u**) | `5241f275…` |
-| `regime_neighbors.parquet` | **5.500 × 11** · pool restrito de CA-089 · **não** é a resposta | `eb101c5a…` |
+| `raw_series.parquet` | **278.439** linhas · **62** séries · 1979-12-31 → 2026-10-10 | `0d23df7a…` *(inalterado desde a Onda 2)* |
+| `series_catalog.parquet` | **138 × 26** · 62 presentes | `f56f207e…` *(inalterado)* |
+| `alinhado_trimestral.parquet` | **4.038** linhas · 49 séries · 83 trimestres | `c66f09a5…` *(inalterado)* |
+| `macro_quarterly.parquet` | **83 × 42** · `revised` · **D-s** | `2b8b65f4…` |
+| `macro_quarterly_provenance.parquet` | **2.548** linhas | `f3068b98…` |
+| `macro_quarterly_asof.parquet` | **83 × 42** · `asof` | `5c4854f2…` |
+| `macro_quarterly_asof_provenance.parquet` | **2.552** · **0** com look-ahead | `319312fb…` |
+| `asset_returns_quarterly.parquet` | **1.963** · **24** ativos | `2798b5c1…` |
+| `regimes_v1.parquet` | **83 × 18** · REC 19 · EXP 19 · EST 16 · DES 13 · 16 `INDETERMINADO` | `76512d8d…` |
+| `regimes_v1_asof.parquet` | **83 × 18** · EXP 21 · REC 17 · EST 16 · DES 13 | `cabdc272…` |
+| `regime_neighbors_v3.parquet` | **9.692 × 21** · 77 referências · lente principal (**D-u**) | `a17d9288…` |
+| `regime_neighbors.parquet` | **5.500 × 11** · pool restrito de CA-089 · **não** é a resposta | `a5d7d127…` |
+| `regime_asset_metrics.parquet` | **120** células · `revised` T0 + V3 T+1 · **o entregável** | `549a1e90…` |
+| `regime_asset_metrics_asof.parquet` | **96** · `asof` T0 (a V3 não tem `asof`) | `407df0f3…` |
+| `regime_asset_metrics_horizonte_cruzado.parquet` | **120** · V1 T+1 + V3 T0 | `4b8d393e…` |
+| `internacional_por_regime.parquet` | **54 × 18** · 3 lentes × 6 ativos · correlações de CA-105 | `9cf0d5d3…` |
+| `internacional_pesos.parquet` | **624 × 13** · ⚠️ **`publicavel: false`** (D-af) | `08e19ca1…` |
+| `figuras/heatmap_dados.parquet` | **322 × 32** (23 ativos × 3 vistas) | `f0881682…` |
+| `figuras/timeline_regimes_dados.parquet` | **166 × 14** (2 materializações × 83) | `2a6cc91e…` |
+| `tabelas/ranking_regime_atual.parquet` | **72** (3 lentes × 24 ativos) | `042f8485…` |
+| `tabelas/concordancia_lentes.parquet` | **37** linhas *tidy* | `c6f4bedc…` |
+| 6 figuras `.png` + 6 `.svg` · 10 `relatorio_*.json` | determinísticos, no manifesto | ver `MANIFEST.json` |
+| `ldc.duckdb` | derivado · **fora** do agregado, `sha256: null`, motivo escrito (**D-ad b**) | — |
 
-> **Os hashes de `alinhado_trimestral`, `macro_quarterly*` e `asset_returns_quarterly` mudaram sem
-> que uma célula de dado mudasse por outro motivo que D-s.** `versao_build` passou a normalizar o
-> fim de linha (**D-v b**, P1-4 do QA), então `fonte_versao` mudou em **toda** a camada canônica.
-> `raw_series` e `series_catalog` **não** têm coluna de versão e saíram byte-idênticos — é a
-> contraprova de que o dado bruto não se moveu. `asset_returns_quarterly`: só `fonte_versao`
-> (valores conferidos). `alinhado_trimestral`: só `fonte_versao`. `macro_quarterly`: `fonte_versao`
-> **+ as 3 colunas de `ibcbr_*`** (D-s).
+> **Por que quase todo hash mudou sem que uma célula de dado mudasse.** `versao_build` é o `sha256`
+> do **conjunto de módulos** de cada feature, e este fechamento editou
+> `packages/shared/schemas/{asset_returns_quarterly,regimes}.py` (**D-ac**),
+> `apps/pipeline/canonical/{macro_quarterly,metricas_regime}.py` (**D-y** P1-3, **D-ab**) e os 3
+> módulos da camada de análise (**D-z**). `raw_series` e `series_catalog` **não** têm coluna de
+> versão e saíram byte-idênticos — é a contraprova de que o bruto não se moveu. **Canários
+> reconferidos no build final, todos idênticos aos que o QA reconstruiu por fora:** distribuição
+> V1 19/19/16/13 + 16 · `rho = 0,25987390740181016` · `INDX` em T+1 `= 0,05043012628905601` ·
+> ciclo Selic 34/23/26 com os 7 do limiar exato = **5 CORTE + 2 ALTA** · `corr(USDBRL, IBOV)` em
+> `RECUPERACAO` `= −0,7974364631220996` · `stress_flag` em **20 de 83** · recálculo independente
+> das 96 células com `max abs dif = 6,94e-18`.
 
-Os 8 `relatorio_*.json` carregam `versao_build` conferido contra o código em disco. Decisões da
-onda anterior: **D-h (a)**, **D-i**, **D-j**, **D-k..D-q**; desta: **D-r..D-x** — todas em
-`DECISIONS_LOG §2.3`, **provisórias onde mudam número**, com o que precisa de ratificação do Edu
+Os **10** `relatorio_*.json` carregam `versao_build` conferido contra o código em disco. Decisões:
+**D-a..D-h** (Onda 1), **D-i..D-q** (Onda 2), **D-r..D-x** (Onda 3), **D-y..D-af** (Onda 4) — todas
+em `DECISIONS_LOG §2.3`, provisórias onde mudam número, com o que precisa de ratificação do Edu
 tabulado em **§4**.
+
+**Próximo passo:** **F-027** (notebook de entrega, em curso em paralelo) e **F-031** (pacote ao
+Comitê, **classe D** — exige os 8 itens de `AGENTS.md §14`, entre eles ADR-001/002/003 **Aceitos** e
+revisão humana registrada). F-031 **lê o campo `publicavel` do `MANIFEST.json`** (D-af) e
+**não** inclui `internacional_pesos.parquet`.
 
 **Consolidação da Onda 1 — o que mudou depois dos 7 relatórios** (decisões D-a..D-h, todas
 registradas em `docs/plans/DECISIONS_LOG.md §2.1` como **provisórias, aval de Edu pendente**):
@@ -957,8 +983,14 @@ constantes, `indice_do_quarter`) · `packages/shared/schemas/__init__.py` (3 nom
   `2026Q3` porque `regime_v1_neighbor` é `nullable=False` e 16 trimestres não têm quadrante (D-m).
   Dívida de schema em **§6**.
 - **os 8 vizinhos de `2026Q3`:** `2006Q3 · 2006Q4 · 2006Q1 · 2024Q3 · 2014Q4 · 2007Q1 · 2024Q2 ·
-  2014Q3`. A variante **sem nenhum look-ahead** dá a **mesma lista** (Jaccard 1,0) — o achado mais
-  forte da feature. **D-s não mudou nada aqui**: lista, distâncias e ranking byte-idênticos.
+  2014Q3`. **D-s não mudou nada aqui**: lista, distâncias e ranking byte-idênticos.
+  ⚠️ **Corrigido em 2026-10-11 (P1-3 do QA da Onda 3 / D-y):** o texto antigo dizia que "a variante
+  sem nenhum look-ahead dá a mesma lista (Jaccard 1,0)" e chamava isso de "o achado mais forte da
+  feature". O 1,0 é **vácuo** — `2026Q3` é o último trimestre da janela, logo as duas lentes
+  coincidem **por construção**. A medida certa é a **distribuição** nas **58** referências que têm
+  as duas lentes: **mediana 0,455**, Q1 0,231, Q3 0,600, mínimo **0,0**, e só **7 de 58** iguais a
+  1,0. A lente descritiva muda o conjunto de vizinhos em ~**55%** dos casos, e **50,0%** das 5.500
+  linhas dela têm vizinho **no futuro** da referência.
 - **exclusão de vizinhança simétrica** (`T±1`, `T±2`): CA-085 fala só dos anteriores, mas sem a
   simetria o vizinho rank 1 de quase todo trimestre seria `T+1` — autocorrelação trivial.
   Declarado em `relatorio_regimes_v3.json → exclusao_de_vizinhanca.simetrica`.
@@ -986,7 +1018,7 @@ anotação é conferido contra `regimes_v1.parquet` de F-019 (**83 trimestres, 0
 
 ---
 
-### [ ] F-022 — Métricas por regime × ativo — **classe C**
+### [~] F-022 — Métricas por regime × ativo — **classe C** — **implementada — QA pendente**
 
 - **Risco:** **C** · **CI alvo:** N2 · **Branch:** `feat/metricas-regime`
 - **Cobre:** RF-032, RF-040 · e-mail: **B1-B5, C1**
@@ -1001,8 +1033,13 @@ a lado, erro-padrão da média, `hit_ratio_cdi`, `pior_tri`/`melhor_tri` com dat
 flags `alerta_n_baixo` e `conclusao_suprimida`.
 **Excluído:** figuras (→ F-023..F-025); variância mínima por regime (→ F-035).
 
-**Arquivos:** `apps/pipeline/analysis/metricas_regime.py`, `tests/unit/test_metricas_regime.py`,
-`tests/contract/test_metricas_schema.py`.
+**Arquivos (reais, D-x estendida — ratificação de 1 linha):**
+`apps/pipeline/canonical/metricas_regime.py` (81 testes unit + 41 de contrato),
+`tests/unit/test_canonical_metricas_regime.py`, `tests/contract/test_metricas_regime_contract.py`.
+Saídas: `data/canonical/regime_asset_metrics{,_asof,_horizonte_cruzado}.parquet` (**120/96/120**)
++ `relatorio_metricas.json`. **`regimes.parquet` NÃO é gravado** (D-r/D-ab): com a série real de
+stress de F-026, `montar_regimes` devolve `gravavel = False` com **um** bloqueio — `regime_v1` é
+`nullable=False` e 16 dos 83 trimestres são `INDETERMINADO` (D-m). Dívida de contrato em §6.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -1017,7 +1054,7 @@ flags `alerta_n_baixo` e `conclusao_suprimida`.
 
 ---
 
-### [ ] F-023 — Heatmap regime × ativo (entregável visual central)
+### [~] F-023 — Heatmap regime × ativo (entregável visual central) — **implementada — QA pendente**
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `feat/heatmap`
 - **Cobre:** RF-033, RF-040 · e-mail: **B1-B5, C1**
@@ -1034,8 +1071,18 @@ implementação).
 hachura, rodapé com `data_inicio` por série e nome explícito da métrica; export PNG + dados em CSV.
 **Excluído:** dashboard interativo (fora de escopo).
 
-**Arquivos:** `apps/pipeline/analysis/figuras.py`, `tests/unit/test_heatmap.py`,
-`apps/analysis/notebooks/` (consumo).
+**Arquivos (reais, D-x estendida):** `apps/analysis/figuras/heatmap_regime_ativo.py`,
+`apps/analysis/figuras/_comum.py` (**novo**: cromo, escala divergente, gate, tooltip SVG),
+`tests/unit/test_figura_heatmap.py` (71 testes). Saídas:
+`data/canonical/figuras/heatmap_{v1_revised,v1_asof,horizonte_cruzado}.{png,svg}` +
+`heatmap_dados.parquet` (**322 × 32** — os dados exatamente como plotados).
+
+> **Duas renomeações de D-z, 2026-10-11:** (i) a vista `v3_t1` passou a **`horizonte_cruzado`** — o
+> slug antigo dizia o oposto da vista (nela a V1 é T+1 e a V3 é **T0**), e os artefatos
+> `heatmap_v3_t1.*` foram **removidos** do disco; (ii) **`SP500_USD` saiu da figura** (retorno em
+> USD contra CDI em BRL mistura moedas, Anti-SPEC §10.2.12, e a linha ficava sob o cabeçalho
+> "INTERNACIONAL (EM BRL)"). A figura tem **23 linhas** (≥ 18 de RF-033) e **115 células** na vista
+> principal; a exclusão é **nomeada no rodapé** e a linha **continua** nas 3 tabelas de F-022.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -1048,7 +1095,7 @@ hachura, rodapé com `data_inicio` por série e nome explícito da métrica; exp
 
 ---
 
-### [ ] F-024 — Tabela "regime atual → ranking de ativos" + concordância entre lentes
+### [~] F-024 — Tabela "regime atual → ranking de ativos" + concordância — **implementada — QA pendente**
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `feat/tabela-ranking`
 - **Cobre:** RF-034, RF-037 · e-mail: objetivo
@@ -1062,7 +1109,15 @@ qual lente abre a página (não bloqueia).
 `excesso_cdi` com `hit_ratio_cdi`, `n` e semáforo; tabela de concordância (1 linha por lente, top-3).
 **Excluído:** recomendação de alocação (é do Alexandre); qualquer linguagem preditiva.
 
-**Arquivos:** `apps/pipeline/analysis/tabelas.py`, `tests/unit/test_tabela_ranking.py`.
+**Arquivos (reais, D-x estendida):** `apps/analysis/tabelas/__init__.py`,
+`apps/analysis/tabelas/ranking_regime_atual.py`, `tests/unit/test_tabela_ranking.py` (86 testes).
+Saídas: `data/canonical/tabelas/ranking_regime_atual.{parquet,csv,md}` (**72** linhas = 3 lentes ×
+24 ativos) + `concordancia_lentes.{parquet,csv,md}`.
+
+> **CA-098 diz "V1 e V2"; a página entrega V1 `revised` + V1 `asof` + V3** (**D-aa (a)**) — F-020
+> foi cortada, então **nenhuma** linha tem `lente = V2`. É **emenda de CA** e entra no aceite do
+> ADR-001. A guarda de linguagem descritiva da feature virou a guarda **única** da camada, em
+> `apps/analysis/_linguagem.py` (**D-z**/P2-1 do QA da Onda 4).
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -1074,7 +1129,7 @@ qual lente abre a página (não bloqueia).
 
 ---
 
-### [ ] F-025 — Timeline de regimes 2006→2026 sobre IBOV e Selic
+### [~] F-025 — Timeline de regimes 2006→2026 sobre IBOV e Selic — **implementada — QA pendente**
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `feat/timeline-regimes`
 - **Cobre:** RF-035 · e-mail: **A1, A2, A4, B4**
@@ -1086,7 +1141,16 @@ qual lente abre a página (não bloqueia).
 **Escopo incluído:** faixa colorida dos 83 trimestres sobre IBOV e Selic; export PNG.
 **Excluído:** interatividade; anotação de eventos políticos.
 
-**Arquivos:** `apps/pipeline/analysis/figuras.py` (extensão), `tests/unit/test_timeline.py`.
+**Arquivos (reais, D-x estendida):** `apps/analysis/__init__.py`,
+`apps/analysis/figuras/__init__.py`, `apps/analysis/figuras/timeline_regimes.py`,
+`tests/unit/test_figura_timeline_regimes.py` (50 testes). Saídas:
+`data/canonical/figuras/timeline_regimes_{revised,asof}.{png,svg}` +
+`timeline_regimes_dados.parquet` (**166 × 14**).
+
+> **D-z:** o módulo passou a **importar o cromo de `_comum.py`** em vez de redeclarar os mesmos 7
+> tokens, e a guarda de linguagem saiu do teste para dentro do desenho
+> (`apps/analysis/_linguagem.py`). Os **bytes das 4 figuras mudaram** — `versao_build` hasheia o
+> módulo e agora também `_comum` e `_linguagem` —, e o **único** texto diferente é o do rodapé.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -1098,7 +1162,7 @@ qual lente abre a página (não bloqueia).
 
 ---
 
-### [ ] F-026 — Dimensionamento da alocação internacional + regra de risk-off — **classe C**
+### [~] F-026 — Dimensionamento da alocação internacional + risk-off — **classe C** — **implementada — QA pendente**
 
 - **Risco:** **C** · **CI alvo:** N2 · **Branch:** `feat/internacional`
 - **Cobre:** RF-038, RF-039 · e-mail: **C1** (escopo implícito virando explícito)
@@ -1116,8 +1180,20 @@ se não houver fonte, a linha sai com `BLOQUEADO — FONTE INDISPONÍVEL`.
 entrega como **faixa estrutural + banda tática por regime**; versões com e sem hedge (D7).
 **Excluído:** variância mínima por regime e fronteira eficiente (→ F-035); ramo EMBI do gatilho (L8).
 
-**Arquivos:** `apps/pipeline/analysis/internacional.py`, `tests/unit/test_internacional.py`,
-`tests/integration/test_risk_off.py`.
+**Arquivos (reais, D-x estendida):** `apps/pipeline/canonical/internacional.py`,
+`packages/shared/schemas/internacional.py` (**novo** — 2 schemas, edição **aditiva** no
+`__init__.py`), `tests/unit/test_canonical_internacional.py` (68),
+`tests/contract/test_internacional_contract.py` (44). **Não há `tests/integration/`** — o CA-104 é
+coberto em `tests/unit` + `tests/contract`, e a pasta `integration/` segue **vazia** (ver §6 e o
+job N2 do `ci.yml`). Saídas: `internacional_por_regime.parquet` (**54 × 18**),
+`internacional_pesos.parquet` (**624 × 13**), `relatorio_internacional.json`.
+
+> **D-ab / D6-a..D6-d:** a regra de `stress_flag` ficou fechada (**20 de 83** trimestres; 14 não
+> avaliáveis pelo ramo da inclinação, nomeados), o representativo é **`ACWI_BRL`** (forçado pelo
+> *total return*, não escolhido), a entrega de CA-107 é **faixa** (o peso médio *expanding* cai de
+> **19,65%** para **10,41%** sem o cap de 40% — por isso faixa) e a **variância mínima fica FORA da
+> v1** (Anti-SPEC §10.3.16/§10.5 → F-035): **`internacional_pesos.parquet` NÃO entra em F-031** e
+> é marcado `publicavel: false` no `MANIFEST.json` por **D-af**.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -1157,7 +1233,7 @@ entrega como **faixa estrutural + banda tática por regime**; versões com e sem
 
 ---
 
-### [ ] F-028 — Página de limitações (blinda a reunião)
+### [~] F-028 — Página de limitações (blinda a reunião) — **implementada — QA pendente**
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `feat/pagina-limitacoes`
 - **Cobre:** RF-042 · e-mail: — (exigência metodológica)
@@ -1167,13 +1243,19 @@ entrega como **faixa estrutural + banda tática por regime**; versões com e sem
 **DoR específica** — [x] conteúdo obrigatório listado na SPEC; [ ] número real do teste de look-ahead
 (vem de F-018) e `n` por regime (vem de F-022).
 
-**Escopo incluído:** 1 página com: `n` pequeno e erro-padrão (~2,7 pp/tri com n=20, σ=12%); quebra
+**Escopo incluído:** 1 página com: `n` pequeno e erro-padrão (**~2,8 pp/tri com n = 19**, σ = 12%
+ao trimestre — corrigido em 2026-10-11, P2-4 do QA da Onda 4: **nenhum** regime tem `n = 20`, o
+máximo medido é **19** em `RECUPERACAO`/`EXPANSAO_INFL`; a página publica 2,8 / 3,3 / 4,2 pp para
+`n` = 19 / 13 / 8 e a aritmética fecha); quebra
 estrutural 2006-2008 × pós-2016; resultado do teste de look-ahead; séries com janela curta (ICON,
 IMOB, IFIX, FII segmentado, ponta longa nominal); aviso de que índice não é investível sem fricção;
 substituições de fonte; gaps abertos (G-01..G-07).
 **Excluído:** defesa de tese metodológica (é a pesquisa, já escrita).
 
-**Arquivos:** `docs/plans/limitacoes-comite-2026-10-14.md`, `tests/unit/test_limitacoes.py`.
+**Arquivos (reais, D-x estendida):** `docs/product/LIMITACOES-COMITE.md` (**8 blocos**, dentro
+da faixa de 150-250 linhas), `tests/unit/test_limitacoes_documento.py` (30 testes, 3 seções — a
+seção C reabre os `relatorio_*.json` e exige a string na página). O nome sem data sobrevive ao
+remarcar da reunião; é documento de **produto**, não de plano.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -1184,7 +1266,7 @@ substituições de fonte; gaps abertos (G-01..G-07).
 
 ---
 
-### [ ] F-029 — Orquestrador "um comando" + idempotência e hash — **classe C**
+### [~] F-029 — Orquestrador "um comando" + idempotência e hash — **classe C** — **implementada — QA pendente**
 
 - **Risco:** **C** · **CI alvo:** N2 (N3 na entrega) · **Branch:** `feat/pipeline-orquestrador`
 - **Cobre:** RF-046, RF-048 · e-mail: entregável ("estrutura de busca e extração")
@@ -1199,9 +1281,20 @@ data, % de nulos por coluna crítica, hash); idempotência (2 execuções → me
 revisão retroativa (novo `vintage`, sem duplicar); runbook.
 **Excluído:** agendador, serviço, container.
 
-**Arquivos:** `apps/pipeline/__main__.py`, `apps/pipeline/pipeline.py`,
-`tests/e2e/test_pipeline_completo.py`, `tests/integration/test_idempotencia.py`,
-`docs/wiki/runbooks/reconstruir-dataset.md`.
+**Arquivos (reais, D-x estendida):** `apps/pipeline/__main__.py` (entrada fina),
+`apps/pipeline/run.py` (a feature inteira), `tests/unit/test_pipeline_run.py` (**42** testes),
+`tests/e2e/test_reprodutibilidade.py` (6 testes, N3),
+`docs/wiki/runbooks/reconstruir-dataset.md`. `pyproject.toml` **não** foi tocado: sem
+`[project.scripts]`, o comando oficial é `python -m apps.pipeline`.
+
+> **Três correções de 2026-10-11** (P1-1/P1-2 do QA da Onda 4 e **D-af**): (i) `verify` **não
+> estoura mais** em Parquet ilegível — `_perfil_do_parquet` nunca levanta, o artefato entra com
+> `ilegivel` e a divergência de `sha256` é reportada com `rc = 1` (antes: traceback cru que não
+> nomeava arquivo nem agregado, justo no caso de *bit-rot* que o selo existe para pegar);
+> (ii) **duas etapas novas** — `internacional` (F-026, depois de `metricas_regime`) e `tabelas`
+> (F-024, depois de `figuras`, por descoberta de submódulos com `construir`) —, sem as quais "um
+> comando" entregava ~2/3 do canônico com `rc = 0`; (iii) `MANIFEST.json` ganhou `publicavel` e o
+> `FROZEN.txt` a seção `EXCLUIDOS DO PACOTE DE ENTREGA`.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -1215,7 +1308,7 @@ revisão retroativa (novo `vintage`, sem duplicar); runbook.
 
 ---
 
-### [ ] F-030 — Testes de contrato com valor-canário + cache condicional
+### [–] F-030 — Testes de contrato com valor-canário + cache condicional — **CORTADA da v1**
 
 - **Risco:** B · **CI alvo:** N1 (contrato em N2) · **Branch:** `feat/testes-contrato`
 - **Cobre:** RF-049, RF-050, RF-051 · e-mail: — (proteção dos 3 endpoints não documentados)
@@ -1242,6 +1335,31 @@ reconciliação ANBIMA S3 × SGS 12461-12469 na data de corte 22/05/2023.
 | segundo download no mesmo dia usa cache (ETag) | integration | CA-127 |
 
 **Anti-SPEC específica:** §10.4.23 (sem rede no CI), §10.4.25 (sem `.skip` sem ADR).
+
+> **CORTADA da v1 em 2026-10-11 — decisão do orquestrador, com o que já existe medido.** O que
+> F-030 ia criar **já está entregue, distribuído pelas features de extração**, e criar o arquivo
+> consolidado agora seria mover teste verde de lugar na semana da entrega:
+>
+> - **valor-canário (CA-125):** os **3** valores estão travados em teste — `IBOV 38.484,84`
+>   (01/02/2006) e `IMA-B 723,070317` (16/09/2003) em `tests/unit/test_canonical_raw_series.py` e
+>   `test_common_parsing.py`; o `MSCI ACWI NETR 121,3858` em `test_extract_msci.py`. O parse
+>   pt-BR tem teste **negativo** explícito (`38.484,84 != 38.48`), que é o erro real que o canário
+>   existe para pegar;
+> - **shape + fixture por fonte (CA-124):** **todo** extrator tem fixture gravada em
+>   `tests/fixtures/<fonte>/` e teste de contrato de formato; `exigir_formato`/`detectar_formato`
+>   recusam HTML onde deveria vir JSON/CSV (os 2 `*__erro_html.*` são fixtures desse caminho);
+> - **versão viva fora do CI (CA-123/126):** **28** testes marcados `@pytest.mark.network` em 10
+>   arquivos, excluídos por `-m "not network"` em todos os jobs do `ci.yml`;
+> - **cache condicional (CA-127):** a primitiva está em `apps/pipeline/common/http.py`
+>   (`If-None-Match`/`If-Modified-Since`, `etag`, `last_modified`) e os manifestos gravam os
+>   validadores onde a fonte os serve. O **CKAN do Tesouro responde 304 com 0 byte**, medido ao
+>   vivo — 14,6 MB economizados por rodada.
+>
+> **O que fica em dívida, nomeado** (§6, não em feature): nenhum extrator **liga** a revalidação
+> (`cache_condicional=False` em todos) — a *política* (quem revalida, com que frequência, o que
+> fazer com o 304) é fase 2; e a **reconciliação ANBIMA S3 × SGS 12461-12469 na data de corte
+> 22/05/2023** não existe como teste de regressão. Nada disso bloqueia o Comitê de 2026-10-14: as
+> 3 fontes não documentadas já estão protegidas por fixture + canário.
 
 ---
 
@@ -1541,7 +1659,7 @@ O que isso muda e o que **não** muda:
 | # | Decisão | Quem decide | O que acontece se o Edu discordar |
 |---|---|---|---|
 | **D-s** | **`ibcbr_yoy` = média dos 3 meses do trimestre**, não fim de período (metodologia §2, QA-A P1-1) | **Edu** — muda o eixo de crescimento da V1 | voltar ao fim de período é 1 linha + rebuild da cadeia; devolve a distribuição EXP 20 · REC 17 · EST 15 · DES 15 e **7 trimestres** mudam de quadrante de volta (2013Q2-Q4, 2020Q1, 2023Q3, 2024Q1, 2025Q2). Travado por teste e canário |
-| **D-t** | **ciclo Selic: `\|Δ\| >= 0,25 pp` é movimento** (desigualdade não estrita), QA-A P1-2 | **Edu** | voltar à desigualdade estrita é 2 caracteres + rebuild; devolve CORTE 29 · NEUTRO 30 · ALTA 24 e põe os cortes reais de 25 bps de **2024Q2/Q3** em `NEUTRO`. Travado por 2 testes |
+| **D-t** | **ciclo Selic: `\|Δ\| >= 0,25 pp` é movimento** (desigualdade não estrita), QA-A P1-2 | **Edu** | voltar à desigualdade estrita é 2 caracteres + rebuild; devolve CORTE 29 · NEUTRO 30 · ALTA 24 e põe em `NEUTRO` os **7** trimestres com `\|Δ\| = 0,25` exato — **5 `CORTE`** (2011Q3, 2012Q4, 2020Q3, **2024Q2**, 2026Q1) e **2 `ALTA`** (2014Q2 e **2024Q3**, a alta de set/2024). ⚠️ **corrigido em 2026-10-11 (P1-3 do QA da Onda 3):** o texto anterior chamava 2024Q2 **e** 2024Q3 de "cortes reais de 25 bps" — `2024Q3` é **ALTA**. O argumento de D-t melhora com a correção: 25 pb é o menor passo do Copom **em qualquer direção**, logo a desigualdade não estrita é **simétrica**. Travado por 2 testes |
 | **D-u** | **eixo de crescimento da V3 = `focus_pib_ano`** (substitui `z_ibcbr_gap`); `regime_v1_neighbor` segue `nullable=False` e **F-022/F-024 leem `regime_neighbors_v3.parquet`** | **Edu** (o eixo) + orquestrador (o schema) | sem o Focus a V3 **não tem vetor para `2026Q3`**, que é a pergunta do Comitê, e perde 2006-2009. Tornar a coluna anulável é feature **classe C** própria (§6) |
 | **D-r** | F-019 grava `regimes_v1.parquet` (`RegimesV1Schema`, acréscimo), junção em `RegimesSchema` delegada a **F-022** | orquestrador (**aceita**) | as 3 alternativas são inventar dado ou **alterar** schema ⇒ pausa |
 | **D-v** | as 3 correções dos P1 dos QAs: `exigir_series` também contra `alinhado_trimestral`; `versao_build` normaliza o fim de linha; janela do CDI vira **limitação declarada** | orquestrador (**aceita**) | nada a desfazer — são guardas e uma declaração; `fonte_versao` de **toda** a camada mudou uma vez, de propósito |
@@ -1560,6 +1678,31 @@ O que isso muda e o que **não** muda:
 > **mensal** na fase 2. Mecanicamente o motivo é conhecido: `ibcbr_gap` é um hiato pequeno (mediana
 > `|g| ≈ 2 pp`) sobre média móvel de 20 trimestres, e deslocar o IBC-Br de um trimestre troca o
 > sinal com facilidade.
+
+### Aceites das decisões da Onda 4 (D-y..D-af, 2026-10-11)
+
+> Registradas em `DECISIONS_LOG §2.3` (parte 4). **Nenhuma** toca SPEC, PRD, Anti-SPEC ou o e-mail
+> de escopo. As únicas que precisam de humano são **D-aa (c)** (qual lente abre a página = **D1**) e
+> a ratificação de **D6** (ADR-003); as outras são de contrato, apresentação ou organização e foram
+> **aceitas pelo orquestrador**.
+
+| # | Decisão | Quem decide | O que acontece se o Edu discordar |
+|---|---|---|---|
+| **D-y** | os **5 P1 do QA da Onda 3**: `CONTRACTS §5.2a` reescrita com as 21 colunas reais; a frase de **D-t** corrigida (2024Q3 é **ALTA**); "Jaccard 1,0" substituído pela **distribuição** (mediana 0,455 em 58 refs); **N2 e N3 habilitados** no `ci.yml`; safra `revised` da V3 declarada | orquestrador (**aceita**) | nada a desfazer — são correções de declaração sobre números que o QA reconferiu com **0** divergência |
+| **D-z** | heatmap: `v3_t1` → **`horizonte_cruzado`**; **`SP500_USD` sai da figura** do Comitê (e fica na tabela de F-022); `timeline_regimes` importa o cromo de `_comum`; guarda de linguagem **única** em `apps/analysis/_linguagem.py` | orquestrador (**aceita**) · a 2ª metade encosta em **Edu** | repor a linha de `SP500_USD` é 1 token na constante `GRUPOS` + rebuild; ela volta marcada com `‡` e com nota de rodapé, como estava. As figuras de F-025 mudaram de **bytes** (não de dado): só o `versao_build` do rodapé |
+| **D-aa** | F-024: **CA-098 "V1 e V2" → V1 `revised` + V1 `asof` + V3** (emenda no aceite do ADR-001); `erro_padrao_excesso` como **dívida** de schema; **D1 segue do Edu** | orquestrador (a) e (b) · **Edu** (c) | (a) a alternativa é uma coluna "V2" vazia na página; (b) acrescentar a coluna é **alteração** de schema ⇒ classe C própria; (c) sem resposta, as 3 lentes saem com peso igual |
+| **D-ab** | F-026: **D6-a** (regra de stress), **D6-b** (`ACWI_BRL` representativo, forçado pelo *total return*), **D6-c** (entrega em faixa), **D6-d** (variância mínima **fora** da v1 — `internacional_pesos.parquet` **NÃO** entra em F-031). `regimes.parquet` **segue não gravado**: com o stress de F-026 resta **um** bloqueio, `regime_v1` não anulável (**D-m**) | orquestrador (**aceita**) · **D6 aguarda Edu/Alexandre** | mudar a inclinação do ramo 1 (para a 5a−1a) ou a amostra do desvio (para a cheia) muda **quais** 20 trimestres são de stress e, com eles, as correlações de CA-105. Publicar os **pesos** exige ADR-003 aceito **e** autorização escrita sobre a Anti-SPEC |
+| **D-ac** | **parser + check de não-nulidade** nas colunas `bool` `nullable=False` de `RegimeAssetMetricsSchema` (2) e `RegimesSchema` (3) — **acréscimo**, nenhuma coluna alterada | orquestrador (**aceita**) | nada a desfazer: antes, `stress_flag = None` nas 83 linhas **validava** e declarava que nenhum trimestre dos 20 anos foi de stress. `lag_adjusted` é a 4ª `bool` e **não** foi coberta — está em §6 |
+| **D-ad** | as 7 decisões (a)-(g) de F-029; `ldc.duckdb` **fora** do agregado com motivo escrito; o job N2 **não** chama `tests/integration/` (pasta vazia ⇒ `pytest` sai com código 5) | orquestrador (**aceita**) | congelar o pacote da classe D com `--sem-duckdb` deixa `data/canonical/` integralmente determinístico — é o que **P2-6** do QA da Onda 4 pede |
+| **D-ae** | as dívidas de contrato viram **uma** lista só em **§6** ("Dívidas de contrato (classe C, pós-Comitê)") | orquestrador (**aceita**) | dívida que mora em context pack desaparece quando o pack é apagado |
+| **D-af** | o `MANIFEST.json` ganha **`publicavel`** + `motivo_nao_publicavel` por artefato e o `freeze` lista os **excluídos do pacote de entrega**; **F-031 lê esse campo** | orquestrador (**aceita**) | sem isso, o dataset congelado de F-031 conteria **fisicamente** `internacional_pesos.parquet`, com o selo só dentro das linhas. O artefato **continua** no `DATASET_SHA256` de propósito: o agregado descreve o que foi **construído** |
+
+> **7 linhas de path a ratificar (P2-3 do QA da Onda 4), extensão de D-x.** O contrato escrito
+> previa `apps/pipeline/analysis/*` e `tests/integration/*`; a árvore real é
+> `apps/pipeline/canonical/` (F-022, F-026), `apps/analysis/figuras|tabelas/` (F-023, F-024, F-025),
+> `apps/pipeline/run.py` (F-029) e `docs/product/LIMITACOES-COMITE.md` (F-028). **Todas** as
+> divergências são **de path, não de escopo**, estão escritas no context pack de cada feature e
+> agora também no bloco "Arquivos (reais…)" de cada uma acima. Ratificar = aceitar este texto.
 
 ### Aceites formais pendentes dos ADRs da camada canônica (2026-10-11)
 
@@ -1664,6 +1807,45 @@ implementadas com o padrão provisório, mas **não publicadas** sem ADR aceito.
 ---
 
 ## 6. Ideias / parking lot
+
+### Dívidas de contrato (classe C, pós-Comitê) — **lista única (D-ae)**
+
+> **Uma** lista, não uma por context pack: pack é descartável, e dívida em arquivo descartável
+> desaparece com ele. **Todas** são *alteração* de schema existente ⇒ **pausa** (`AGENTS.md §9`), e
+> **nenhuma** foi feita. Ordem = impacto no que o Comitê lê.
+
+| # | Dívida | Schema / arquivo | Por que importa, medido | Origem |
+|---|---|---|---|---|
+| **1** | **`regime_v1` anulável** | `RegimesSchema` | é o **único** bloqueio restante de `regimes.parquet`: `nullable=False` num enum de 4 rótulos contra **16 dos 83** trimestres `INDETERMINADO` (D-m). As 3 alternativas sem isso são inventar quadrante, excluir `2006Q1..2009Q3` + `2026Q3` em silêncio, ou quebrar `todos_os_quadrantes_povoados` | D-m, D-r, **D-ab** |
+| **2** | **`regime_v1_neighbor` anulável** | `RegimeNeighborsSchema` | custa **4 dos 8** vizinhos de `2026Q3` (Jaccard **0,33** contra a lente completa) — perde 2006-2009 inteiro, a crise inclusive, **sem a tabela dizer que perdeu**. É por isso que F-022/F-024 leem `regime_neighbors_v3.parquet` | **D-u** |
+| **3** | **`erro_padrao_excesso`** | `RegimeAssetMetricsSchema` | a coluna publicada é o erro-padrão do retorno **nominal** (`desvio(ret_tri)/√n`); F-021 publica o do **excesso** (`INDX`: 2,54 pp × 2,60 pp). Lida ao lado de `excesso_cdi`, a coluna atual é confundida com a do excesso | **D-aa (b)** |
+| **4** | **`materializacao` + `horizonte`** | `RegimeAssetMetricsSchema` | colapsariam as **3** tabelas `regime_asset_metrics*` em 1 e dariam uma PK honesta; hoje a PK `(lente, regime, asset_id)` colide entre as três leituras, e é por isso que são 3 arquivos | F-022 §3 |
+| **5** | **`lag_adjusted` sem guarda de nulo** | `RegimesSchema` | é a **4ª** coluna `bool` + `nullable=False` do schema e a única que **D-ac não cobriu**: D-ac fechou as 3 nomeadas pelo achado de F-022 §8.3. Mesmo modo de falha — `None → False` na coerção, "não é `asof`" afirmado sem dado | F-022 §8.3, **D-ac** |
+| **6** | **`catalogo_sha256` não normaliza fim de linha** | `build_raw_series.py` | resíduo de **D-v (b)**: `versao_build` passou a normalizar `\r\n → \n` antes do `sha256`, mas este hash diagnóstico de **um** arquivo não — então ele difere entre checkout CRLF (Windows) e LF (CI) sem que uma célula mude | **D-v (b)** |
+| **7** | **`especificacao_congelada` não existe em `RegimeAssetMetricsSchema`** | idem | o gate de CA-090 não viaja com a linha: é propagado no relatório e no log. Hoje não é problema porque F-023/F-024 leem o relatório também — passa a ser se alguém consumir o Parquet direto | F-022 §8.2 |
+| **8** | **`data/canonical/{figuras,tabelas}/*.parquet` sem schema pandera** | — | são artefatos **derivados de figura/tabela**, não tabela canônica; o contrato de colunas é `COLUNAS_DADOS_PLOTADOS` / `COLUNAS_RANKING`, travado por teste. Se virarem insumo de modelo, migram para classe C com schema próprio | F-023, F-024, F-025 |
+| **9** | **`MIN_OBS_PADRONIZACAO_EXPANDING` é constante de módulo**, não de contrato | `regimes_v3.py` | 20 trimestres de aquecimento decidem **quais** referências a V3 cobre (58 de 77 na lente `somente_passado`); constante que muda cobertura pertence ao contrato | F-021 §8 |
+
+> **Resolvida nesta onda, registrada para não voltar:** o achado pandera `bool` +
+> `nullable=False` + `coerce=True` que **não recusava `None`** — fechado por **D-ac** nas 5 colunas
+> nomeadas, com `parser` (roda **antes** da coerção) + `check`. O resíduo é o item **5** acima.
+
+### Dívidas operacionais (não são contrato)
+
+- **Cache condicional por fonte** — a primitiva existe em `apps/pipeline/common/http.py` e os
+  manifestos gravam `ETag`/`Last-Modified` onde a fonte os serve, mas **nenhum** extrator liga a
+  revalidação (`cache_condicional=False` em todos). A *política* era F-030, que foi **cortada da
+  v1**; vira fase 2.
+- **Reconciliação ANBIMA S3 × SGS 12461-12469 na data de corte 22/05/2023** — prevista em F-030,
+  **não** implementada. É o teste que pegaria divergência entre as duas fontes do IMA.
+- **`tests/integration/` está vazia** — o job N2 do `ci.yml` tem o passo **comentado e nomeado**
+  (2 linhas para descomentar): `pytest` em pasta sem teste sai com código 5 e deixaria o job
+  vermelho sem defeito. Os CAs que o contrato mandava para `integration` foram cobertos em
+  `tests/unit` + `tests/contract` (F-026) e em `tests/e2e` (F-029).
+- **Tempo a frio do pipeline (RNF-008/CA-119) não medido** — exige `data/` vazio **e** rede. O
+  trecho offline gasta **0,7-0,8 min** com `data/processed/` quente.
+
+---
 
 > Coisas que apareceram mas não devem quebrar o foco. Revisar a cada 2 semanas.
 

@@ -659,12 +659,20 @@ def ciclo_selic(delta_pp: float | None, *, limiar: float = LIMIAR_SELIC_PP) -> s
     tem ciclo, e chamar isso de `NEUTRO` inventaria uma pausa que ninguém mediu.
 
     **A desigualdade é não estrita desde D-t (2026-10-11).** A leitura literal da metodologia
-    (`< -0,25` / `> +0,25`) punha **7** trimestres com `|Δ| = 0,25` exato em `NEUTRO`, entre eles
-    **2024Q2 e 2024Q3**, que são cortes reais de 25 bps do Copom (P1-2 do QA da Onda 2, lote A).
-    Um movimento de 25 pb é o **menor passo que o Copom dá**: chamá-lo de "parada" rotula como
-    pausa justamente o início e o fim dos ciclos. `|Δ| >= 0,25` conta como movimento; só `Δ`
-    estritamente dentro da banda é parada — e dos `NEUTRO` que sobram, a quase totalidade é
-    `Δ = 0` de fato.
+    (`< -0,25` / `> +0,25`) punha **7** trimestres com `|Δ| = 0,25` exato em `NEUTRO`:
+    `2011Q3 · 2012Q4 · 2014Q2 · 2020Q3 · 2024Q2 · 2024Q3 · 2026Q1` — **5 `CORTE`**
+    (`2011Q3`, `2012Q4`, `2020Q3`, `2024Q2`, `2026Q1`) e **2 `ALTA`** (`2014Q2` e `2024Q3`).
+    Um movimento de 25 pb é o **menor passo que o Copom dá**, **em qualquer direção**: chamá-lo de
+    "parada" rotula como pausa justamente o início e o fim dos ciclos. `|Δ| >= 0,25` conta como
+    movimento; só `Δ` estritamente dentro da banda é parada — e dos `NEUTRO` que sobram, a quase
+    totalidade é `Δ = 0` de fato.
+
+    **Correção de fato (P1-3 do QA da Onda 3, aplicada em 2026-10-11).** O texto anterior desta
+    docstring e do relatório chamava **2024Q2 e 2024Q3** de "cortes reais de 25 bps". Medido em
+    `macro_quarterly.parquet`: `2024Q2 = −0,25` é **CORTE** (10,75 → 10,50, mai/2024) mas
+    **`2024Q3` = +0,25 é `ALTA`** (10,50 → 10,75, set/2024 — a alta que abriu o ciclo de aperto).
+    O *dado* sempre esteve certo; a *frase* invertia o sinal de um dos dois. D-t continua
+    defensável pelo mesmo motivo — e por um motivo **simétrico**, não por "não perder cortes".
 
     **Não é coluna desta tabela.** `MacroQuarterlySchema` não tem `ciclo_selic`: o rótulo mora em
     `RegimesSchema` (F-019/F-020). A função vive aqui porque o insumo (`selic_meta_delta`) é desta
@@ -1653,9 +1661,20 @@ def montar_relatorio(
             "decisao": (
                 "D-t (2026-10-11), a partir do P1-2 do QA da Onda 2: a desigualdade passou de "
                 "estrita a nao estrita. Com a regra literal da metodologia 2, 7 trimestres com "
-                "|delta| = 0,25 exato saiam NEUTRO, entre eles 2024Q2 e 2024Q3 (cortes reais de "
-                "25 bps). Aguarda ratificacao do Edu."
+                "|delta| = 0,25 exato saiam NEUTRO - 5 CORTE (2011Q3, 2012Q4, 2020Q3, 2024Q2, "
+                "2026Q1) e 2 ALTA (2014Q2, 2024Q3). 25 bps e o menor passo do Copom em QUALQUER "
+                "direcao: 2024Q2 e CORTE (-0,25, mai/2024) e 2024Q3 e ALTA (+0,25, set/2024). "
+                "Correcao de fato do P1-3 do QA da Onda 3: o texto anterior chamava os dois de "
+                "corte. Aguarda ratificacao do Edu."
             ),
+            "trimestres_no_limiar_exato": {
+                "nota": (
+                    "Os 7 trimestres com |delta| = 0,25 exato, que D-t tira de NEUTRO nos DOIS "
+                    "sentidos. Publicado para que a premissa que o Edu ratifica seja conferivel."
+                ),
+                "corte": ["2011Q3", "2012Q4", "2020Q3", "2024Q2", "2026Q1"],
+                "alta": ["2014Q2", "2024Q3"],
+            },
             "distribuicao": {
                 estado: int(sum(1 for c in ciclos if c == estado))
                 for estado in sorted({c for c in ciclos if c is not None})

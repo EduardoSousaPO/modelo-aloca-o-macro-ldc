@@ -26,6 +26,8 @@ import pytest
 
 from apps.pipeline.common.errors import ErroDeExtracao
 from apps.pipeline.run import (
+    ARTEFATOS_NAO_PUBLICAVEIS,
+    MOTIVO_ILEGIVEL,
     NAO_DETERMINISTICOS,
     NOME_FROZEN,
     NOME_MANIFESTO,
@@ -69,7 +71,9 @@ ORDEM_ESPERADA: tuple[str, ...] = (
     "regimes_v1_asof",
     "regimes_v3",
     "metricas_regime",
+    "internacional",
     "figuras",
+    "tabelas",
 )
 
 
@@ -101,8 +105,13 @@ def test_dependencias_de_ordem_que_nao_podem_inverter() -> None:
         "regimes_v1",
         "regimes_v3",
         "metricas_regime",
+        "internacional",
     ]
     assert [ordem.index(nome) for nome in cadeia] == sorted(ordem.index(n) for n in cadeia)
+    # F-026 lê as métricas de F-022 (`metricas_da_celula`) e os vizinhos da lente canônica.
+    assert ordem.index("metricas_regime") < ordem.index("internacional")
+    # as figuras e as tabelas leem o canônico inteiro, logo fecham a lista.
+    assert ordem.index("internacional") < ordem.index("figuras") < ordem.index("tabelas")
 
 
 def test_offline_nao_seleciona_extracao() -> None:
@@ -131,10 +140,11 @@ def test_so_roda_uma_etapa_e_tem_precedencia_sobre_ate() -> None:
     assert [etapa.nome for etapa in selecao] == ["regimes_v3"]
 
 
-def test_sem_opcionais_remove_f022_e_f025() -> None:
+def test_sem_opcionais_remove_as_quatro_etapas_opcionais() -> None:
+    """`--sem-opcionais` tira F-022, F-026, as figuras (F-023/F-025) e as tabelas (F-024)."""
     nomes = [etapa.nome for etapa in selecionar_etapas(online=False, com_opcionais=False)]
-    assert "metricas_regime" not in nomes
-    assert "figuras" not in nomes
+    for opcional in ("metricas_regime", "internacional", "figuras", "tabelas"):
+        assert opcional not in nomes
 
 
 def test_etapa_inexistente_lista_as_validas_na_mensagem() -> None:
@@ -403,6 +413,84 @@ def test_verify_nao_reprova_o_derivado_nao_deterministico(tmp_path: Path) -> Non
     resultado = verificar(raiz=tmp_path)
     assert resultado.ok, "ldc.duckdb é derivado e declarado não reprodutível"
     assert any(d.arquivo in NAO_DETERMINISTICOS and d.informativa for d in resultado.divergencias)
+
+
+def test_verify_reprova_parquet_ilegivel_sem_estourar_traceback(tmp_path: Path) -> None:
+    """**P1-1 do QA da Onda 4.** *Bit-rot* / arquivo truncado é o caso que o selo existe para
+    pegar, e era o único em que o `verify` **estourava**: `inventariar` chamava
+    `_perfil_do_parquet` (→ `pd.read_parquet`) **antes** de comparar hash, e um `.parquet` que não
+    é Parquet levantava `OSError`/`ArrowInvalid` como traceback cru — sem nomear o arquivo nem o
+    agregado (encosta em Anti-SPEC §10.4.26).
+
+    Agora: perfil vazio + `ilegivel` preenchido, divergência de `sha256` reportada, `rc = 1`.
+    """
+    pasta = _canonical_de_teste(tmp_path)
+    gravar_manifesto(montar_manifesto(raiz=tmp_path), destino=pasta / NOME_MANIFESTO)
+    alvo = pasta / "tabela_sintetica.parquet"
+    alvo.write_bytes(b"nao sou parquet")
+
+    resultado = verificar(raiz=tmp_path)  # não levanta
+
+    assert not resultado.ok
+    graves = {d.arquivo: d for d in resultado.graves}
+    assert "tabela_sintetica.parquet" in graves
+    assert "<agregado>" in graves
+    situacoes = {d.situacao for d in resultado.graves if d.arquivo == "tabela_sintetica.parquet"}
+    assert "sha256 divergente" in situacoes
+    assert any(MOTIVO_ILEGIVEL in s for s in situacoes)
+    assert main(["verify", "--raiz", str(tmp_path)]) == 1
+
+
+def test_inventario_de_parquet_ilegivel_nao_levanta_e_marca_o_motivo(tmp_path: Path) -> None:
+    """O inventário descreve o disco; "não consigo abrir" é **informação**, não exceção."""
+    pasta = _canonical_de_teste(tmp_path)
+    (pasta / "tabela_sintetica.parquet").write_bytes(b"xxx")
+    artefatos = {a.arquivo: a for a in inventariar(raiz=tmp_path)}
+    quebrado = artefatos["tabela_sintetica.parquet"]
+    assert quebrado.ilegivel is not None
+    assert MOTIVO_ILEGIVEL in quebrado.ilegivel
+    assert quebrado.linhas is None
+    assert len(quebrado.sha256) == 64, "o hash dos bytes em disco continua sendo calculado"
+
+
+def test_verify_ilegivel_reprova_mesmo_com_hash_batendo(tmp_path: Path) -> None:
+    """Hash igual só diz "não mudou **desde o manifesto**" — e o manifesto pode ter nascido sobre o
+    arquivo já corrompido. Nesse caso o `verify` **ainda** reprova, nomeando o arquivo."""
+    pasta = _canonical_de_teste(tmp_path)
+    (pasta / "tabela_sintetica.parquet").write_bytes(b"corrompido desde o inicio")
+    gravar_manifesto(montar_manifesto(raiz=tmp_path), destino=pasta / NOME_MANIFESTO)
+    resultado = verificar(raiz=tmp_path)
+    assert not resultado.ok
+    assert any(
+        d.arquivo == "tabela_sintetica.parquet" and MOTIVO_ILEGIVEL in d.situacao
+        for d in resultado.graves
+    )
+
+
+def test_manifesto_marca_o_nao_publicavel_e_frozen_o_lista(tmp_path: Path) -> None:
+    """**D-af.** `internacional_pesos.parquet` é construído e conferido, mas **não** vai ao Comitê
+    (Anti-SPEC §10.3.16/§10.5 → F-035). O manifesto diz `publicavel: false` **na entrada** e o
+    `FROZEN.txt` o lista como excluído do pacote — é essa lista que F-031 lê, não o nome do
+    arquivo. Ele **continua** no agregado: o `DATASET_SHA256` descreve o que foi construído.
+    """
+    pasta = _canonical_de_teste(tmp_path)
+    nome = next(iter(ARTEFATOS_NAO_PUBLICAVEIS))
+    pd.DataFrame({"quarter": ["2006Q1"], "peso": [0.2]}).to_parquet(pasta / nome, index=False)
+
+    manifesto = montar_manifesto(raiz=tmp_path)
+    por_arquivo = {a["arquivo"]: a for a in manifesto["artefatos"]}
+    assert por_arquivo[nome]["publicavel"] is False
+    assert por_arquivo[nome]["motivo_nao_publicavel"] == ARTEFATOS_NAO_PUBLICAVEIS[nome]
+    assert por_arquivo["tabela_sintetica.parquet"]["publicavel"] is True
+    assert nome in [a["arquivo"] for a in manifesto["artefatos"] if a.get("sha256")], (
+        "o nao publicavel continua tendo hash e entrando no agregado"
+    )
+
+    resultado = congelar(tag="teste-d-af", raiz=tmp_path)
+    frozen = resultado.caminho_frozen.read_text(encoding="utf-8")
+    assert "EXCLUIDOS DO PACOTE DE ENTREGA" in frozen
+    assert nome in frozen
+    assert "publicavel" in frozen
 
 
 def test_verify_sem_manifesto_e_erro_acionavel(tmp_path: Path) -> None:

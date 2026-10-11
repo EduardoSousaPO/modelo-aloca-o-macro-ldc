@@ -178,22 +178,27 @@ def test_contrato_recusa_n_negativo() -> None:
         RegimeAssetMetricsSchema.validate(_tabela(_linha(n_obs=-1)), lazy=True)
 
 
-def test_coerce_transforma_flag_booleana_nula_em_false_em_silencio() -> None:
-    """⚠️ **ACHADO DE CONTRATO, não aceitação.** `nullable=False` + `coerce=True` em coluna `bool`
-    **não recusa** `None`: o pandera manda `astype(bool)`, e em pandas `None → False` e
-    `NaN → True`. Ou seja, uma flag de `n` ausente vira "não há alerta" **sem exceção nenhuma** —
-    exatamente o modo de falha silenciosa que `AGENTS.md §2` diz ser o dominante deste projeto.
+def test_contrato_recusa_flag_booleana_nula_em_vez_de_coagir_para_false() -> None:
+    """**D-ac fechado.** O achado de F-022 §8.3 era: `nullable=False` + `coerce=True` em coluna
+    `bool` **não recusava** `None` — o pandera mandava `astype(bool)` **antes** dos checks e em
+    pandas `None → False` / `NaN → True`, então uma flag de `n` ausente entrava como "não há
+    alerta" sem exceção nenhuma (o modo de falha silenciosa de `AGENTS.md §2`).
 
-    O teste trava o comportamento medido (para que mudança de versão do pandera apareça) e prova
-    que **este módulo não depende do schema** para isso: as duas flags saem de `alerta_n_baixo(n)`
-    e `conclusao_suprimida(n)` sobre um `int`, então não existe caminho que produza `None`.
+    D-ac acrescentou ao schema, **sem alterar coluna nenhuma**, o par parser + check: o parser
+    roda antes da coerção e converte para o dtype nulável `boolean`, de modo que `None`, `NaN` e
+    `pd.NA` fazem a coerção para `bool` **falhar**. Este teste trava os três.
 
-    Dívida para o orquestrador: `Check(lambda s: s.notna().all())` nas 2 flags de
-    `RegimeAssetMetricsSchema` e nas 3 de `RegimesSchema` — é **alteração** de schema, logo pausa.
+    A segunda metade continua valendo: **este módulo não depende do schema** para isso — as duas
+    flags saem de `alerta_n_baixo(n)`/`conclusao_suprimida(n)` sobre um `int`.
     """
     for flag in ("alerta_n_baixo", "conclusao_suprimida"):
-        validada = RegimeAssetMetricsSchema.validate(_tabela(_linha(**{flag: None})), lazy=True)
-        assert bool(validada[flag].iloc[0]) is False, "o coerce silencioso mudou de comportamento"
+        for ausente in (None, float("nan"), pd.NA):
+            with pytest.raises(ERROS_DE_SCHEMA):
+                RegimeAssetMetricsSchema.validate(_tabela(_linha(**{flag: ausente})), lazy=True)
+        # o caminho feliz segue passando e saindo como `bool` puro
+        valida = RegimeAssetMetricsSchema.validate(_tabela(_linha(**{flag: True})), lazy=True)
+        assert valida[flag].dtype == "bool"
+        assert bool(valida[flag].iloc[0]) is True
 
     for n in (0, 1, 4, 5, 7, 8, 20):
         saida = M.metricas_da_celula(
@@ -417,15 +422,18 @@ def test_regimes_schema_recusa_regime_v1_nulo() -> None:
         RegimesSchema.validate(pd.DataFrame(linhas), lazy=True)
 
 
-def test_stress_flag_nulo_passa_pelo_schema_virando_false_logo_a_guarda_e_do_modulo() -> None:
-    """⚠️ **O motivo nº 2 de D-r, e a razão de `montar_regimes` bloquear ANTES de validar.**
+def test_stress_flag_nulo_e_recusado_pelo_schema_e_tambem_bloqueado_pelo_modulo() -> None:
+    """⚠️ **O motivo nº 2 de D-r — agora fechado nas DUAS camadas.**
 
-    `stress_flag` é `nullable=False`, mas `coerce=True` converte `None → False`: um
-    `regimes.parquet` sem a regra de RF-039 **passaria** pelo contrato declarando que **nenhum**
-    trimestre dos 83 foi de stress — dado inventado, com o selo do pandera (Anti-SPEC §10.1.1).
+    Antes de **D-ac**: `stress_flag` era `nullable=False` mas `coerce=True` convertia
+    `None → False`, e um `regimes.parquet` sem a regra de RF-039 **passava** pelo contrato
+    declarando que **nenhum** dos 83 trimestres foi de stress — dado inventado com o selo do
+    pandera (Anti-SPEC §10.1.1). Depois de D-ac, o parser de `RegimesSchema` converte a coluna
+    para `boolean` antes da coerção e o nulo **reprova**.
 
-    É por isso que o bloqueio de `montar_regimes` é uma lista de `bloqueios` avaliada **antes** de
-    `RegimesSchema.validate`, e não a validação em si. Este teste prova as duas metades.
+    A guarda do módulo continua existindo e continua sendo a primeira a falar: o bloqueio de
+    `montar_regimes` é uma lista avaliada **antes** de `RegimesSchema.validate`. Este teste prova
+    as duas metades — defesa em profundidade, não redundância.
     """
     linhas = [
         {
@@ -447,8 +455,8 @@ def test_stress_flag_nulo_passa_pelo_schema_virando_false_logo_a_guarda_e_do_mod
         }
         for i, rotulo in enumerate(r.value for r in RegimeV1)
     ]
-    validada = RegimesSchema.validate(pd.DataFrame(linhas), lazy=True)
-    assert not validada["stress_flag"].any(), "o coerce silencioso mudou de comportamento"
+    with pytest.raises(ERROS_DE_SCHEMA):
+        RegimesSchema.validate(pd.DataFrame(linhas), lazy=True)
 
     regimes_v1 = pd.DataFrame(
         {
@@ -472,6 +480,50 @@ def test_stress_flag_nulo_passa_pelo_schema_virando_false_logo_a_guarda_e_do_mod
     assert juncao.gravavel is False
     assert juncao.tabela is None
     assert any("stress_flag" in b for b in juncao.bloqueios)
+
+
+def test_regimes_schema_recusa_nulo_nas_tres_flags_booleanas_de_d_ac() -> None:
+    """**D-ac:** as 3 colunas `bool` + `nullable=False` nomeadas pelo achado de F-022 §8.3
+    (`stress_flag`, `alerta_n_baixo`, `especificacao_congelada`) recusam `None`, `NaN` e `pd.NA`.
+
+    `especificacao_congelada` é a mais perigosa das três: coagida a `False` o gate de CA-090 ficava
+    *mais* conservador, mas coagida a `True` (`NaN → True` em pandas) uma tabela sem gate passaria
+    a se declarar **publicável**.
+
+    `lag_adjusted` **também** é `bool`/`nullable=False` e não está coberta: D-ac nomeia as 3 do
+    achado, e a 4ª está declarada na lista de dívidas de contrato (`TODO.md §6`).
+    """
+
+    def _linhas(**sobrescritas: object) -> pd.DataFrame:
+        base = [
+            {
+                "quarter": f"2010Q{i + 1}",
+                "regime_v1": rotulo,
+                "regime_v1b": None,
+                "ciclo_selic": "NEUTRO",
+                "regime_v2": f"{rotulo}_NEUTRO",
+                "stress_flag": False,
+                "g_score": 1.0,
+                "pi_score": 0.5,
+                "n_obs_regime_v1": 10,
+                "alerta_n_baixo": False,
+                "lag_adjusted": False,
+                "trocou_vs_revised": None,
+                "especificacao_congelada": False,
+                "versao_especificacao": "V1",
+                "fonte_versao": "a" * 64,
+            }
+            | sobrescritas
+            for i, rotulo in enumerate(r.value for r in RegimeV1)
+        ]
+        return pd.DataFrame(base)
+
+    RegimesSchema.validate(_linhas(), lazy=True)  # caminho feliz, para o negativo ter sentido
+
+    for flag in ("stress_flag", "alerta_n_baixo", "especificacao_congelada"):
+        for ausente in (None, float("nan"), pd.NA):
+            with pytest.raises(ERROS_DE_SCHEMA):
+                RegimesSchema.validate(_linhas(**{flag: ausente}), lazy=True)
 
 
 def test_regimes_schema_exige_os_4_quadrantes_povoados() -> None:

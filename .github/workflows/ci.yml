@@ -52,68 +52,98 @@ jobs:
 
   # ───────────────────────────────────────────────────────────────
   # N2 — Roda em PR e em push para main. Obrigatório para B relevante/C.
-  # Descomente quando existirem tests/integration e tests/contract.
+  # Habilitado em 2026-10-11 (QA Onda 3, P1-4 / decisão D-y): a Onda 3/4 entregou
+  # `tests/contract/` (10 arquivos) e o orquestrador `apps.pipeline` (F-029), que é o
+  # "build do canônico a partir de fixtures" que este nível exige.
+  # `tests/integration/` ainda está VAZIO — o passo está comentado abaixo, nomeado, em vez
+  # de chamar uma pasta sem teste (pytest sairia com código 5 e o job ficaria vermelho sem
+  # defeito nenhum). Quem criar o primeiro teste de integração descomenta 2 linhas.
   # ───────────────────────────────────────────────────────────────
-  # n2-integration:
-  #   name: N2 — Integration + Contract (pandera) + Build canônico
-  #   needs: n1-basic
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 20
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-python@v5
-  #       with:
-  #         python-version: "3.11"
-  #         cache: "pip"
-  #     - run: |
-  #         python -m pip install --upgrade pip
-  #         pip install -e ".[dev]"
-  #     - name: Integration tests
-  #       run: pytest tests/integration -m "not network"
-  #     - name: Contract tests (schemas pandera sobre fixtures)
-  #       run: pytest tests/contract -m "not network"
-  #     - name: Build do dataset canônico a partir de fixtures
-  #       run: python -m pipeline.build_canonical --from-fixtures --out /tmp/canonical
-  #     - name: Validar schema do canônico gerado
-  #       run: python -m pipeline.validate --path /tmp/canonical
+  n2-integration:
+    name: N2 — Contract (pandera) + Build canônico de fixtures
+    needs: n1-basic
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      # - name: Integration tests (tests/integration ainda vazio — ver nota acima)
+      #   run: pytest tests/integration -m "not network"
+      - name: Contract tests (schemas pandera)
+        run: pytest tests/contract -m "not network"
+      - name: Build do canônico a partir das fixtures versionadas
+        # Árvore de trabalho fora do repo, com data/processed/ copiado de tests/fixtures/.
+        # `--ate build_raw_series` é o trecho que as fixtures sustentam (F-029 §4);
+        # `--sem-duckdb` deixa data/canonical/ integralmente determinístico (decisão F-029 (b)).
+        run: |
+          set -euo pipefail
+          ARVORE="$RUNNER_TEMP/n2"
+          mkdir -p "$ARVORE/data"
+          cp -r tests/fixtures/processed "$ARVORE/data/processed"
+          python -m apps.pipeline run --offline --ate build_raw_series --sem-duckdb --raiz "$ARVORE"
+      - name: Validar o canônico gerado (sha256 x MANIFEST.json)
+        run: python -m apps.pipeline verify --raiz "$RUNNER_TEMP/n2"
 
   # ───────────────────────────────────────────────────────────────
   # N3 — Só em PR para main, ou manual. Obrigatório para C crítica/D.
-  # Descomente quando o pipeline ponta a ponta rodar com fixtures.
+  # Habilitado em 2026-10-11 (QA Onda 3, P1-4 / decisão D-y): `tests/e2e/` existe
+  # (F-029, 6 testes) e o par run/verify fecha a conferência de reprodutibilidade
+  # (rodar 2x -> mesmo MANIFEST.json e mesmo agregado DATASET_SHA256).
   # ───────────────────────────────────────────────────────────────
-  # n3-e2e-repro:
-  #   name: N3 — E2E + Reprodutibilidade
-  #   needs: n2-integration
-  #   if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 30
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-python@v5
-  #       with:
-  #         python-version: "3.11"
-  #         cache: "pip"
-  #     - run: |
-  #         python -m pip install --upgrade pip
-  #         pip install -e ".[dev]"
-  #     - name: E2E (pipeline ponta a ponta sobre fixtures)
-  #       run: pytest tests/e2e -m "not network"
-  #     - name: Reprodutibilidade — rodar 2x e comparar hash
-  #       run: |
-  #         python -m pipeline.build_canonical --from-fixtures --out /tmp/run1
-  #         python -m pipeline.build_canonical --from-fixtures --out /tmp/run2
-  #         find /tmp/run1 -type f -exec sha256sum {} + | sed 's|/tmp/run1||' | sort > /tmp/h1
-  #         find /tmp/run2 -type f -exec sha256sum {} + | sed 's|/tmp/run2||' | sort > /tmp/h2
-  #         diff /tmp/h1 /tmp/h2
-  #     - name: Smoke do relatório (sem publicar)
-  #       run: python -m analysis.report --dry-run
+  n3-e2e-repro:
+    name: N3 — E2E + Reprodutibilidade
+    needs: n2-integration
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: E2E (pipeline ponta a ponta sobre fixtures)
+        run: pytest tests/e2e -m "not network"
+      - name: Reprodutibilidade — duas árvores independentes, mesmo MANIFEST.json
+        run: |
+          set -euo pipefail
+          for n in 1 2; do
+            ARVORE="$RUNNER_TEMP/repro$n"
+            mkdir -p "$ARVORE/data"
+            cp -r tests/fixtures/processed "$ARVORE/data/processed"
+            python -m apps.pipeline run --offline --ate build_raw_series --sem-duckdb --raiz "$ARVORE"
+            python -m apps.pipeline verify --raiz "$ARVORE"
+          done
+          M1="$RUNNER_TEMP/repro1/data/canonical/MANIFEST.json"
+          M2="$RUNNER_TEMP/repro2/data/canonical/MANIFEST.json"
+          diff "$M1" "$M2"
+          python -c "import json,sys; print('DATASET_SHA256=' + json.load(open(sys.argv[1]))['agregado']['sha256'])" "$M1"
 
 # ───────────────────────────────────────────────────────────────
 # Notas
 # ───────────────────────────────────────────────────────────────
-# - Os módulos referenciados nos jobs comentados (pipeline.build_canonical, pipeline.validate,
-#   analysis.report) são NOMES SUGERIDOS. Ajuste ao que for implementado em apps/pipeline/ e
-#   apps/analysis/, e mantenha a correspondência registrada em docs/plans/.
+# - Os nomes sugeridos no esqueleto original (pipeline.build_canonical, pipeline.validate,
+#   analysis.report) NÃO existem. O que foi implementado é o orquestrador de F-029:
+#     python -m apps.pipeline run --offline [--ate ETAPA] [--sem-duckdb] [--raiz ARVORE]
+#     python -m apps.pipeline verify [--raiz ARVORE]      (rc != 0 se um sha256 divergir)
+#     python -m apps.pipeline freeze --tag <tag>          (MANIFEST.json + FROZEN.txt)
+#   Correspondência registrada em docs/plans/DECISIONS_LOG.md (D-y) e em
+#   docs/wiki/runbooks/reconstruir-dataset.md.
+#
+# - As figuras (F-023/F-025) e as tabelas (F-024) NÃO entram no N2/N3: elas dependem de
+#   data/canonical/ completo, que as fixtures não sustentam (o trecho reproduzível é
+#   `--ate build_raw_series`). A cobertura delas no CI é via tests/unit, que roda sintético.
 #
 # - Nenhum job acessa rede externa. Se um teste precisar de fonte viva, marque `@pytest.mark.network`
 #   e rode local; o CI roda sempre com `-m "not network"`.

@@ -699,6 +699,206 @@ S-09, S-10, S-11, S-12**) são operacionais e podem ser aceitas por e-mail, sem 
   features por estética. Impacto: 1 linha por feature no `TODO.md` (F-014..F-019, F-021) —
   ref: QA-A §2, F-019 §1/§10.4, F-021 §7.6
 
+#### Parte 4 — Onda 4: fechamento de F-022..F-029 + os P1 dos QAs das Ondas 3 e 4 (2026-10-11)
+
+> Decisões tomadas ao **fechar** a Onda 4 (F-022 métricas, F-023 heatmap, F-024 tabela, F-025
+> timeline, F-026 internacional, F-028 limitações, F-029 orquestrador) e ao absorver os **5 P1 do
+> QA da Onda 3** e os **3 P1 do QA da Onda 4**. **D-aa (c)** e a ratificação de **D6** são do Edu;
+> as demais foram **aceitas pelo orquestrador**. Nenhuma toca SPEC, PRD, Anti-SPEC ou o e-mail de
+> escopo. ADR-001/002/003 seguem em `Proposta`, logo **nada daqui é publicável** (CA-090).
+
+- [2026-10-11] [contrato/CI] **D-y · os 5 P1 do QA da Onda 3 aplicados: §5.2a corrigida, D-t
+  reescrita, "Jaccard 1,0" requalificado, N2/N3 habilitados no `ci.yml`, safra `revised` declarada
+  — ACEITA pelo orquestrador** — motivo: os cinco são **de declaração**, não de número (o QA
+  reconstruiu 5 colunas × 83 × 2 materializações, 83 × 2 rótulos, `rho` + 16 distâncias e 24 médias
+  de ativo com **zero** divergência). Declaração errada em contrato espelho é pior que contrato
+  ausente: quem confia nela implementa em cima do que não existe. Impacto, item a item:
+  **(P1-1)** `CONTRACTS.md §5.2a` dizia que `RegimeNeighborsV3Schema` tem `rho_shrinkage` e "as 5
+  features em unidade original" — **nenhuma das duas existe**; a seção foi reescrita com as **21
+  colunas reais** lidas do schema (6 herdadas intactas, 3 herdadas com outro sentido, 1 relaxada e
+  **11 novas**), e o `rho` foi apontado para `relatorio_regimes_v3.json → shrinkage`.
+  **(P1-2)** a frase "a variante sem look-ahead dá a mesma lista (Jaccard 1,0) é o achado mais
+  forte da feature" foi substituída, em `CONTRACTS.md §5.2a` e em `TODO.md`/`modules/regimes.md`,
+  pela **distribuição**: nas **58** referências que têm as duas lentes, mediana **0,455**, Q1
+  0,231, Q3 0,600, mínimo 0,0 e **7 de 58** iguais a 1,0; o 1,0 de `2026Q3` é **vácuo** (último
+  trimestre da janela, as lentes coincidem por construção) e **2.751 das 5.500 linhas (50,0%)** da
+  variante descritiva têm vizinho **no futuro** da referência. A leitura correta é a inversa da
+  publicada: a lente descritiva muda o conjunto de vizinhos em ~**55%** dos casos.
+  **(P1-3)** a justificativa de **D-t** chamava `2024Q2` **e** `2024Q3` de "cortes reais de 25 bps"
+  em 3 lugares. Medido em `macro_quarterly.parquet`: os 7 trimestres com `|Δ| = 0,25` exato são
+  **5 `CORTE`** (`2011Q3`, `2012Q4`, `2020Q3`, `2024Q2`, `2026Q1`) e **2 `ALTA`** (`2014Q2` e
+  **`2024Q3`**, a alta de set/2024 que abriu o ciclo de aperto). O *dado* sempre esteve certo; a
+  *frase* invertia o sinal de dois deles. Corrigido no texto do relatório
+  (`macro_quarterly.py → ciclo_selic`, docstring **e** `relatorio_macro.json`, que agora publica
+  `trimestres_no_limiar_exato` com as duas listas nomeadas), no `TODO.md §4` e aqui. **D-t continua
+  defensável e continua aguardando Edu** — e o argumento melhora: 25 pb é o menor passo do Copom
+  **em qualquer direção**, então a desigualdade não estrita é simétrica, não um jeito de "não
+  perder cortes".
+  **(P1-4)** `.github/workflows/ci.yml`: `n2-integration` e `n3-e2e-repro` saíram do comentário. N2
+  = `pytest tests/contract` + build do canônico a partir de `tests/fixtures/processed/` em árvore
+  de `$RUNNER_TEMP` (`run --offline --ate build_raw_series --sem-duckdb --raiz`) + `verify`. N3 =
+  `pytest tests/e2e` + **duas árvores independentes** com `diff` do `MANIFEST.json`. Os dois passos
+  foram **executados nesta máquina** antes de serem escritos: agregado
+  `f9214b8e2a3ea502cc1f234cbaf8459857a5a4821fd6b0ec25bd7b3e109644fd`, `verify` **rc 0**. O passo de
+  `tests/integration` fica **comentado e nomeado**: a pasta está **vazia** e `pytest` em pasta sem
+  teste sai com código 5 — job vermelho sem defeito. Os nomes do esqueleto
+  (`pipeline.build_canonical`, `pipeline.validate`, `analysis.report`) **não existem** e foram
+  trocados pelos reais nas notas do arquivo.
+  **(P1-5)** a V3 roda sobre `revised` (safra **única**) — limitação **declarada** em
+  `CONTRACTS.md §5.2a`: `lag_adjusted = False` nas 9.692 linhas; 3 das 5 features são idênticas em
+  `revised` e `asof` (lag 0), mas **`ipca_12m_delta` difere em 83/83** (`max abs dif` 1,98 pp; em
+  `2026Q3`, −0,06 contra −0,50). `somente_passado` elimina look-ahead de **seleção** e de
+  **padronização**, **não de safra** — ref: `qa/ONDA-3-QA.md §6`, CONTRACTS §5.2a, `ci.yml`
+
+- [2026-10-11] [apresentação] **D-z · a vista `v3_t1` do heatmap passa a `horizonte_cruzado`;
+  `SP500_USD` SAI da figura do Comitê (e permanece na tabela de F-022); `timeline_regimes` importa
+  o cromo de `_comum` — ACEITA pelo orquestrador** — motivo: (i) o slug `v3_t1` vinha do briefing e
+  dizia o **oposto** da vista — nela a V1 é medida em T+1 e a V3 é **contemporânea (T0)**;
+  (ii) `SP500_USD` é retorno em **USD** e o excesso dele contra o CDI em **BRL** mistura moedas
+  (Anti-SPEC §10.2.12), o que deixa a célula **sem leitura** — e, pior, a linha ficava sob o
+  cabeçalho de grupo "INTERNACIONAL (EM BRL)", que **afirma** BRL para uma série em USD (P2-2 do QA
+  da Onda 4); (iii) F-025 declarava localmente os mesmos 7 tokens de cromo que `_comum` publica, e
+  duas figuras do mesmo pacote com dois cinzas de grade é o jeito de o cromo divergir em silêncio.
+  Impacto medido: a figura passa a ter **23 linhas** (23 ≥ 18 continua cumprindo RF-033) e
+  **115 células** na vista principal; `heatmap_dados.parquet` cai de 336 para **322** linhas; o
+  rodapé **nomeia a exclusão** (`FORA desta figura (D-z): SP500_USD …`) e diz que a linha **segue
+  em `regime_asset_metrics*.parquet`** — não é apagamento, é decisão de apresentação, e há teste de
+  acervo que falha nas **duas** direções (fora da figura **e** presente nas 3 tabelas). Os
+  artefatos `heatmap_v3_t1.{png,svg}` foram **removidos** do disco. A refatoração de cromo **mudou
+  os bytes** das 4 figuras de F-025, como previsto e **declarado**: `MODULOS_DA_TIMELINE` hasheia o
+  próprio módulo (e agora também `_comum` e `_linguagem`), então `versao_build` muda de propósito —
+  o **único** texto diferente é o do rodapé, e os 3 `sha256` dos insumos são idênticos
+  — ref: F-023 §3/§7, F-025 §6, `qa/ONDA-4-QA.md §4` (vetores 4 e 5), Anti-SPEC §10.2.12
+
+- [2026-10-11] [contrato/escopo] **D-aa · F-024: CA-098 "V1 e V2" vira V1 `revised` + V1 `asof` +
+  V3 (emenda a entrar no aceite do ADR-001); `erro_padrao_excesso` é dívida de schema; a escolha da
+  lente (D1) é do Edu — ACEITA pelo orquestrador, com (c) aguardando Edu** — motivo: **(a)** F-020
+  foi **cortada** da onda, então não existe linha com `lente = V2`; a página entrega a **dupla
+  materialização da V1** no lugar, que é exatamente a divergência que o Comitê precisa ver (CA-074,
+  33,33%) — a alternativa seria uma coluna "V2" vazia, pior que declarar. É **emenda de CA**, que o
+  agente não pode fazer sozinho: entra no **aceite do ADR-001**, junto das de CA-078 e CA-079
+  (P2-1/P2-4 do QA da Onda 3). **(b)** `erro_padrao_media` de `RegimeAssetMetricsSchema` é o do
+  retorno **nominal** (`desvio(ret_tri)/√n`), enquanto F-021 publica o do **excesso** (`INDX`:
+  2,54 pp contra 2,60 pp); a página declara qual mostra e trata `|excesso|/ep` como **semáforo**,
+  nunca como estatística de teste. Acrescentar `erro_padrao_excesso` é **alteração** de schema ⇒
+  dívida (lista única de `TODO.md §6`), não feita aqui. **(c)** qual lente abre a página é **D1** e
+  é do Edu; enquanto não houver resposta, as três saem com peso igual
+  — ref: F-024 §4, CONTRACTS §4.1, CA-098/099, CA-074
+
+- [2026-10-11] [metodologia/internacional] **D-ab · as quatro decisões de F-026 (D6-a..D6-d)
+  registradas; `internacional_pesos.parquet` NÃO entra em F-031; `regimes.parquet` segue NÃO
+  gravado, agora por UM motivo só — ACEITA pelo orquestrador (a ratificação de D6 é do Edu)** —
+  motivo e impacto:
+  **(D6-a)** a regra de `stress_flag` que RF-039/CA-106 não fechava: queda da
+  **`INCLINACAO_REAL_5A_3A`** (a principal de **D-i**, 95,25% de cobertura) maior que **1 desvio
+  expanding até T−1** (mínimo de 8 observações anteriores), sobre a **variação**
+  `Δincl(T) = incl(T) − incl(T−1)`, **ou** `usdbrl_var_tri > 10%`. O **ramo EMBI fica
+  declaradamente fora**, com o número que prova: `embi_delta_tri` tem **0** valores não nulos nos
+  83 trimestres (o EMBI+ morreu em 30/07/2024), e a coluna `ramo_embi` existe e é sempre `False`
+  para que a ausência seja **visível**. Resultado: **20 de 83** trimestres (24,1%) — 7 só pelo ramo
+  da inclinação, 11 só pelo do câmbio, 2 pelos dois (`2015Q1`, `2020Q1`); **14 não avaliáveis**
+  pelo ramo 1 (`2006Q1..2008Q1`, aquecimento do expanding, e `2020Q3..2021Q3`, o buraco da 5a−3a) —
+  e trimestre **não avaliável ≠ trimestre sem stress**, o que a saída nomeia. Validação externa que
+  **não** calibrou a regra: **9 dos 10 piores trimestres do IBOV** estão marcados.
+  **(D6-b)** o representativo da carteira é **`ACWI_BRL`**, não o `SP500_BRL` que ADR-003 §1 nomeia
+  — **forçado pelo dado, não escolhido**: `IBOV`, `IMAB` e `CDI` são *total return* e `SP500_BRL` é
+  *price return*; montar covariância misturando os dois é o que a **Anti-SPEC §10.2.12 / CA-064**
+  proíbe. `SP500_BRL` fica na tabela de retornos com a flag visível e **nunca é somado** com os
+  demais.
+  **(D6-c)** a entrega de CA-107 é **faixa**: piso estrutural `[16%, 20%]` (FGVcef) + banda tática
+  `[15%, 35%]` (ADR-003) com truncamento, cap de 40% por ativo **e a versão sem cap publicada ao
+  lado**. O motivo é medido: por regime o internacional sai entre **15,9% e 23,6%**, mas o
+  *expanding* médio cai de **19,65%** (cap 0,40) para **10,41%** (sem cap) — um número que quase
+  dobra com uma restrição de apresentação **não é um número**, é uma faixa.
+  **(D6-d)** a **variância mínima é calculada mas fica FORA da entrega v1** (Anti-SPEC §10.3.16 e
+  §10.5; `TODO.md` F-026 → **F-035**): `internacional_pesos.parquet` **NÃO entra no pacote de
+  F-031**. Ela existe porque era o insumo da faixa, e nasce isolada por construção — tabela
+  separada, `especificacao_congelada = False` em todas as 624 linhas, `WARNING` em toda execução,
+  **nenhuma** coluna onde escrever previsão (com teste de contrato que falha se alguém acrescentar
+  uma) e **nenhum backtest** (sem série de retorno de carteira, sem posição, sem rebalanceamento).
+  Publicar qualquer número dela exige ADR-003 aceito **e** autorização escrita sobre a Anti-SPEC
+  (`AGENTS.md §9/§14`) — ver **D-af** para o mecanismo que impede o vazamento físico.
+  **`regimes.parquet`:** com a série real de F-026, `montar_regimes` foi executado e devolveu
+  `gravavel = False` com **um** bloqueio de contrato: `regime_v1` é `nullable=False` e **16 dos 83**
+  trimestres são `INDETERMINADO` (**D-m**). Como o schema **não** deve ser alterado sem autorização,
+  **`regimes.parquet` segue não gravado** e o relatório de F-022 passou a dizer que o bloqueio de
+  `stress_flag` está **RESOLVIDO por F-026** (era **P2-5** do QA da Onda 4: dois relatórios
+  dizendo coisas opostas sobre o mesmo bloqueio) — ref: F-026 §4/§7/§8/§12, F-022 §4, CONTRACTS
+  §5.1/§6a, ADR-003, Anti-SPEC §10.3.16/§10.5
+
+- [2026-10-11] [contrato] **D-ac · `Check` + `parser` de não-nulidade nas colunas `bool`
+  `nullable=False` de `RegimeAssetMetricsSchema` (2) e `RegimesSchema` (3) — ACRÉSCIMO, ACEITA pelo
+  orquestrador** — motivo: o achado de F-022 §8.3, reproduzido pelo QA da Onda 4 em schema mínimo:
+  **`nullable=False` + `coerce=True` em coluna `bool` do pandera NÃO recusa `None`**. O coerce
+  manda `astype(bool)`, e em pandas `None → False` e `NaN → True`. Os dois casos medidos eram
+  graves: `alerta_n_baixo = None` entrava como "não há alerta", e `stress_flag = None` nas 83 linhas
+  **validava**, declarando que **nenhum** trimestre dos 20 anos foi de stress — dado inventado com
+  o selo do pandera, que é o modo de falha que `AGENTS.md §2` chama de dominante neste projeto.
+  **Medição que mudou a implementação:** um `Check(lambda s: s.notna().all())` sozinho **não
+  resolve** — os checks rodam **depois** da coerção, então eles veem `False`, não `None`. O que
+  resolve, e continua sendo **acréscimo** (nenhuma declaração de coluna foi tocada), é um
+  **`@pa.parser`**, que roda **antes** da coerção (medido) e converte a coluna para o dtype nulável
+  `boolean`: com `None`, `NaN` ou `pd.NA` a coerção para `bool` passa a **falhar**. O `Check` entra
+  junto, como declaração de intenção e para cobrir o caminho sem coerção. Impacto: 5 colunas
+  (`alerta_n_baixo`, `conclusao_suprimida` em `RegimeAssetMetricsSchema`; `stress_flag`,
+  `alerta_n_baixo`, `especificacao_congelada` em `RegimesSchema`), 3 testes de contrato novos que
+  exigem a recusa dos **três** valores ausentes, e dois testes antigos **reescritos** — eles
+  travavam o comportamento silencioso como "medido", e agora travam a recusa. **Resíduo declarado:**
+  `lag_adjusted` **também** é `bool`/`nullable=False` em `RegimesSchema` e **não** foi coberta —
+  D-ac nomeia as 3 do achado; a 4ª está na lista única de `TODO.md §6`
+  — ref: F-022 §8.3, `qa/ONDA-4-QA.md §4` (vetor 2), CONTRACTS §4.1/§5.1, AGENTS §2
+
+- [2026-10-11] [organização] **D-ad · as 7 decisões (a)-(g) de F-029 registradas; `ldc.duckdb` fica
+  fora do agregado; o job N2 NÃO chama `tests/integration/` — ACEITA pelo orquestrador** — motivo:
+  **(a)** `--offline` lê `data/processed/`, não `data/raw/` (reprocessar sem rede é explícito, com
+  `--reprocessar`). **(b)** `ldc.duckdb` entra no manifesto com `determinista: false`,
+  `sha256: null` e o motivo escrito, fica **fora** do agregado e o `verify` o reporta como `INFO`:
+  **medido** que em diretório criado do zero duas escritas dão o mesmo tamanho (274.432 B) e
+  `sha256` **diferente**, e o caso que importa (CA-118/119: máquina limpa) é justamente esse. Ele é
+  derivado e descartável (ADR-006 §(a).2) e `run --sem-duckdb` deixa o diretório integralmente
+  determinístico — que é como o pacote da classe D **deve** ser congelado (P2-6 do QA da Onda 4).
+  **(c)** o manifesto cobre `data/canonical/` **recursivamente**, com nome em POSIX, para a ordem
+  do agregado ser a mesma no Windows e no Linux. **(d)** nada lê o relógio: `data_do_dado` sai dos
+  relatórios das features, e é isso que faz o `MANIFEST.json` sair byte-idêntico em duas execuções.
+  **(e)** `freeze` **não executa git**: o commit vem de `.git/HEAD` + `refs/` por leitura pura, e a
+  tag continua ato humano. **(f)** etapa opcional com módulo presente mas sem `construir()`/`main()`
+  é **pulada com aviso**, não falha — aconteceu de verdade enquanto F-025 era escrita; falha
+  **dentro** de `construir()` continua parando o pipeline. **(g)** o agregado é no formato
+  `sha256sum` (`"<sha256>  <arquivo>\n"`, ordenado por nome, LF), reproduzível na linha de comando.
+  **E o job N2 não chama `tests/integration/`:** a pasta está **vazia**, o passo fica comentado e
+  **nomeado** no `ci.yml` (duas linhas para descomentar), porque `pytest` em pasta sem teste sai com
+  código 5 e deixaria o job vermelho sem defeito nenhum — ref: F-029 §3/§4, `ci.yml`, ADR-006
+
+- [2026-10-11] [contrato] **D-ae · as dívidas de contrato viram UMA lista só em `TODO.md §6`,
+  classe C, pós-Comitê — ACEITA pelo orquestrador** — motivo: as dívidas de schema estavam espalhadas
+  por 5 context packs e 2 QAs, cada uma com o seu "registrado como dívida", e dívida que mora em
+  arquivo descartável desaparece quando o pack é apagado. A lista única tem hoje: **(1)** o achado
+  pandera `bool` — **fechado por D-ac** nas 5 colunas nomeadas, com `lag_adjusted` como resíduo;
+  **(2)** `catalogo_sha256`, que não passa por `normalizar_fim_de_linha` e por isso muda entre
+  checkout CRLF e LF (resíduo de **D-v (b)**); **(3)** `erro_padrao_excesso` em
+  `RegimeAssetMetricsSchema` (**D-aa (b)**); **(4)** `regime_v1` anulável em `RegimesSchema`
+  (**D-m**/**D-r**, o único bloqueio restante de `regimes.parquet`); **(5)** `regime_v1_neighbor`
+  anulável em `RegimeNeighborsSchema` (**D-u**, custa 4 dos 8 vizinhos de `2026Q3`); **(6)**
+  `materializacao` + `horizonte` em `RegimeAssetMetricsSchema`, que colapsariam as 3 tabelas em 1.
+  Todas são **alteração** de schema existente ⇒ **pausa** (`AGENTS.md §9`), nenhuma feita
+  — ref: F-021 §8, F-022 §8.2, F-024 §4, D-v (b), D-m, D-u, TODO §6
+
+- [2026-10-11] [entrega/contrato] **D-af · o MANIFEST ganha `publicavel` e o `freeze` lista os
+  artefatos excluídos do pacote de entrega — ACEITA pelo orquestrador** — motivo: **P1-3 do QA da
+  Onda 4**. `internacional_pesos.parquet` é não publicável (Anti-SPEC §10.3.16/§10.5 → F-035), mas
+  mora em `data/canonical/` e o manifesto cobre o diretório **recursivamente** — então o dataset
+  congelado de F-031 conteria **fisicamente** a tabela de pesos, com o selo só **dentro** das
+  linhas. Selo dentro da linha protege quem lê a linha; não protege quem recebe o diretório.
+  Impacto: `apps/pipeline/run.py` ganha `ARTEFATOS_NAO_PUBLICAVEIS` (nome do artefato → motivo
+  escrito); o `MANIFEST.json` grava `publicavel: false` + `motivo_nao_publicavel` **na entrada do
+  artefato**; o `FROZEN.txt` abre a seção `EXCLUIDOS DO PACOTE DE ENTREGA`; e **F-031 lê esse
+  campo**, não uma convenção de nome de arquivo. **Decisão explícita de não tirar do hash:** o
+  artefato **continua** no `DATASET_SHA256`, porque o agregado descreve o que foi **construído** —
+  tirá-lo confundiria reprodutibilidade com publicabilidade, e um dataset cujo hash esconde um
+  arquivo presente é pior que um dataset que declara o que não publica. Travado por
+  `test_manifesto_marca_o_nao_publicavel_e_frozen_o_lista`
+  — ref: `qa/ONDA-4-QA.md §5` (P1-3), F-026 §8, CONTRACTS §6a.2, AGENTS §9/§14
+
 ---
 
 ## 3. Regras deste log
@@ -723,6 +923,6 @@ S-09, S-10, S-11, S-12**) são operacionais e podem ser aceitas por e-mail, sem 
 ---
 
 *Documento vivo e deliberadamente pequeno — a §2.2 (achados de fonte) é a parte que mais cresce e a
-primeira a enxugar. Quando o Edu avaliar D-a..D-x, o que virar permanente sobe para `CONTRACTS.md` /
+primeira a enxugar. Quando o Edu avaliar D-a..D-af, o que virar permanente sobe para `CONTRACTS.md` /
 ADR e sai daqui; o que virar óbvio se apaga. Nunca apague a linha original de uma decisão avaliada:
 troque o marcador por `ACEITA — <quem> em <data>`.*

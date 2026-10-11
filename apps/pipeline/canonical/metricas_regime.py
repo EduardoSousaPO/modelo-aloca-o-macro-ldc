@@ -103,17 +103,20 @@ derivável. O resultado medido:
   definição escrita no próprio contrato;
 - `regime_v1` (`nullable=False`, enum de 4) é **BLOQUEIO**: 16 trimestres são `INDETERMINADO`
   por **D-m**;
-- `stress_flag` (`nullable=False`) é **BLOQUEIO**: RF-039/CA-106 diz "inclinação cai > 1
-  desvio-padrão **ou** USDBRL sobe > 10% no trimestre", mas **não** diz qual inclinação
-  (nominal ou real, 5a−1a ou 5a−3a — D-i/D-n), em que amostra o desvio-padrão é estimado, nem
-  se o "cai" é sobre o nível ou sobre a variação. É escopo de **F-026**.
+- `stress_flag` (`nullable=False`) **era** bloqueio quando esta feature foi escrita, porque
+  RF-039/CA-106 não fechava a definição. **F-026 fechou** (D6-a: queda da `INCLINACAO_REAL_5A_3A`
+  maior que 1 desvio *expanding* até T−1, sobre a **variação**, **ou** `usdbrl_var_tri > 10%`;
+  ramo EMBI declaradamente fora) e marcou **20 dos 83** trimestres. O que sobra aqui é de
+  **ordem**, não de definição: esta etapa roda **antes** de `internacional` no pipeline e **não** a
+  importa — a dependência é a inversa (F-026 importa `metricas_da_celula` daqui). Quem monta a
+  tabela completa passa `stress_flag=internacional.serie_de_stress_flag(stress)`.
 
 Pela regra do `AGENTS.md §9` (inventar dado e alterar schema são as duas proibidas), a saída é a
 terceira: **`regimes.parquet` NÃO é gravado**, a fonte autoritativa da V1 continua
-`regimes_v1.parquet`, e o relatório publica exatamente os dois bloqueios acima com o que
-destravaria cada um. A junção **é** testada: com `stress_flag` injetado e restrita aos 67
-trimestres classificados, a tabela **valida** contra `RegimesSchema` — o que prova que o que falta
-é dado (de F-026) e contrato (`regime_v1` anulável), não implementação.
+`regimes_v1.parquet`, e o relatório publica o bloqueio que resta (**`regime_v1`**, por D-m) e o
+que destravaria. A junção **é** testada: com `stress_flag` injetado — hoje a série **real** de
+F-026 — e restrita aos 67 trimestres classificados, a tabela **valida** contra `RegimesSchema`:
+o que falta é **contrato** (`regime_v1` anulável), não dado nem implementação.
 
 ## Idempotência, anti-look-ahead e gate de publicação
 
@@ -340,12 +343,18 @@ MOTIVO_BLOQUEIO_REGIME_V1_NULO = (
     "canonico 2006Q1..2009Q3 (a crise de 2008) e 2026Q3 (o trimestre do Comite) sem que a "
     "tabela diga que tirou; tornar a coluna anulavel e ALTERACAO de schema existente => pausa."
 )
+#: ATUALIZADO em 2026-10-11 (D-ab, a partir de P2-5 do QA da Onda 4). O bloqueio de **definicao**
+#: de `stress_flag` esta RESOLVIDO: F-026 fechou RF-039/CA-106 em D6-a. Esta mensagem agora diz o
+#: que de fato acontece quando `montar_regimes` e chamado sem a serie, que e o caso do `construir`
+#: desta feature - ela roda ANTES de F-026 no pipeline e nao a importa (a dependencia e o
+#: contrario: F-026 importa `metricas_da_celula` daqui).
 MOTIVO_BLOQUEIO_STRESS_FLAG = (
-    "stress_flag e nullable=False e RF-039/CA-106 nao fecha a definicao: 'inclinacao cai > 1 "
-    "desvio-padrao OU USDBRL sobe > 10% no trimestre' nao diz qual inclinacao (nominal ou real, "
-    "5a-1a ou 5a-3a - D-i/D-n), em que amostra o desvio e estimado, nem se 'cai' e sobre o nivel "
-    "ou sobre a variacao. Escolher aqui seria especificar regime fora da feature dona (F-026) e "
-    "depois de ver os retornos (Anti-SPEC 10.2.9)."
+    "stress_flag nao foi passado nesta chamada. A DEFINICAO nao e mais o problema: F-026 fechou "
+    "RF-039/CA-106 em D6-a (queda da INCLINACAO_REAL_5A_3A maior que 1 desvio expanding ate T-1, "
+    "minimo de 8 obs., sobre a VARIACAO; OU usdbrl_var_tri > 10%; ramo EMBI declaradamente fora) "
+    "e marcou 20 dos 83 trimestres. Esta feature roda antes de F-026 no pipeline e nao a importa "
+    "(F-026 importa metricas_da_celula daqui), entao quem monta a tabela completa passa "
+    "stress_flag=internacional.serie_de_stress_flag(stress). O bloqueio que RESTA e regime_v1."
 )
 
 
@@ -1454,7 +1463,13 @@ def montar_relatorio(
         "juncao_regimes": {
             "artefato": NOME_REGIMES_JUNTOS,
             "gravado": juncao.gravavel,
-            "decisao": "D-r",
+            "decisao": "D-r, atualizada por D-ab (2026-10-11)",
+            "bloqueio_de_stress_flag_resolvido_por_f026": True,
+            "unico_bloqueio_de_contrato": (
+                "regime_v1 e nullable=False e 16 dos 83 trimestres sao INDETERMINADO (D-m). "
+                "Medido com a serie real de stress de F-026: montar_regimes devolve "
+                "gravavel=False com esse unico bloqueio de contrato."
+            ),
             "derivaveis": juncao.derivadas,
             "bloqueios": juncao.bloqueios,
             "trimestres_indeterminados": juncao.trimestres_indeterminados,
@@ -1463,8 +1478,9 @@ def montar_relatorio(
             "o_que_destravaria": {
                 "regime_v1": "tornar regime_v1 anulavel em RegimesSchema (classe C propria) OU "
                 "resolver D-m (min_periods=8 ou outro eixo de crescimento)",
-                "stress_flag": "F-026 implementar RF-039/CA-106 escolhendo, em ADR, qual "
-                "inclinacao e em que amostra o desvio-padrao e estimado",
+                "stress_flag": "RESOLVIDO em F-026 (D6-a): a regra existe, marca 20 de 83 "
+                "trimestres e e entregue por internacional.serie_de_stress_flag. Falta so a "
+                "ORDEM: esta etapa roda antes de internacional no pipeline e nao a importa.",
             },
         },
         "consistencia": {

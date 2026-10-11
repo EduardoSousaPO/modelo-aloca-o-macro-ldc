@@ -31,6 +31,8 @@ packages/shared/schemas/
 │                                  RegimeAssetMetricsSchema                         (pandera)
 ├── regimes.py                  ← RegimesSchema, RegimeNeighborsSchema,
 │                                  RegimesV1Schema, RegimeNeighborsV3Schema, enums  (pandera)
+├── internacional.py            ← InternacionalPorRegimeSchema,
+│                                  InternacionalPesosSchema (F-026, §6a)            (pandera)
 └── calendario.py               ← CalendarioDiasUteisSchema (grade de dias úteis)   (pandera)
 ```
 
@@ -42,6 +44,7 @@ Fronteiras onde a validação é **obrigatória** (`wiki/architecture.md §4`):
 | `data/processed/` → `data/canonical/` | `RawSeriesSchema` + schema da tabela destino |
 | `data/canonical/series_catalog.parquet` (catálogo **materializado**, 26 colunas) | `SeriesCatalogMaterializedSchema` (§2.4) |
 | `raw_series` → grade trimestral (`data/canonical/alinhado_trimestral.parquet`) | `AlinhadoTrimestralSchema` (§8) |
+| regimes + retornos → internacional (`data/canonical/internacional_*.parquet`) | `InternacionalPorRegimeSchema`, `InternacionalPesosSchema` (§6a) |
 | entrada e saída de `data/canonical/` | `MacroQuarterlySchema`, `MacroQuarterlyProvenanceSchema`, `MacroQuarterlyAsofProvenanceSchema`, `AssetReturnsQuarterlySchema`, `RegimesSchema`, `RegimesV1Schema`, `RegimeNeighborsSchema`, `RegimeNeighborsV3Schema`, `SeriesCatalogSchema` |
 | config de extrator / parâmetros de janela | `ExtractorConfig` (pydantic) |
 | catálogo de séries | `SeriesCatalogEntry` (pydantic) |
@@ -509,6 +512,20 @@ Colunas: `n_obs`, `ret_medio`, `ret_mediana`, `ret_desvio`, `erro_padrao_media`,
 > `n_obs` é obrigatório e não anulável **por contrato**: é o que garante "`n` em toda célula de toda
 > tabela" (RN-04).
 
+> ⚠️ **`erro_padrao_media` é o erro-padrão do retorno NOMINAL** — `desvio(ret_tri)/√n`, **não** o do
+> excesso sobre CDI. É a dívida registrada por F-024 (item (b), **D-aa**): quem lê a coluna ao lado
+> de `excesso_cdi` supõe que ela é o erro-padrão **daquela** métrica, e não é. Medido: para `INDX`
+> na V3 a coluna publica **2,54 pp** enquanto o erro-padrão do excesso que F-021 publica é
+> **2,60 pp**. A página de F-024 declara qual mostra e trata `|excesso|/ep` como **semáforo**, nunca
+> como estatística de teste. Acrescentar `erro_padrao_excesso` é **alteração** de schema ⇒ feature
+> classe C própria; está na lista única de dívidas de `TODO.md §6`.
+
+> **Acréscimo de D-ac (2026-10-11):** as 2 colunas `bool` `nullable=False` (`alerta_n_baixo`,
+> `conclusao_suprimida`) ganharam **parser + check** que recusam `None`/`NaN`/`pd.NA`. Sem eles,
+> `coerce=True` fazia `astype(bool)` **antes** dos checks e em pandas `None → False` — flag ausente
+> entrava como "não há alerta" com o selo do pandera. Nenhuma coluna foi alterada; é acréscimo.
+> Travado por `tests/contract/test_metricas_regime_contract.py`.
+
 ---
 
 ## 5. `regimes` e `regime_neighbors` (RF-027..031, RF-036) · **classe C**
@@ -528,12 +545,29 @@ Colunas: `n_obs`, `ret_medio`, `ret_mediana`, `ret_desvio`, `erro_padrao_media`,
 
 **Check:** `todos_os_quadrantes_povoados` — os 4 rótulos existem na amostra.
 
-> **`regimes.parquet` NÃO EXISTE AINDA.** `RegimesSchema` é o contrato da tabela **completa**, e
-> `ciclo_selic`/`regime_v2`/`stress_flag` são `nullable=False` e pertencem a F-020/F-021. A junção
-> é **F-022** (**D-r**) e vai ter de decidir o que fazer com os `regime_v1` nulos: excluir as
-> linhas, tornar `regime_v1` anulável, ou acrescentar `INDETERMINADO` ao enum (o que quebraria
-> `todos_os_quadrantes_povoados`, que exige `nunique() == len(RegimeV1)`). As três são **alteração
-> de schema existente ⇒ pausa**.
+> **`regimes.parquet` NÃO EXISTE** — e o motivo encurtou para **um** (**D-ab**, 2026-10-11).
+> `RegimesSchema` é o contrato da tabela **completa**. Em F-022 (**D-r**) havia **dois** bloqueios:
+> `stress_flag` sem definição e `regime_v1` não anulável com 16 trimestres `INDETERMINADO`.
+> **F-026 resolveu o primeiro** (`D6-a`: a regra de stress, 20 de 83 trimestres), e
+> `internacional.serie_de_stress_flag` entrega exatamente a `Series` que
+> `metricas_regime.montar_regimes(stress_flag=...)` espera. **Medido em 2026-10-11** com a série
+> real de F-026: `montar_regimes` devolve `gravavel = False` com **um** bloqueio de contrato —
+> `regime_v1` é `nullable=False` no enum de 4 rótulos e **16 dos 83** trimestres são
+> `INDETERMINADO` (**D-m**).
+>
+> As três saídas seguem proibidas sem decisão humana: preencher = quadrante inventado (Anti-SPEC
+> §10.1.1); excluir as linhas = tirar do canônico `2006Q1..2009Q3` (a crise de 2008) **e** `2026Q3`
+> (o trimestre do Comitê) sem a tabela dizer que tirou; tornar `regime_v1` anulável ou acrescentar
+> `INDETERMINADO` ao enum (o que quebraria `todos_os_quadrantes_povoados`) = **alteração de schema
+> existente ⇒ pausa**. **O schema não foi alterado**; a fonte autoritativa da V1 segue
+> `regimes_v1.parquet`, e há teste de contrato que **falha** se `regimes.parquet` aparecer em disco.
+
+> **Acréscimo de D-ac (2026-10-11):** `stress_flag`, `alerta_n_baixo` e `especificacao_congelada`
+> — as 3 colunas `bool` `nullable=False` que o achado de F-022 §8.3 nomeia — ganharam
+> **parser + check** que recusam `None`/`NaN`/`pd.NA`. O caso fechado era grave: `stress_flag =
+> None` nas 83 linhas **validava**, declarando que nenhum trimestre dos 20 anos foi de stress.
+> `lag_adjusted` também é `bool`/`nullable=False` e **não** está coberta — é a 4ª, e está na lista
+> única de dívidas de `TODO.md §6`. Nenhuma coluna foi alterada; é acréscimo.
 
 ### 5.1a `RegimesV1Schema` — a V1 isolada, PK `(quarter, lag_adjusted)` (F-019, **D-r**)
 
@@ -587,9 +621,43 @@ exclusão dos 2 trimestres anteriores é verificada no teste da feature (CA-085)
 ### 5.2a `RegimeNeighborsV3Schema` — a lente completa (F-021, **D-u**)
 
 Acrescentado ao fim de `packages/shared/schemas/regimes.py`. PK
-`(quarter_ref, rank, metrica, k_usado, restrito_pos_2016, somente_passado)`, **21** colunas: as de
-`RegimeNeighborsSchema` mais `quarter_t_mais_1`, `somente_passado`, `status_regime_v1_neighbor`,
-`rho_shrinkage`, as 5 features em unidade original e `regime_v1_neighbor` **anulável**.
+`(quarter_ref, rank, metrica, k_usado, restrito_pos_2016, somente_passado)`, **21** colunas.
+
+> ⚠️ **Corrigido em 2026-10-11 (QA Onda 3, P1-1 / decisão D-y).** A redação anterior desta seção
+> dizia que o schema tem `rho_shrinkage` e "as 5 features em unidade original". **Nenhuma das duas
+> existe** — nem no schema, nem no Parquet. Quem confiasse no parágrafo iria buscar a feature do
+> vizinho numa coluna inexistente. O `rho` de Ledoit-Wolf mora em
+> `relatorio_regimes_v3.json → shrinkage.intensidade_rho`; as features em unidade original **não
+> são publicadas** em tabela nenhuma. Abaixo, as 21 colunas reais, lidas do schema.
+
+As **6** herdadas de `RegimeNeighborsSchema` sem mudança: `quarter_ref`, `rank`,
+`quarter_neighbor`, `distancia`, `metrica`, `k_usado`. As **3** herdadas que a V3 preenche com
+outro sentido: `n_features` (= 5, ver §5.3), `shrinkage` (o **nome** do estimador, `ledoit_wolf`,
+não a intensidade), `restrito_pos_2016`. A **1** herdada que a V3 relaxa: `regime_v1_neighbor`,
+aqui **anulável** (D-m/D-u). E as **11 novas**:
+
+| coluna | tipo | o que é |
+|---|---|---|
+| `n_vizinhos` | `int` | quantos vizinhos a linha de fato achou — pode ser `< k_usado` (208 linhas) |
+| `features_usadas` | `str` | as 5 features **nomeadas na linha**, nunca só no relatório |
+| `status_regime_v1_neighbor` | `str` | por que o rótulo V1 do vizinho é nulo, quando é |
+| `quarter_t_mais_1` | `str`, anulável | o trimestre **seguinte** ao vizinho — a chave de CA-102 |
+| `janela_padronizacao` | `str` | `expanding` × `amostra_completa` |
+| `somente_passado` | `bool` | a lente sem look-ahead de seleção/padronização (parte da PK) |
+| `alerta_n_baixo` | `bool` | `n_vizinhos < N_ALERTA` (CA-108) |
+| `especificacao_congelada` | `bool` | o gate de CA-090 **na linha** |
+| `versao_especificacao` | `str` | `V1`/`V1.1` da especificação de regime |
+| `lag_adjusted` | `bool` | `False` nas 9.692 linhas: a V3 roda sobre `revised` (ver abaixo) |
+| `fonte_versao` | `str` | hash do código (CA-088) |
+
+> **A V3 roda sobre `revised` — safra única, limitação declarada** (QA Onda 3, P1-5 / **D-y**).
+> `lag_adjusted = False` nas 9.692 linhas. Das 5 features, 3 (`focus_pib_ano`,
+> `juro_real_exante`, `usdbrl_var_12m`) são **idênticas** em `revised` e `asof` (lag 0, 0 de 83
+> células diferentes), mas **`ipca_12m_delta` difere em 83/83** (`max abs dif` 1,98 pp; em
+> `2026Q3`, `revised = −0,06` contra `asof = −0,50`). Logo: a variante `somente_passado` elimina
+> look-ahead de **seleção** (quais trimestres entram) e de **padronização** (média/desvio do
+> z-score), **não de safra**. Ler "sem nenhum caminho de look-ahead" como "sem look-ahead de
+> safra" é erro. Rodar a V3 também sobre `macro_quarterly_asof` é feature própria, não feita.
 
 > **Por que existem DOIS artefatos de vizinhos — e qual F-022/F-024 devem ler.**
 > `RegimeNeighborsSchema.regime_v1_neighbor` é `nullable=False`, e por **D-m** 16 trimestres não
@@ -609,14 +677,23 @@ Acrescentado ao fim de `packages/shared/schemas/regimes.py`. PK
 > flags. `asset_returns_quarterly` está em **fração** e `macro_quarterly` em **por cento** (D-o).
 
 > **Estado medido em 2026-10-11:** `regime_neighbors_v3.parquet` **9.692 × 21**, **77**
-> referências com vetor completo, `sha256 5241f275…`; `regime_neighbors.parquet` **5.500 × 11**,
-> `sha256 eb101c5a…`. Mahalanobis com shrinkage de **Ledoit-Wolf** medido (`rho = 0,259874`,
+> referências com vetor completo, `sha256 a17d9288…`; `regime_neighbors.parquet` **5.500 × 11**,
+> `sha256 a5d7d127…` (rodada de 2026-10-11 pós-fechamento da Onda 4). Mahalanobis com shrinkage de **Ledoit-Wolf** medido (`rho = 0,259874`,
 > condicionamento 8,26 → 3,97), implementado em numpy puro. Exclusão de vizinhança **simétrica**
 > (`T±1`, `T±2`) — CA-085 fala só dos anteriores, mas sem a simetria o vizinho rank 1 de quase
 > todo trimestre seria `T+1`, autocorrelação trivial. Os **8 vizinhos de `2026Q3`** são
-> `2006Q3 · 2006Q4 · 2006Q1 · 2024Q3 · 2014Q4 · 2007Q1 · 2024Q2 · 2014Q3`, e a variante **sem
-> nenhum look-ahead** dá a **mesma lista** (Jaccard 1,0). **D-s não mudou nada aqui** (lista,
-> distâncias e ranking byte-idênticos): nenhuma das 5 features passa pelo IBC-Br.
+> `2006Q3 · 2006Q4 · 2006Q1 · 2024Q3 · 2014Q4 · 2007Q1 · 2024Q2 · 2014Q3`. **D-s não mudou nada
+> aqui** (lista, distâncias e ranking byte-idênticos): nenhuma das 5 features passa pelo IBC-Br.
+>
+> **A sobreposição entre a lente descritiva e a `somente_passado` é uma DISTRIBUIÇÃO, não o número
+> de `2026Q3`** (QA Onda 3, P1-2 / **D-y**). Em `2026Q3` o Jaccard é 1,0, mas isso é **vácuo**:
+> `2026Q3` é o **último** trimestre da janela, não existe futuro para a lente descritiva escolher,
+> então as duas coincidem **por construção**. Medido nas **58** referências que têm as duas lentes:
+> **mediana 0,455 · média 0,461 · Q1 0,231 · Q3 0,600 · mínimo 0,000**, e **só 7 de 58** dão 1,0
+> (`2011Q3` = 0,000, `2012Q1` = 0,000, `2015Q4` = 0,143, `2024Q4` = 0,333). E **2.751 das 5.500
+> linhas (50,0%)** da variante descritiva têm vizinho **no futuro** da referência. Ou seja: a
+> lente descritiva muda o conjunto de vizinhos em cerca de **55%** dos casos. Citar o 1,0 como
+> "o achado mais forte" é o oposto do que o dado diz.
 
 ### 5.3 Constantes do contrato (não números soltos no código)
 
@@ -662,6 +739,89 @@ z_usdbrl_var_12m, z_termos_troca_yoy)`.
 | série "a confirmar" entrando como `ok` | `model_validator` recusa |
 | `ffill` de 10 dias úteis | `le=5` no campo recusa |
 | excesso sobre CDI por subtração | não é contrato de schema: é **teste obrigatório** (CA-069) |
+
+---
+
+## 6a. `internacional_por_regime` e `internacional_pesos` (RF-038/039) · **classe C**
+
+`packages/shared/schemas/internacional.py` (**novo** em F-026, 2026-10-11; a edição em
+`packages/shared/schemas/__init__.py` foi **aditiva**) · produzido por
+`apps/pipeline/canonical/internacional.py` (CLI
+`python -m apps.pipeline.canonical.internacional [--offline]`, ou a etapa `internacional` de
+`python -m apps.pipeline run --offline`).
+
+> **Numeração:** entra como **§6a**, não como §6, porque `CONTRACTS.md §7` e `§8` são citados de
+> dentro do código (`alinhamento.py`, `build_raw_series.py`) e renumerar invalidaria as citações.
+> Mesmo recurso já usado em §3.1, §5.1a e §5.2a.
+
+### 6a.1 `InternacionalPorRegimeSchema` — PK `(lente, regime, asset_id)`, 18 colunas
+
+`strict=True`, `coerce=True`. `lente ∈ {V1, V1_ASOF, V3}` — note que **não** é o enum de
+`RegimeAssetMetricsSchema` (`{V1, V2, V3}`): aqui a materialização entra como **valor de lente**,
+porque esta tabela não tem variante `asof` em arquivo separado. `asset_id` usa o **mesmo**
+`ASSET_IDS_VALIDOS` de `asset_returns_quarterly` — nenhum ativo novo foi inventado.
+
+| Coluna | Tipo | Nulo? | Semântica |
+|---|---|---|---|
+| `lente`, `regime`, `asset_id` | str | não | **PK**. `regime` = os 4 quadrantes da V1 ou `VIZINHOS_2026Q3` |
+| `n_obs` | int ≥ 0 | não | `n` em **toda** célula (RN-04 / CA-108/109) |
+| `ret_medio`, `ret_mediana`, `excesso_cdi`, `ret_real`, `hit_ratio_cdi` | float | sim | **importadas inteiras** de `metricas_regime.metricas_da_celula` (F-022) — CA-104 cumprido por `import`, não por texto. Resíduo medido contra `regime_asset_metrics.parquet`: **0,0 em 24 células** |
+| `corr_ibov`, `corr_imab` | float ∈ [−1, 1] | sim | correlação condicional ao regime (CA-105) |
+| `n_pares_ibov`, `n_pares_imab` | int ≥ 0 | não | o `n` **da correlação**, que não é o `n` da célula |
+| `is_total_return` | `boolean` | sim | nulável de propósito: 820 linhas de `asset_returns_quarterly` não sabem. É o que separa `ACWI_BRL` (`True`) de `SP500_BRL` (`False`) |
+| `alerta_n_baixo`, `conclusao_suprimida` | bool | não | `n < 8` / `n < 5` |
+| `especificacao_congelada` | bool | não | o gate de CA-090 **na linha** |
+| `fonte_versao` | str | não | hash do código (CA-088) |
+
+**Checks de DataFrame:** `pares_de_correlacao_nunca_excedem_n_obs` e `correlacao_exige_pares` —
+correlação sem ao menos 2 pares é **recusada**, nunca publicada como 0.
+
+### 6a.2 `InternacionalPesosSchema` — PK `(escopo, chave, cap, carteira, asset_id)`, 13 colunas
+
+| Coluna | Tipo | Nulo? | Semântica |
+|---|---|---|---|
+| `escopo` | str | não | `POR_REGIME` \| `EXPANDING` (sem look-ahead: um peso por trimestre) |
+| `chave` | str | não | o regime (em `POR_REGIME`) ou o `quarter` (em `EXPANDING`) |
+| `carteira` | str | não | a composição usada — `{CDI, IMAB, IBOV, ACWI_BRL}` |
+| `asset_id` | str | não | ativo da carteira |
+| `peso` | float ∈ [0, 1] | não | variância mínima **long-only** com cap |
+| `cap` | float ∈ (0, 1] | não | o cap por ativo; a versão **sem cap** sai ao lado |
+| `peso_na_banda` | float ∈ [0,15; 0,35] | sim | **só** no ativo internacional: o peso truncado na banda tática de ADR-003 |
+| `n_obs` | int ≥ 0 | não | trimestres que entraram na covariância |
+| `rho_shrinkage` | float ∈ [0, 1] | não | intensidade de Ledoit-Wolf **medida** (CA-084), nunca escolhida |
+| `alerta_n_baixo`, `conclusao_suprimida`, `especificacao_congelada`, `fonte_versao` | — | não | como acima |
+
+**Checks de DataFrame:** `pesos_somam_um_por_carteira`, `peso_respeita_o_cap`,
+`banda_so_no_ativo_internacional`.
+
+> ⚠️ **`internacional_pesos.parquet` está FORA da entrega v1 (`D6-d` / D-ab) e é marcado como NÃO
+> PUBLICÁVEL no manifesto (D-af).** A variância mínima por regime é nomeada em **Anti-SPEC
+> §10.3.16** e **§10.5** como fora desta versão, e o `TODO.md` de F-026 a manda para **F-035**. A
+> tabela **é calculada** (era o insumo pedido para traduzir D6 em faixa), mas:
+> `especificacao_congelada = False` em **toda** linha por construção; o relatório carrega
+> `BLOQUEIO_ANTI_SPEC_VARIANCIA_MINIMA` nomeando as duas seções e a feature destino; o CLI emite
+> `WARNING` em toda execução; **o schema não tem coluna onde escrever previsão**
+> (`retorno_esperado`, `recomendacao`, `alvo`) e há teste de contrato que falha se alguém
+> acrescentar uma; e **não há backtest** — nenhuma série de retorno de carteira, nenhuma posição,
+> nenhum rebalanceamento.
+>
+> **D-af, o mecanismo:** `apps/pipeline/run.py` tem a lista `ARTEFATOS_NAO_PUBLICAVEIS`; o
+> `MANIFEST.json` grava `publicavel: false` + `motivo_nao_publicavel` **na entrada do artefato**, e
+> o `FROZEN.txt` abre uma seção `EXCLUIDOS DO PACOTE DE ENTREGA`. **F-031 lê esse campo**, não uma
+> convenção de nome de arquivo. O artefato **continua** no `DATASET_SHA256`: o agregado descreve o
+> que foi **construído**, e tirá-lo do hash confundiria reprodutibilidade com publicabilidade.
+>
+> **`internacional_pesos.parquet` NÃO entra no pacote de F-031.** O que é publicável de F-026
+> depois de ADR-001/ADR-003 aceitos: os retornos por regime, as correlações de CA-104/105, o
+> `stress_flag` de CA-106 e a **faixa** de CA-107 — nenhum deles depende da tabela de pesos.
+
+> **Estado medido em 2026-10-11:** `internacional_por_regime.parquet` **54 × 18** ·
+> `internacional_pesos.parquet` **624 × 13**. `stress_flag = 1` em **20 de 83** trimestres (7 só
+> pelo ramo da inclinação, 11 só pelo ramo do câmbio, 2 pelos dois); **14** trimestres **não
+> avaliáveis** pelo ramo da inclinação. `corr(USDBRL, IBOV)` = **−0,795** nos 20 de stress contra
+> **−0,418** nos 62 de não stress. Variância mínima com `cap = 0,40`: internacional de **15,9% a
+> 23,6%** por regime; **sem cap**, o *expanding* médio cai de **19,65%** para **10,41%** — é essa
+> sensibilidade que faz CA-107 entregar **faixa**, nunca número pontual.
 
 ---
 

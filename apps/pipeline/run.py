@@ -91,6 +91,24 @@ NAO_SAO_ARTEFATO: frozenset[str] = frozenset({".gitkeep", NOME_MANIFESTO, NOME_F
 #: com `determinista: false`, ficam fora do agregado e o `verify` só os reporta. Ver decisão 3.
 NAO_DETERMINISTICOS: frozenset[str] = frozenset({"ldc.duckdb"})
 
+#: Artefatos que **existem, são conferidos e NÃO vão ao Comitê** (**D-af**, 2026-10-11, a partir do
+#: P1-3 do QA da Onda 4). O manifesto cobre `data/canonical/` recursivamente, então o não publicável
+#: viajava no dataset congelado com o selo só **dentro** das linhas. Agora o manifesto diz
+#: `publicavel: false` na entrada do artefato e o `FROZEN.txt` os lista como excluídos do pacote de
+#: entrega — **F-031 lê esta lista**, não uma convenção de nome de arquivo.
+#:
+#: Eles continuam no agregado de propósito: o `DATASET_SHA256` descreve o que **foi construído**, e
+#: tirar um artefato do hash para "não publicar" confundiria reprodutibilidade com publicabilidade.
+ARTEFATOS_NAO_PUBLICAVEIS: dict[str, str] = {
+    "internacional_pesos.parquet": (
+        "variancia minima por regime esta fora desta versao (Anti-SPEC 10.3.16 e 10.5; "
+        "TODO F-026 -> F-035). A tabela e calculada como insumo da faixa de D6 (CA-107) e nao "
+        "e publicavel sem ADR-003 aceito E autorizacao escrita sobre a Anti-SPEC (AGENTS 9/14). "
+        "O que F-026 publica depois dos ADRs: retornos por regime, correlacoes, stress_flag e a "
+        "FAIXA - nenhum deles depende desta tabela."
+    ),
+}
+
 #: Primeira coluna encontrada é a que dá `date_min`/`date_max` do artefato (CA-118). `quarter` é
 #: string ordenável (`2006Q1` < `2026Q3`), então `min`/`max` lexicográficos são a data certa.
 COLUNAS_DE_DATA: tuple[str, ...] = ("date", "quarter", "date_obs", "quarter_ref")
@@ -259,19 +277,24 @@ def _rodar_opcional(ctx: Contexto, *, modulo: str) -> None:
         raise FalhaDeEtapa(msg)
 
 
-def _rodar_figuras(ctx: Contexto) -> None:
-    """Roda **todo** submódulo de `apps/analysis/figuras/` que exponha `construir`, em ordem.
+def _rodar_submodulos(ctx: Contexto, *, pacote: str, rotulo: str) -> None:
+    """Roda **todo** submódulo de `pacote` que exponha `construir(raiz=...)`, em ordem de nome.
 
-    Descoberta em vez de lista: F-025 entregou `timeline_regimes`, e o heatmap (F-023) e o
-    ranking (F-024) entram na mesma pasta depois. O pacote `apps.analysis.figuras` não reexporta
-    `construir` (cada figura é um módulo), então a ponte varre `pkgutil.iter_modules` e chama o
-    que existir — figura nova é desenhada pelo `run` sem tocar neste arquivo.
+    Descoberta em vez de lista: F-025 entregou `timeline_regimes`, o heatmap (F-023) entrou na
+    mesma pasta depois e o ranking (F-024) numa pasta irmã. O pacote não reexporta `construir`
+    (cada artefato é um módulo), então a ponte varre `pkgutil.iter_modules` e chama o que existir —
+    figura ou tabela nova entra no `run` sem tocar neste arquivo.
+
+    Submódulo com `_` no início é **privado** (ex.: `_comum`, `_linguagem`) e não é varrido: ele é
+    infraestrutura compartilhada, não artefato.
     """
-    pacote = importlib.import_module("apps.analysis.figuras")
-    caminhos = list(getattr(pacote, "__path__", []))
+    modulo_do_pacote = importlib.import_module(pacote)
+    caminhos = list(getattr(modulo_do_pacote, "__path__", []))
     chamados: list[str] = []
     for info in sorted(pkgutil.iter_modules(caminhos), key=lambda i: i.name):
-        modulo = importlib.import_module(f"apps.analysis.figuras.{info.name}")
+        if info.name.startswith("_"):
+            continue
+        modulo = importlib.import_module(f"{pacote}.{info.name}")
         construir = getattr(modulo, "construir", None)
         if not callable(construir):
             continue
@@ -279,11 +302,21 @@ def _rodar_figuras(ctx: Contexto) -> None:
         chamados.append(info.name)
     if not chamados:
         msg = (
-            "apps.analysis.figuras existe mas nenhum submódulo expõe `construir(raiz=...)` — "
-            "nada a desenhar (F-025 em construção)."
+            f"{pacote} existe mas nenhum submódulo expõe `construir(raiz=...)` — "
+            f"nada a construir em {rotulo}."
         )
         raise EtapaNaoChamavel(msg)
-    _log.info("figuras desenhadas por: %s", ", ".join(chamados))
+    _log.info("%s construido por: %s", rotulo, ", ".join(chamados))
+
+
+def _rodar_figuras(ctx: Contexto) -> None:
+    """As figuras de `apps/analysis/figuras/` (F-023, F-025)."""
+    _rodar_submodulos(ctx, pacote="apps.analysis.figuras", rotulo="figuras")
+
+
+def _rodar_tabelas(ctx: Contexto) -> None:
+    """As tabelas de `apps/analysis/tabelas/` (F-024)."""
+    _rodar_submodulos(ctx, pacote="apps.analysis.tabelas", rotulo="tabelas")
 
 
 def etapas() -> tuple[Etapa, ...]:
@@ -412,11 +445,32 @@ def etapas() -> tuple[Etapa, ...]:
             modulo_opcional="apps.pipeline.canonical.metricas_regime",
         ),
         Etapa(
+            nome="internacional",
+            fase=Fase.CANONICO,
+            descricao="F-026 (opcional): stress_flag, internacional por regime e faixa de D6",
+            executar=lambda ctx: _rodar_opcional(
+                ctx, modulo="apps.pipeline.canonical.internacional"
+            ),
+            modulo_opcional="apps.pipeline.canonical.internacional",
+            artefatos=(
+                "internacional_por_regime.parquet",
+                "internacional_pesos.parquet",
+                "relatorio_internacional.json",
+            ),
+        ),
+        Etapa(
             nome="figuras",
             fase=Fase.ANALISE,
-            descricao="F-025 (opcional): toda figura de apps/analysis/figuras/ com construir()",
+            descricao="F-023/F-025 (opcional): toda figura de apps/analysis/figuras/",
             executar=_rodar_figuras,
             modulo_opcional="apps.analysis.figuras",
+        ),
+        Etapa(
+            nome="tabelas",
+            fase=Fase.ANALISE,
+            descricao="F-024 (opcional): toda tabela de apps/analysis/tabelas/",
+            executar=_rodar_tabelas,
+            modulo_opcional="apps.analysis.tabelas",
         ),
     )
 
@@ -504,6 +558,11 @@ class Artefato:
     date_max: str | None = None
     pct_nulos: float | None = None
     nulos_por_coluna: Mapping[str, float] = field(default_factory=dict)
+    #: Preenchido quando o Parquet não abre (P1-1): o perfil de CA-118 é desconhecido, o `sha256`
+    #: dos bytes em disco continua sendo calculado e é ele que denuncia a corrupção.
+    ilegivel: str | None = None
+    #: `False` nos artefatos de `ARTEFATOS_NAO_PUBLICAVEIS` (**D-af**).
+    publicavel: bool = True
 
     def como_dicionario(self) -> dict[str, Any]:
         """Forma estável para o `MANIFEST.json` — nada de `Path`, `Timestamp` ou `float` cru.
@@ -523,7 +582,12 @@ class Artefato:
             "linhas": self.linhas,
             "nulos_por_coluna_pct": dict(sorted(self.nulos_por_coluna.items())),
             "pct_nulos": self.pct_nulos,
+            "publicavel": self.publicavel,
         }
+        if not self.publicavel:
+            comum["motivo_nao_publicavel"] = ARTEFATOS_NAO_PUBLICAVEIS[self.arquivo]
+        if self.ilegivel is not None:
+            comum["ilegivel"] = self.ilegivel
         if not self.determinista:
             return {
                 **comum,
@@ -544,15 +608,31 @@ def _texto_de_data(valor: Any) -> str | None:
     return texto[:10] if "T" in texto or " " in texto else texto
 
 
+#: O que entra em `Artefato.ilegivel` quando o Parquet não abre — texto curto, que o `verify`
+#: imprime no lugar do perfil. Ver `_perfil_do_parquet`.
+MOTIVO_ILEGIVEL = "parquet ilegivel"
+
+
 def _perfil_do_parquet(caminho: Path) -> dict[str, Any]:
     """Linhas, colunas, min/max da coluna de data e % de nulos **por coluna** (CA-118).
 
     Lido do Parquet, não do relatório da feature: o manifesto tem de poder ser conferido contra o
     arquivo publicado, mesmo que o relatório não exista.
+
+    **Nunca levanta** (P1-1 do QA da Onda 4). O caso que importa é o que o selo existe para pegar:
+    arquivo truncado, *bit-rot*, `.parquet` que não é Parquet. Antes, `pd.read_parquet` estourava
+    `OSError`/`ArrowInvalid` **dentro de `inventariar`**, isto é, **antes** de qualquer comparação
+    de hash — e o `verify` saía com um traceback cru que não nomeava o arquivo nem o agregado
+    (encosta em Anti-SPEC §10.4.26). Agora o perfil sai vazio com `ilegivel` preenchido, e a
+    divergência de `sha256` — que **existe**, porque o conteúdo mudou — é reportada normalmente.
     """
     import pandas as pd
 
-    quadro = pd.read_parquet(caminho)
+    try:
+        quadro = pd.read_parquet(caminho)
+    except Exception as erro:  # noqa: BLE001 - qualquer falha de leitura é "ilegivel", nunca fatal
+        _log.warning("perfil de %s indisponivel: %s", caminho.name, type(erro).__name__)
+        return {"ilegivel": f"{MOTIVO_ILEGIVEL} ({type(erro).__name__})"}
     linhas = int(len(quadro))
     nulos: dict[str, float] = {}
     for coluna in quadro.columns:
@@ -606,6 +686,7 @@ def inventariar(*, raiz: Path | None = None) -> tuple[Artefato, ...]:
                 bytes=len(corpo),
                 sha256=sha256_de(corpo),
                 determinista=relativo not in NAO_DETERMINISTICOS,
+                publicavel=relativo not in ARTEFATOS_NAO_PUBLICAVEIS,
                 **perfil,
             )
         )
@@ -1043,6 +1124,12 @@ def verificar(
                     informativa,
                 )
             )
+    # Parquet ilegível é divergência GRAVE mesmo quando o `sha256` bate (P1-1): o hash só diz que
+    # os bytes não mudaram **desde o manifesto**, e o manifesto pode ter sido gerado já sobre o
+    # arquivo corrompido. "Não consigo abrir" nunca pode sair como VERIFY OK.
+    for nome, atual in sorted(atuais.items()):
+        if atual.ilegivel is not None:
+            divergencias.append(Divergencia(nome, atual.ilegivel, None, atual.sha256))
     agregado_esperado = (manifesto.get("agregado") or {}).get("sha256")
     agregado_obtido = hash_agregado(atuais.values())
     if agregado_esperado and agregado_esperado != agregado_obtido:
@@ -1153,7 +1240,23 @@ def texto_frozen(manifesto: Mapping[str, Any]) -> str:
     ]
     for nome, versao in sorted((manifesto.get("versao_build") or {}).items()):
         linhas.append(f"  {nome:<34} {versao}")
+    nao_publicaveis = [
+        a
+        for a in (manifesto.get("artefatos") or [])
+        if isinstance(a, Mapping) and a.get("publicavel") is False
+    ]
     linhas += [
+        "",
+        "EXCLUIDOS DO PACOTE DE ENTREGA (D-af) - construidos e conferidos, NAO publicaveis",
+    ]
+    if not nao_publicaveis:
+        linhas.append("  (nenhum)")
+    for entrada in nao_publicaveis:
+        linhas.append(f"  {entrada.get('arquivo')}")
+        linhas.append(f"      motivo: {entrada.get('motivo_nao_publicavel')}")
+    linhas += [
+        "  Estes arquivos ENTRAM no DATASET_SHA256 (o agregado descreve o que foi CONSTRUIDO),",
+        "  mas NAO entram no pacote do Comite (F-031 le o campo publicavel do MANIFEST.json).",
         "",
         "COMO CONFERIR",
         "  python -m apps.pipeline verify",

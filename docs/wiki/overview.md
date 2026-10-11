@@ -6,7 +6,7 @@
 > (imutável). **Fonte de verdade do produto:** [`docs/product/PRD.md`](../product/PRD.md) (v1.0, 2026-10-10).
 > Esta página **resume** o PRD — não o duplica. Em conflito, vale o PRD; em conflito de escopo, vale o e-mail.
 
-**Última revisão:** 2026-10-11 (§8 atualizada para a **Onda 3, parte 1** — F-018/F-019/F-021 implementadas, QA pendente)
+**Última revisão:** 2026-10-11 (§8 atualizada para o **fechamento da Onda 4** — F-022..F-026, F-028, F-029 implementadas; F-027 em curso)
 **Versão refletida:** PRD v1.0 + SPEC v1.0 (gerados em modo autônomo; **aprovação do Edu pendente**)
 
 ---
@@ -85,67 +85,69 @@ truncamento sem aviso, filtros ignorados) · janela rolante e descontinuações 
 anti-bot (FRED pode estar bloqueado) · unidade/escala/formato mentirosos · overfitting e confusão
 descritivo × preditivo.
 
-## 8. Estado atual (2026-10-11, Onda 3 parte 1 implementada — QA pendente)
+## 8. Estado atual (2026-10-11, **Onda 4 implementada** — F-027 e F-031 pendentes)
 
-- **Fase:** **Ondas 0, 1 e 2 completas e aprovadas; Onda 3 parte 1 implementada, aguardando QA** —
-  escopo → pesquisa → PRD v1.0 → SPEC v1.0 + Anti-SPEC → contratos → TODO (40 features) → PLAN
-  (ondas) → Onda 0 (F-001, F-009) → Onda 1 (F-002..F-008) → **Onda 2 (F-013..F-017 + F-010)**,
-  **todas com QA independente aprovado** (`docs/plans/qa/`, **0 × P0**, com a revisão numérica da
-  classe C reconstruindo as camadas por fora e achando **igualdade exata em float64**) → **Onda 3
-  parte 1: F-018 (`asof`), F-019 (V1) e F-021 (V3) implementadas** e aguardando QA/revisão numérica.
-  **Aprovação do Edu ainda pendente** no PRD e na SPEC.
-- **Pipeline implementado:** **9** extratores em `apps/pipeline/extract/` (o 9º é o Focus/Olinda) +
-  job diário em `jobs/` + infra em `common/` + `transform/cambio.py` + **`apps/pipeline/canonical/`**
-  (`build_raw_series.py`, `alinhamento.py`, `curva.py`, `macro_quarterly.py`, `retornos.py`,
-  **`asof.py`**, **`regimes_v1.py`**, **`regimes_v3.py`**); `apps/analysis/` segue vazio. Contratos
-  em `packages/shared/schemas/` (8 módulos pandera/pydantic + **138** séries), com
-  `RegimesV1Schema` e `RegimeNeighborsV3Schema` **acrescentados** (nunca alterados) em `regimes.py`.
-- **Dataset canônico: completo, com as duas materializações e as duas lentes de regime.**
-  `data/canonical/` tem **20** artefatos: `raw_series.parquet` (**278.439** linhas, **62** séries,
-  1979-12-31 → 2026-10-10), `series_catalog.parquet` materializado (**138 × 26**),
-  `alinhado_trimestral.parquet` (**4.038**), **`macro_quarterly.parquet` (83 × 42, `revised`)** +
-  procedência (**2.548**), **`macro_quarterly_asof.parquet` (83 × 42, `asof` — a materialização de
-  decisão)** + procedência (**2.552**, com `date_obs`/`lag_dias` em todas e **0** células com
-  look-ahead), **`asset_returns_quarterly.parquet` (1.963, 24 ativos)**,
-  **`regimes_v1{,_asof}.parquet` (83 × 18)**, **`regime_neighbors_v3.parquet` (9.692 × 21)** e
-  `regime_neighbors.parquet` (5.500 × 11), mais 8 relatórios e o `ldc.duckdb` derivado.
-  `data/processed/` tem **69 Parquets**, todos reconstruíveis sem rede com `--offline` e
-  byte-idênticos entre rodadas. **Falta a junção das lentes (F-022) e a V2 (F-020).**
+- **Fase:** **Ondas 0 a 3 completas e aprovadas; Onda 4 implementada, com o QA já rodado e as
+  mudanças aplicadas** — escopo → pesquisa → PRD v1.0 → SPEC v1.0 + Anti-SPEC → contratos → TODO →
+  PLAN → Onda 0 (F-001, F-009) → Onda 1 (F-002..F-008) → Onda 2 (F-013..F-017 + F-010) → Onda 3
+  (F-018 `asof`, F-019 V1, F-021 V3) → **Onda 4 (F-022 métricas, F-023 heatmap, F-024 ranking,
+  F-025 timeline, F-026 internacional, F-028 limitações, F-029 orquestrador)**. **Todas** com QA
+  independente: **0 × P0** em todas as ondas, e **0 divergência numérica** nas reconstruções
+  independentes de classe C (os P1 foram sempre de **declaração** ou de **orquestração**, nunca de
+  número). **Aprovação do Edu ainda pendente** no PRD, na SPEC e nos ADRs.
+- **Pipeline implementado:** **9** extratores em `apps/pipeline/extract/` + job diário + infra em
+  `common/` + `transform/cambio.py` + **`apps/pipeline/canonical/`** (`build_raw_series`,
+  `alinhamento`, `curva`, `macro_quarterly`, `retornos`, `asof`, `regimes_v1`, `regimes_v3`,
+  **`metricas_regime`**, **`internacional`**) + **`apps/pipeline/run.py`** (o orquestrador) +
+  **`apps/analysis/`** (`_linguagem.py`, `figuras/{_comum,heatmap_regime_ativo,timeline_regimes}.py`,
+  `tabelas/ranking_regime_atual.py`). Contratos em `packages/shared/schemas/` (**9** módulos
+  pandera/pydantic + **138** séries), com `internacional.py` **novo** e tudo o mais só por
+  **acréscimo** — nenhuma declaração de coluna existente foi alterada em nenhuma onda.
+- **UM comando reconstrói a camada inteira** (F-029): `python -m apps.pipeline run --offline`, **13
+  etapas** na ordem, sem rede; `verify` recalcula todo `sha256` contra o `MANIFEST.json` e sai com
+  erro se um byte divergir; `freeze --tag` congela com `FROZEN.txt` + rollback. **Rebuild final de
+  2026-10-11: 2 execuções byte-idênticas, 47 artefatos determinísticos, `verify` rc 0,
+  `DATASET_SHA256 = fc2331183b9355e6424f223085fd501683678d73fc50a9cf2b570376750f17ef`.**
+- **Dataset canônico: completo.** `data/canonical/` tem, além de `raw_series.parquet` (**278.439**
+  linhas, **62** séries), `series_catalog` (**138 × 26**), `alinhado_trimestral` (**4.038**),
+  `macro_quarterly` nas **duas** materializações (**83 × 42** cada) + as 2 procedências (**2.548** e
+  **2.552**, esta com **0** células com look-ahead), `asset_returns_quarterly` (**1.963**, 24
+  ativos), `regimes_v1{,_asof}` (**83 × 18**), `regime_neighbors_v3` (**9.692 × 21**) e
+  `regime_neighbors` (**5.500 × 11**): as **3** tabelas `regime_asset_metrics*`
+  (**120 / 96 / 120** células), `internacional_por_regime` (**54**) e `internacional_pesos`
+  (**624**, ⚠️ marcado **`publicavel: false`**), **12 figuras** (PNG + SVG das 3 vistas do heatmap e
+  das 2 materializações da timeline) com os 2 Parquet de dados plotados (**322** e **166**), as **6**
+  tabelas do Comitê (`ranking_regime_atual` e `concordancia_lentes` em parquet/csv/md), **10**
+  relatórios e o `ldc.duckdb` derivado (fora do agregado, declarado).
+  **`regimes.parquet` NÃO é gravado** (**D-r**/**D-ab**): F-026 resolveu `stress_flag` e sobrou um
+  bloqueio — `regime_v1` é `nullable=False` contra 16 trimestres `INDETERMINADO` (**D-m**), e
+  alterar schema existente é pausa.
 - **Pesquisa:** concluída — fontes (`fontes-de-dados.md`) e metodologia (`metodologia-regimes-macro.md`).
-- **Decisões de fonte e convenção:** 12 substituições + as **8 convenções da Onda 1** (D-a..D-h:
-  `date` em fim de período, `vintage` do manifesto, catálogo 134, calendário por HTML, grade bancária
-  única) + as **7 + 2 da Onda 2**: **D-i** (vértice de 3 anos, catálogo **138**), **D-j** (prazo em
-  dias corridos), **D-k** (Focus fora de `raw_series`), **D-l** (`USDBRL` no universo de retornos),
-  **D-m** (CA-007 não satisfazível — 16 nulos em `ibcbr_gap`), **D-n** (inclinação 5a−3a sem coluna),
-  **D-o** (unidade: por cento × fração), **D-p** (`FOCUS_PIB_TOTAL` descartada) e **D-q** (achados do
-  Focus: G-04, G-05, exceção a D-a, `%20` × `+`) + as **7 da Onda 3 parte 1**: **D-r**
-  (`RegimesV1Schema`, junção em F-022), **D-s** (IBC-Br pela **média do trimestre** — superou
-  D-q(e); 7 trimestres trocam de quadrante), **D-t** (ciclo Selic: `|Δ| >= 0,25 pp` é movimento),
-  **D-u** (eixo da V3 = `focus_pib_ano`; F-022/F-024 leem `regime_neighbors_v3`), **D-v** (as 3
-  correções dos P1 do QA), **D-w** (`CONTRACTS.md` com o estado medido) e **D-x** (paths em
-  `canonical/`). Todas **provisórias** em
-  [`docs/plans/DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md); **ADR-001..006 em Proposta**.
-- **Ambiente:** `uv sync --extra dev` entrega o ambiente completo (deps corrigidas em 2026-10-10).
-  **FRED bloqueado nesta máquina** → bloco internacional pelo plano B (Yahoo + MSCI + PTAX).
-- **CI:** N1 configurado; N2/N3 comentados aguardando testes reais.
-- **Bloqueios:** **8 decisões** travam a publicação — ver `TODO.md §4`, PRD §13.2 e SPEC §11
-  (**D1** lente oficial, **D3** eixo inflação, **D5** métrica do heatmap, **D6** forma do internacional,
-  **D12** setoriais/FII no pacote mínimo, **L1** IFIX 2011+, **L2** FII segmentado via terceiro, **L4**
-  contratar ANBIMA Feed ou não). **Extração e camada canônica não estão bloqueadas.**
-- **Próximo passo: F-022** (métricas por regime × ativo + a junção das lentes em `RegimesSchema`,
-  que **D-r** delegou) **e a Onda 4** (F-020 V2, F-023 heatmap, F-024 ranking, F-025 timeline,
-  F-028 limitações). Os insumos de F-022 estão em disco: `regime_neighbors_v3.parquet` (lente
-  principal — **D-u**), `regimes_v1.parquet` e `asset_returns_quarterly.parquet`. Em paralelo:
-  **QA/revisão numérica de F-018/F-019/F-021**, responder as 8 decisões e ratificar D-h..D-x (as que
-  precisam do Edu estão tabuladas em `TODO.md §4`).
-- ⚠️ **O achado que muda a conversa com o Comitê, e que não é bug de ninguém:** rodando a V1 nas
-  duas materializações, **22 de 66 trimestres (33,33%) trocam de rótulo** entre `revised` e `asof` —
-  acima dos **25%** que `metodologia §5.1` e **CA-074** fixam como limite. Pelo critério escrito, a
-  leitura **operacional** da V1 ("em que quadrante estamos agora, com o que se sabia na época")
-  **não é operacional nesta forma**, e com ela cai a hipótese **H-03** do PRD. A leitura
-  **descritiva** (RF-027) continua válida e é o entregável. Vai à **página de limitações (F-028)** e
-  ao slide — junto do lembrete de que a V1 classifica **67** dos 83 trimestres, não 83 (**D-m**: a
-  crise de 2008 inteira fica fora do eixo de crescimento).
+- **Decisões de fonte e convenção: D-a..D-af**, todas em
+  [`docs/plans/DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md) e **provisórias onde mudam número**.
+  As da Onda 4: **D-y** (os 5 P1 do QA da Onda 3 — contrato espelho, a correção de fato de **D-t**,
+  a distribuição do Jaccard, N2/N3 no CI, a safra `revised` da V3), **D-z** (renomeação da vista,
+  `SP500_USD` fora do heatmap, cromo e guarda de linguagem unificados), **D-aa** (CA-098 "V1 e V2" →
+  V1 `revised` + V1 `asof` + V3), **D-ab** (D6-a..d de F-026), **D-ac** (guarda de não-nulidade nas
+  flags `bool` — o pandera **não** recusava `None` sob `coerce`), **D-ad** (as 7 de F-029),
+  **D-ae** (dívidas de contrato numa lista única) e **D-af** (`publicavel` no manifesto).
+  **ADR-001..006 em Proposta.**
+- **Ambiente:** `uv sync --extra dev`. **FRED bloqueado nesta máquina** → bloco internacional pelo
+  plano B (Yahoo + MSCI + PTAX).
+- **CI:** **N1, N2 e N3 habilitados** (`.github/workflows/ci.yml`) — N2 = `tests/contract` + build do
+  canônico a partir das fixtures + `verify`; N3 = `tests/e2e` + **duas árvores independentes** com
+  `diff` do `MANIFEST.json`. O passo de `tests/integration` fica comentado e nomeado: a pasta está
+  **vazia** e `pytest` nela sairia com código 5.
+- **Bloqueios:** **8 decisões** travam a publicação — `TODO.md §4`, PRD §13.2, SPEC §11 (**D1**
+  lente oficial, **D3** eixo inflação, **D5** métrica do heatmap, **D6** forma do internacional,
+  **D12** setoriais/FII, **L1** IFIX 2011+, **L2** FII segmentado, **L4** ANBIMA Feed).
+  **Desenvolvimento não está bloqueado; publicação está** (CA-090).
+- **Próximo passo:** **F-027** (notebook de entrega, em curso em paralelo) e **F-031** (pacote ao
+  Comitê, **classe D**: exige os 8 itens de `AGENTS.md §14` — ADR-001/002/003 **Aceitos**, revisão
+  humana registrada, dataset congelado com hash e tag, rollback). **F-020** (V2) e **F-030** foram
+  **cortadas da v1**, com justificativa escrita no `TODO.md`. Em paralelo: responder as 8 decisões e
+  ratificar D-h..D-af (as que precisam do Edu estão tabuladas em `TODO.md §4`), mais as **7 linhas de
+  path** e as **emendas de CA** (CA-078, CA-079, CA-098) que entram no aceite do ADR-001.
 
 ## 9. Próximo grande objetivo
 

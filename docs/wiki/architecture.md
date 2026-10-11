@@ -5,10 +5,35 @@
 > **Fonte de verdade:** `docs/specs/SPEC.md` + `packages/shared/schemas/`.
 > Esta página existe para que qualquer agente entenda a topologia em < 5 min sem ler todo o SPEC.
 
-**Última revisão:** 2026-10-11 (**Onda 3, parte 1**: F-018 `asof` + F-019 V1 + F-021 V3 entregues; Onda 2 aprovada no QA)
+**Última revisão:** 2026-10-11 (**fechamento da Onda 4**: F-022..F-026, F-028 e F-029 entregues; a camada `apps/analysis/` existe)
 **Versão do SPEC refletida:** **v1.0** (52 RFs → 128 CAs + Anti-SPEC §10, sagrada)
-**Status do código (2026-10-11):** contratos escritos (`packages/shared/schemas/`, **8** módulos + catálogo de **138** séries, com `MacroQuarterlyAsofProvenanceSchema`, `RegimesV1Schema` e `RegimeNeighborsV3Schema` **acrescentados**); **camada de extração pronta e aprovada** — `apps/pipeline/common/` (infra), `extract/` (**9** extratores, com o Focus/Olinda), `jobs/` (job diário), `transform/cambio.py`; **camada canônica completa e aprovada no QA** — `apps/pipeline/canonical/` com `build_raw_series.py` (F-013), `alinhamento.py` (F-014), `curva.py` (F-016), `macro_quarterly.py` (F-015) e `retornos.py` (F-017); e **a primeira metade da camada de regimes** — `asof.py` (F-018), `regimes_v1.py` (F-019) e `regimes_v3.py` (F-021), **no mesmo pacote `canonical/`** (**D-x**: `apps/pipeline/analysis/` não existe na árvore). `data/processed/` tem **69** Parquets e `data/canonical/` tem **20** artefatos: `raw_series` (278.439 linhas, 62 séries), `series_catalog` materializado (138 × 26), `alinhado_trimestral` (4.038), **`macro_quarterly` (83 × 42, `revised`)** + procedência (2.548), **`macro_quarterly_asof` (83 × 42, `asof`)** + procedência (2.552, com `date_obs`/`lag_dias`), **`asset_returns_quarterly` (1.963, 24 ativos)**, **`regimes_v1{,_asof}` (83 × 18)**, **`regime_neighbors_v3` (9.692 × 21)** e `regime_neighbors` (5.500 × 11), mais 8 relatórios e o `ldc.duckdb` derivado — tudo reconstruível com `--offline`, na ordem `build_raw_series` → `alinhamento` → `macro_quarterly` → `asof` → `retornos` → `regimes_v1` (nas duas materializações) → `regimes_v3` (a `curva` roda antes de tudo, porque escreve em `data/processed/`), **2 rodadas com hashes idênticos**. `apps/analysis/` segue vazio — é F-022/F-023 em diante.
-Ondas 0, 1 e **2 fechadas e aprovadas** (`docs/plans/qa/ONDA-0-QA.md`, `ONDA-1-QA-{A,B}.md`, `ONDA-2-QA-{A,B}.md`, **0 × P0**); **Onda 3 parte 1: F-018/F-019/F-021 implementadas, aguardando QA/revisão numérica**. As convenções (`date` em fim de período, `vintage` do manifesto, grade bancária única de D-h, vértice de 3 anos de D-i, prazo em dias corridos de D-j, Focus fora de `raw_series` de D-k, `USDBRL` no universo de D-l, unidade por cento × fração de D-o, **IBC-Br pela média do trimestre de D-s**, **ciclo Selic com desigualdade não estrita de D-t**, **eixo da V3 em `focus_pib_ano` de D-u**) estão em `docs/plans/DECISIONS_LOG.md §2.1/§2.3`, ainda **provisórias**. ⚠️ **Gate de publicação fechado:** ADR-001 em `Proposta` ⇒ `especificacao_congelada = False` nas 83 linhas de F-019/F-021 ⇒ nenhum número de regime é publicável (CA-090).
+**Status do código (2026-10-11, pós-Onda 4):** contratos escritos
+(`packages/shared/schemas/`, **9** módulos + catálogo de **138** séries, com
+`MacroQuarterlyAsofProvenanceSchema`, `RegimesV1Schema`, `RegimeNeighborsV3Schema` e o novo
+`internacional.py` — **sempre por acréscimo**, nenhuma coluna existente alterada em nenhuma onda);
+**camada de extração pronta e aprovada** — `apps/pipeline/common/` (infra), `extract/` (**9**
+extratores), `jobs/` (job diário), `transform/cambio.py`; **camada canônica completa** —
+`apps/pipeline/canonical/` com `build_raw_series.py` (F-013), `alinhamento.py` (F-014), `curva.py`
+(F-016), `macro_quarterly.py` (F-015), `retornos.py` (F-017), `asof.py` (F-018), `regimes_v1.py`
+(F-019), `regimes_v3.py` (F-021), **`metricas_regime.py` (F-022)** e **`internacional.py` (F-026)**;
+o **orquestrador** em **`apps/pipeline/run.py`** + `__main__.py` (F-029); e a **camada de análise**,
+que deixou de estar vazia — **`apps/analysis/`** com `_linguagem.py` (a guarda única de linguagem
+descritiva), `figuras/_comum.py`, `figuras/heatmap_regime_ativo.py` (F-023),
+`figuras/timeline_regimes.py` (F-025) e `tabelas/ranking_regime_atual.py` (F-024).
+**Nota de caminho (D-x, estendida na Onda 4):** `apps/pipeline/analysis/` **não existe** — as
+features de cálculo moram em `canonical/` e as de apresentação em `apps/analysis/`; são **7**
+divergências de path, todas de path e não de escopo, listadas no `TODO.md §4` para ratificação.
+
+`data/processed/` tem **69** Parquets e `data/canonical/`, **48** artefatos conferidos pelo
+`MANIFEST.json` (**47** determinísticos + o `ldc.duckdb`, fora do agregado por decisão declarada).
+**Um comando reconstrói tudo:** `python -m apps.pipeline run --offline` → **13 etapas** na ordem
+`curva → build_raw_series → alinhamento → macro_quarterly → asof → retornos → regimes_v1 →
+regimes_v1_asof → regimes_v3 → metricas_regime → internacional → figuras → tabelas`, sem rede;
+`python -m apps.pipeline verify` → `rc != 0` se um byte divergir; `freeze --tag` congela.
+**Rebuild final: 2 execuções byte-idênticas, `verify` rc 0,
+`DATASET_SHA256 = fc2331183b9355e6424f223085fd501683678d73fc50a9cf2b570376750f17ef`.**
+
+Ondas 0 a **3 fechadas e aprovadas** (`docs/plans/qa/ONDA-0-QA.md`, `ONDA-1-QA-{A,B}.md`, `ONDA-2-QA-{A,B}.md`, `ONDA-3-QA.md`, **0 × P0** e **0 divergência numérica**); **Onda 4 implementada, com o QA (`ONDA-4-QA.md`) rodado e as mudanças aplicadas** — F-022..F-026, F-028 e F-029; **F-020 (V2) e F-030 cortadas da v1**. As convenções (`date` em fim de período, `vintage` do manifesto, grade bancária única de D-h, vértice de 3 anos de D-i, prazo em dias corridos de D-j, Focus fora de `raw_series` de D-k, `USDBRL` no universo de D-l, unidade por cento × fração de D-o, **IBC-Br pela média do trimestre de D-s**, **ciclo Selic com desigualdade não estrita de D-t**, **eixo da V3 em `focus_pib_ano` de D-u**) estão em `docs/plans/DECISIONS_LOG.md §2.1/§2.3`, ainda **provisórias**. ⚠️ **Gate de publicação fechado:** ADR-001 em `Proposta` ⇒ `especificacao_congelada = False` nas 83 linhas de F-019/F-021 ⇒ nenhum número de regime é publicável (CA-090).
 
 ---
 
@@ -66,14 +91,22 @@ produz o mesmo **hash** (RF-048). Nada volta para a esquerda. Persistência: **P
 | `canonical/retornos` | `ret_tri`, excesso CDI, real (sempre razão) — **em fração** (D-o) | **C** | **F-017** |
 | `canonical/macro_quarterly` · `asof` | 83 trimestres + procedência por célula — **em por cento/pp** (D-o); `asof` é F-018 | **C** | **F-015**, F-018 |
 | `canonical/build_raw_series` | camada canônica + catálogo materializado + DuckDB | **C** | F-013 |
-| `analysis/regimes_v1|v2|v3` | V1 quadrantes, V2 ciclo Selic, V3 vizinhos | **C** | F-019..021 |
-| `analysis/metricas_regime` | métricas por regime × ativo | **C** | F-022 |
-| `analysis/figuras`, `tabelas`, `internacional` | heatmap, timeline, ranking, risk-off | B / **C** | F-023..026 |
-| `pipeline` (CLI), `deliver/pacote` | um comando + pacote do Comitê | **C** / **D** | F-029, F-031 |
+| `canonical/regimes_v1`, `regimes_v3` | V1 quadrantes, V3 vizinhos (**V2 cortada da v1**) | **C** | F-019, F-021 |
+| `canonical/metricas_regime` | métricas por regime × ativo — **3** tabelas nomeadas | **C** | **F-022** |
+| `canonical/internacional` | `stress_flag`, correlações por regime, faixa de D6 | **C** | **F-026** |
+| `analysis/figuras/{_comum,heatmap_regime_ativo,timeline_regimes}` | heatmap e timeline, determinísticos | B | **F-023**, **F-025** |
+| `analysis/tabelas/ranking_regime_atual` | "em que regime estamos?" × 3 + concordância | B | **F-024** |
+| `analysis/_linguagem` | a guarda **única** de linguagem descritiva (§10.2.10) | B | F-023/024/025 |
+| `pipeline/run` (CLI `run`/`verify`/`freeze`) | um comando + `MANIFEST.json` + `FROZEN.txt` | **C** | **F-029** |
+| `deliver/pacote` | pacote do Comitê — lê `publicavel` do manifesto (**D-af**) | **D** | F-031 |
 
-`canonical/`, `transform/` e `analysis/regimes*` são o coração do risco: **classe C** (`AGENTS.md §2`).
-Nota de caminho: **F-013, F-014, F-015, F-016 e F-017** moram em **`apps/pipeline/canonical/`**, não em `load/`/`transform/`
-como o `TODO.md` previa — ajuste registrado no Feature Contract de cada uma, sem efeito em CA.
+`canonical/` e `transform/` são o coração do risco: **classe C** (`AGENTS.md §2`). `apps/analysis/`
+é **classe B** — lê o canônico e **não recalcula nada** (as flags de `n` são reconferidas e a
+divergência é erro); se um número está errado na figura, o bug é da feature dona.
+Nota de caminho (**D-x**): as features de cálculo moram em **`apps/pipeline/canonical/`** e as de
+apresentação em **`apps/analysis/`**, não em `load/`/`transform/`/`analysis/` como o `TODO.md`
+previa — são 7 divergências de path, registradas no Feature Contract de cada uma e tabuladas no
+`TODO.md §4`, sem efeito em CA nenhum.
 
 ## 4. Fronteiras de validação (onde o pandera **tem** que estar)
 

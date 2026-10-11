@@ -55,7 +55,9 @@ conferível linha a linha.
 ## Honestidade estatística (Anti-SPEC §10.2)
 
 - **Descritivo, nunca preditivo** (§10.2.10): há guarda executável —
-  `conferir_linguagem_descritiva` levanta se qualquer forma de previsão aparecer no Markdown.
+  `conferir_linguagem_descritiva`, que desde **D-z/P2-1** vive em
+  `apps/analysis/_linguagem.py` e é a **mesma** das figuras (F-023/F-025) e da página de
+  limitações (F-028). Levanta se qualquer forma de previsão aparecer no Markdown.
 - **`n` em toda célula** (§10.2.8): a coluna `n_obs` é obrigatória nas 72 linhas, e `simbolo_n`
   traduz os limiares `N_ALERTA`/`N_SUPRESSAO` importados de F-019 — nunca redefinidos aqui.
 - **`asof` sempre rotulada** (§10.2.7): a materialização está no nome da lente, na coluna
@@ -93,6 +95,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import pandas as pd
 
+from apps.analysis import _linguagem
 from apps.pipeline.canonical.build_raw_series import caminhos_dos_componentes
 from apps.pipeline.canonical.build_raw_series import versao_build as _hash_dos_componentes
 from apps.pipeline.canonical.metricas_regime import (
@@ -158,6 +161,7 @@ NOME_NEIGHBORS_V3 = "regime_neighbors_v3.parquet"
 #: contratos onde moram os limiares de `n` e os nomes das colunas. Mudar qualquer um muda a página.
 MODULOS_DA_TABELA: tuple[str, ...] = (
     "apps.analysis.tabelas.ranking_regime_atual",
+    "apps.analysis._linguagem",
     "apps.pipeline.canonical.metricas_regime",
     "packages.shared.schemas.asset_returns_quarterly",
     "packages.shared.schemas.regimes",
@@ -245,62 +249,19 @@ O_QUE_ISSO_NAO_DIZ: tuple[str, ...] = (
     "alocação (Anti-SPEC §10.2.10, §10.2.11, §10.3.16).",
 )
 
-#: Formas **assertivas** de previsão: não podem aparecer no Markdown de jeito nenhum. A guarda é
-#: executável, não um pedido na revisão. Acentuada e sem acento, porque o acento é o primeiro a
-#: cair quando alguém reescreve a frase à mão.
-FORMAS_PREDITIVAS_PROIBIDAS: tuple[str, ...] = (
-    "vai render",
-    "vai subir",
-    "vai cair",
-    "vai performar",
-    "deve render",
-    "deve subir",
-    "deve cair",
-    "deve performar",
-    "tende a render",
-    "projetamos",
-    "prevemos",
-    "esperamos",
-    "espera-se",
-    "estimamos que",
-    "recomendamos",
-    "recomendacao de alocacao:",
-    "sugerimos",
-    "melhor aposta",
-    "aposta para",
-)
-
-#: Substantivos preditivos que **só** podem aparecer sob negação ("não é previsão", "nenhum
-#: backtest"). Proibi-los por inteiro tornaria o bloco D impossível de escrever — é justamente
-#: nele que se diz o que a página **não** é; e permiti-los soltos deixaria passar um
-#: "Previsão para 4T2026: +5%". Então a guarda exige a negação no contexto imediato.
+# A guarda de linguagem **não** vive mais aqui: vive em `apps/analysis/_linguagem.py`, única
+# para as três features da camada (F-023, F-024, F-025) desde 2026-10-11 (P2-1 do QA da Onda 4).
+# Havia três versões divergentes, e a desta feature — a única executável — **reprovava** textos
+# legítimos das outras duas e da página de limitações, porque a janela de negação só olhava para
+# trás e só reconhecia `não`/`nunca` colados ao termo. Os nomes abaixo são **re-exportações**: o
+# notebook de F-027 e os testes importam `conferir_linguagem_descritiva` deste módulo.
+FORMAS_PREDITIVAS_PROIBIDAS: tuple[str, ...] = _linguagem.FORMAS_PREDITIVAS_PROIBIDAS
 SUBSTANTIVOS_PREDITIVOS_SOB_NEGACAO: tuple[str, ...] = (
-    "previsao",
-    "previsão",
-    "projecao",
-    "projeção",
-    "extrapolacao",
-    "extrapolação",
-    "backtest",
-    "recomendacao",
-    "recomendação",
+    _linguagem.SUBSTANTIVOS_PREDITIVOS_SOB_NEGACAO
 )
-
-JANELA_DE_NEGACAO = 80
-"""Quantos caracteres antes do termo a guarda olha procurando a negação."""
-
-MARCADORES_DE_NEGACAO: tuple[str, ...] = (
-    "não",
-    "nao",
-    "nunca",
-    "nenhum",
-    "nem ",
-    "sem ",
-    "≠",
-    "proib",
-    "fora de escopo",
-    "fora desta",
-)
+MARCADORES_DE_NEGACAO: tuple[str, ...] = _linguagem.MARCADORES_DE_NEGACAO
+JANELA_DE_NEGACAO = _linguagem.JANELA_DE_NEGACAO_ANTES
+conferir_linguagem_descritiva = _linguagem.conferir_linguagem_descritiva
 
 
 class SecaoDaConcordancia(StrEnum):
@@ -1205,44 +1166,6 @@ def tabela_de_concordancia(bloco: Mapping[str, Any], *, versao: str) -> pd.DataF
 # ─────────────────────────────────────────────────────────────────────────────
 # Markdown — a página. Derivada dos DataFrames, nunca escrita à mão
 # ─────────────────────────────────────────────────────────────────────────────
-
-
-def _sem_negacao_no_contexto(minusculo: str, termo: str) -> bool:
-    """Alguma ocorrência de `termo` aparece **sem** negação nos `JANELA_DE_NEGACAO` chars antes?"""
-    posicao = minusculo.find(termo)
-    while posicao != -1:
-        contexto = minusculo[max(0, posicao - JANELA_DE_NEGACAO) : posicao]
-        if not any(marcador in contexto for marcador in MARCADORES_DE_NEGACAO):
-            return True
-        posicao = minusculo.find(termo, posicao + len(termo))
-    return False
-
-
-def conferir_linguagem_descritiva(texto: str) -> None:
-    """Levanta se qualquer forma de previsão aparecer no Markdown (Anti-SPEC §10.2.10).
-
-    Duas listas, porque o risco tem duas formas. **Forma assertiva** ("vai render", "esperamos")
-    é proibida por inteiro. **Substantivo preditivo** ("previsão", "backtest", "recomendação") é
-    permitido **só sob negação** — é exatamente o que o bloco D faz ("não é previsão de retorno,
-    não é backtest"), e proibi-lo por inteiro tornaria o aviso impossível de escrever.
-
-    É uma guarda **executável**, não um pedido na revisão: o risco real deste projeto é uma frase
-    preditiva entrar num slide que já passou por três revisões de número.
-    """
-    minusculo = texto.lower()
-    assertivas = [p for p in FORMAS_PREDITIVAS_PROIBIDAS if p in minusculo]
-    soltos = [
-        termo
-        for termo in SUBSTANTIVOS_PREDITIVOS_SOB_NEGACAO
-        if _sem_negacao_no_contexto(minusculo, termo)
-    ]
-    if assertivas or soltos:
-        msg = (
-            f"linguagem preditiva na tabela (Anti-SPEC §10.2.10): formas assertivas "
-            f"{assertivas}; substantivos preditivos sem negação no contexto {soltos}. "
-            "O entregável é descritivo: 'rendeu X, n = Y', nunca 'vai render'."
-        )
-        raise SerieInconsistente(msg)
 
 
 def _tabela_md(cabecalho: Sequence[str], linhas: Sequence[Sequence[str]]) -> list[str]:
