@@ -394,7 +394,10 @@ _BCB_SGS: list[dict[str, Any]] = [
         "BRL",
         transformacao_padrao="ultimo_dia_util_do_trimestre",
         calendario="dias_uteis",
-        obs="09/10/2026 = 4.9892 (valor-canario). Fonte primaria do USDBRL (nao FRED/Yahoo).",
+        is_total_return=False,
+        obs="09/10/2026 = 4.9892 (valor-canario). Fonte primaria do USDBRL (nao FRED/Yahoo). "
+        "is_total_return=False por D-l: e taxa de cambio, nao ativo com carrego — o retorno "
+        "trimestral do asset_id USDBRL (F-017) e so a variacao do nivel, sem cupom cambial.",
     ),
     _sgs(
         10813,
@@ -647,17 +650,18 @@ _BCB_FOCUS: list[dict[str, Any]] = [
     },
     {
         "series_id": "FOCUS_PIB_TOTAL",
-        "nome": "Expectativa de PIB total — rotulo do indicador a confirmar",
+        "nome": "Expectativa de PIB total — descartada por D-p (sai dentro de FOCUS_ANUAIS)",
         "item_email": "A3",
         "fonte": "BCB_OLINDA",
-        "identificador": "a_confirmar",
+        "identificador": "ExpectativasMercadoAnuais (Indicador eq 'PIB Total')",
         "fonte_url": URL_OLINDA.format(es="ExpectativasMercadoAnuais"),
         "freq": "D",
         "unit": "%",
         "confianca": "NAO_VERIFICADO",
-        "status": "a_confirmar",
-        "obs": "Gap G-04: enumerar os valores de 'Indicador' baixando um ano e fazendo set(). "
-        "Confirmados: IPCA, Cambio, Selic, PIB Agropecuaria, IGP-DI, IGP-M, IPC-Fipe.",
+        "status": "descartada",
+        "obs": "D-p: redundante — G-04 resolvido (o rotulo da fonte e 'PIB Total', enumerado em "
+        "INDICADORES_ENUMERADOS por F-010) e o dado sai como FOCUS_A_PIB_TOTAL_H0/H1 dentro do "
+        "EntitySet FOCUS_ANUAIS. Entrada mantida como descartada para nao reaparecer como gap.",
     },
 ]
 
@@ -946,8 +950,13 @@ _TESOURO_E_CURVA: list[dict[str, Any]] = [
         "data_inicio": "2004-12-31",
         "transformacao_padrao": "ultimo_dia_util_do_trimestre",
         "confianca": "NAO_VERIFICADO",
-        "obs": "VARIAVEL PRINCIPAL DE CURVA na V3 (L4/L5). Nao e a ETTJ Svensson oficial da "
-        "ANBIMA: sao taxas do Tesouro Direto (varejo), com pequeno spread vs. secundario.",
+        "obs": "SECUNDARIA desde D-i (2026-10-11): era a VARIAVEL PRINCIPAL DE CURVA na V3 "
+        "(L4/L5) e foi substituida nesse papel por INCLINACAO_REAL_5A_3A, porque a ponta curta de "
+        "1 ano so existe em 60,53% das datas base de 2006 em diante (CA-025 pede >= 95%) — a "
+        "grade de vencimentos da NTN-B e alternada e 2021-2022 nao tiveram nenhum titulo vencendo "
+        "em menos de 1 ano. Segue publicada e declarada pela leitura historica de 20 anos que "
+        "ADR-004 §3 nomeia. Nao e a ETTJ Svensson oficial da ANBIMA: sao taxas do Tesouro Direto "
+        "(varejo), com pequeno spread vs. secundario.",
     },
     {
         "series_id": "INCLINACAO_NOMINAL_5A_1A",

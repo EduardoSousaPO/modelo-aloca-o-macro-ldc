@@ -4,8 +4,9 @@
 > (`pandera` para DataFrame, `pydantic` para catálogo e config de extrator). Este arquivo descreve —
 > nunca duplica a definição e nunca a contradiz.
 >
-> **Versão:** 1.1 (2026-10-10, correções P0/P1 da auditoria do harness) — **Referência:** `docs/specs/SPEC.md` v1.0 (RF-019..RF-032),
-> `docs/research/metodologia-regimes-macro.md §6`.
+> **Versão:** 1.2 (2026-10-11, Onda 2: `raw_series`/`series_catalog` materializados por F-013,
+> tabela `alinhado_trimestral` de F-014, catálogo 134 → **138** por D-i/F-016) — **Referência:**
+> `docs/specs/SPEC.md` v1.0 (RF-019..RF-032), `docs/research/metodologia-regimes-macro.md §6`.
 >
 > **Regra absoluta:** se o agente precisa de um tipo/coluna que ainda não existe, ele **cria primeiro
 > em `packages/shared/schemas/`** e só depois implementa o extrator ou a transformação.
@@ -19,9 +20,11 @@
 packages/shared/schemas/
 ├── __init__.py                 ← re-export de tudo
 ├── raw_series.py               ← RawSeriesSchema, ProcessedSeriesSchema            (pandera)
-├── series_catalog.py           ← SeriesCatalogEntry, ExtractorConfig,
-│                                  SeriesCatalogSchema, enums, load_catalog()       (pydantic+pandera)
-├── series_catalog_data.py      ← O CATÁLOGO COMO DADO — 134 séries
+├── series_catalog.py           ← SeriesCatalogEntry, ExtractorConfig, SeriesCatalogSchema,
+│                                  SeriesCatalogMaterializedSchema, enums,
+│                                  load_catalog()                                   (pydantic+pandera)
+├── series_catalog_data.py      ← O CATÁLOGO COMO DADO — 138 séries
+├── alinhado_trimestral.py      ← AlinhadoTrimestralSchema (grade trimestral long)  (pandera)
 ├── macro_quarterly.py          ← MacroQuarterlySchema,
 │                                  MacroQuarterlyProvenanceSchema                   (pandera)
 ├── asset_returns_quarterly.py  ← AssetReturnsQuarterlySchema,
@@ -36,6 +39,8 @@ Fronteiras onde a validação é **obrigatória** (`wiki/architecture.md §4`):
 |---|---|
 | saída de cada extrator → `data/processed/` | `ProcessedSeriesSchema` |
 | `data/processed/` → `data/canonical/` | `RawSeriesSchema` + schema da tabela destino |
+| `data/canonical/series_catalog.parquet` (catálogo **materializado**, 26 colunas) | `SeriesCatalogMaterializedSchema` (§2.4) |
+| `raw_series` → grade trimestral (`data/canonical/alinhado_trimestral.parquet`) | `AlinhadoTrimestralSchema` (§8) |
 | entrada e saída de `data/canonical/` | `MacroQuarterlySchema`, `MacroQuarterlyProvenanceSchema`, `AssetReturnsQuarterlySchema`, `RegimesSchema`, `RegimeNeighborsSchema`, `SeriesCatalogSchema` |
 | config de extrator / parâmetros de janela | `ExtractorConfig` (pydantic) |
 | catálogo de séries | `SeriesCatalogEntry` (pydantic) |
@@ -70,6 +75,61 @@ Fronteiras onde a validação é **obrigatória** (`wiki/architecture.md §4`):
 - `strict=True`: coluna fora do schema **falha**. É o que impede DataFrame ad hoc (Anti-SPEC §10.4.24).
 - `ProcessedSeriesSchema` herda o mesmo contrato para `data/processed/`.
 
+### 1.1 Materialização — `data/canonical/raw_series.parquet` e `relatorio_build.json` (F-013)
+
+`apps/pipeline/canonical/build_raw_series.py` (CLI
+`python -m apps.pipeline.canonical.build_raw_series [--offline] [--sem-duckdb]`) é o único produtor
+desta camada. **O que o contrato precisa dizer sobre a materialização:**
+
+- **`raw_series` é um *union* validado de `data/processed/`, e nada mais** — zero agregação,
+  reamostragem, `ffill` ou arredondamento. Cada série do canônico é idêntica, **célula a célula**,
+  ao Parquet de origem (teste `test_real_cada_serie_e_identica_linha_a_linha_a_sua_origem`).
+- **O Parquet é reescrito inteiro a cada build; não há `append`.** Série nova em `data/processed/`
+  (F-010, F-011, F-012, F-016) só aparece em `raw_series` **e** no catálogo materializado depois de
+  **reexecutar o build**. É item de DoR de toda feature que publica em `data/processed/`.
+- **Sete tabelas de `data/processed/` ficam fora, declaradas no dado** (`tabelas_excluidas` do
+  relatório), por **dois** motivos distintos:
+  1. **schema próprio** — `calendario/dias_uteis_anbima.parquet` (§7, não é série de valores);
+  2. **`series_id` composto que não é entrada do catálogo** — `tesouro-direto/td_painel.parquet`
+     (**750** compostos `TD_<SIGLA>_<AAAAMMDD>_<METRICA>`) e as **5** fatias de `focus/`
+     (`FOCUS_ANUAIS`, `FOCUS_MENSAIS`, `FOCUS_TRIMESTRAIS`, `FOCUS_SELIC`, `FOCUS_INFLACAO_12M`,
+     juntas **197** compostos `FOCUS_<ESCOPO>_<INDICADOR>_<CHAVE>`), acrescentadas por **D-k**.
+     Admiti-los violaria CA-055/CA-120.
+
+  Nos dois casos de (2) o catálogo registra a **fonte** e as séries canônicas derivadas vêm de outra
+  feature: do painel do Tesouro nascem os vértices de F-016 (`CURVA_*`, `INCLINACAO_*`,
+  `BREAKEVEN_5A`, `fonte=DERIVADO`, em `data/processed/curva/`); o Focus é consumido **direto de
+  `data/processed/focus/`** por F-015, pelo mesmo `ProcessedSeriesSchema`, e a procedência de
+  `macro_quarterly` aponta para o **EntitySet**, não para o `series_id` por horizonte.
+- **Quatro guardas públicas** rodam entre o concatenado e a escrita, porque o pandera não cobre
+  nenhuma delas: `validar_procedencia` (CA-055/CA-120 — `series_id` existe no catálogo e
+  `source`/`unit`/`freq` da linha são os declarados), `validar_frequencia_nativa` (CA-058),
+  `validar_sem_mistura_de_fontes` (CA-077) e `exigir_series` (CA-076 →
+  `BLOQUEADO — FONTE INDISPONÍVEL`). São reutilizadas por F-014..F-017, **não** reimplementadas.
+- **Idempotência sem relógio:** nada no build lê a hora — `collected_at`/`vintage` vêm do manifesto
+  do bruto (D-b) e o relatório **não tem** campo de hora de geração. Duas rodadas dão Parquet e
+  relatório byte-idênticos (CA-121).
+
+`relatorio_build.json` é parte do contrato de saída (RF-026/RF-047) e tem os campos:
+
+| Campo | O que registra |
+|---|---|
+| `feature`, `arquivos_lidos`, `linhas_dedup` | qual build, quantos Parquets de `data/processed/` entraram, quantas linhas de PK duplicada **idêntica** foram colapsadas (hoje `0`) |
+| `versao_build` · `versao_build_componentes` | `sha256` do **conjunto** de módulos que decidem o artefato (`build_raw_series` + `raw_series` + `series_catalog` + `series_catalog_data`), e a lista ordenada deles |
+| `catalogo_sha256` | hash do catálogo **como dado**; é o que detecta artefato publicado com catálogo mais novo que o build |
+| `raw_series` / `series_catalog` | por artefato: `arquivo`, `bytes`, `sha256`, `linhas`, `series`, `date_min`/`date_max`, `collected_at_max` (**com hora**), `vintages`, `linhas_por_source`, `linhas_por_freq`, `n_nulos_value`/`pct_nulos_value`, `presentes_no_processed`, `cobrem_1t2006`, `colunas_observadas` |
+| `series` | **1 bloco por série**: `n_obs`, `n_nulos`, `pct_nulos`, janela, `freq`, `unit`, `source`, `vintages`, `value_min`/`value_max` |
+| `tabelas_excluidas` · `catalogo_ok_ausente_no_processed` · `series_sem_cobertura_1t2006` | o que ficou fora e **por quê**, série a série — a ausência está no dado, não só na documentação |
+| `duckdb` | nome do arquivo derivado e as **views** criadas (nunca tabelas — ver ADR-006 §(a).2) |
+
+> **Estado medido em 2026-10-11** (rebuild sincronizado da Onda 2 completa, com o Focus em disco):
+> **62** Parquets lidos → `raw_series` com **278.439** linhas e **62** séries,
+> 1979-12-31 → 2026-10-10, `linhas_dedup = 0`, `sha256 0d23df7a…`,
+> `versao_build = e48262bb…`; `series_catalog.parquet` com **138 × 26** (`sha256 f56f207e…`), 62
+> presentes no processado, 59 cobrindo 1T2006, **7** tabelas excluídas, 33 séries `ok` do pacote
+> mínimo ainda ausentes (F-011/F-012 e as demais). O número vivo é o próprio relatório, não esta
+> linha.
+
 ---
 
 ## 2. `series_catalog` — procedência de cada série (RF-019)
@@ -93,6 +153,7 @@ Fronteiras onde a validação é **obrigatória** (`wiki/architecture.md §4`):
 | `confianca` | `Confianca` | `CONFIRMADO` \| `CONFIRMADO_SUB` \| `NAO_VERIFICADO` — **copiada de `docs/research/`** |
 | `status` | `StatusSerie` | `ok` \| `a_confirmar` \| `descontinuada` \| `descartada` \| `paga` |
 | `is_total_return` | bool \| None | `None` = a confirmar (gap G-01, setoriais da B3) |
+| `calendario` | `"dias_uteis"` \| `"corrido"` \| None | grade de publicação de série `freq=D`; `None` = não medido (ou série não diária) |
 | `janela_rolante` | bool | `True` = a fonte apaga o passado → **nunca** usar para backfill |
 | `fonte_instavel` | bool | endpoint não documentado ou conectividade incerta (B3, MSCI, Yahoo, FRED) |
 | `licenca_restrita` | bool | terceiro sem licença comercial explícita (Teva) |
@@ -104,6 +165,22 @@ Fronteiras onde a validação é **obrigatória** (`wiki/architecture.md §4`):
 - `status = descontinuada` exige `data_fim`.
 - `data_fim < data_inicio` → erro.
 - `series_id` duplicado no catálogo → `load_catalog()` falha.
+- `calendario` preenchido em série **não** diária → erro (`_coerencia_status`): dia útil versus dia
+  corrido só faz sentido em `freq=D`.
+
+> **Nota sobre `calendario` (acréscimo de 2026-10-11, P1-2 do QA da Onda 2).** O campo nasceu para
+> resolver um achado da Onda 1: a **meta Selic (SGS 432) publica em dia corrido** — o mesmo valor em
+> sábado, domingo e feriado —, e **2.377 dos seus 8.319 pontos (28,6%) caem em fim de semana**. A
+> distinção vivia só na constante `SERIES_DIARIAS_DE_CALENDARIO` dentro de
+> `apps/pipeline/extract/bcb_sgs.py`, e quem consome o catálogo (alinhamento trimestral, qualquer
+> contagem de dias úteis) não tinha como sabê-la: uma média sobre `freq='D'` sairia enviesada em
+> 28,6% dos pontos. Agora a grade é **declarada no dado**. Hoje **7** séries `freq=D` a declaram —
+> `BCB_SGS_432 = corrido` e as seis de dia útil (Selic over 11/1178, CDI 12/4389, PTAX 1/10813); nas
+> demais o campo é nulo, **nunca** a string `"None"`. É de `calendario` que F-014 **deriva** a régua
+> de cada série (`series_de_calendario_corrido()`, §8), em vez de manter uma segunda lista — e um
+> teste de contrato afirma que as **três** declarações (catálogo, derivação de F-014 e a constante do
+> extrator) coincidem. O campo entrou também em `SeriesCatalogSchema` (§2.4): sem isso, `strict=True`
+> o mantinha fora do tabular e o artefato publicava 25 colunas sem ele.
 
 **Propriedades derivadas:**
 
@@ -115,21 +192,36 @@ Fronteiras onde a validação é **obrigatória** (`wiki/architecture.md §4`):
 As 13 séries FRED (10 delas `ok`) continuam no catálogo com identificador confirmado pela pesquisa —
 e **não** contam no pacote mínimo. O plano B é Yahoo/MSCI/PTAX (S-09 no `DECISIONS_LOG.md`).
 
-### 2.1 Estado do catálogo em 2026-10-11 (**134** séries, validadas por pydantic)
+### 2.1 Estado do catálogo em 2026-10-11 (**138** séries, validadas por pydantic)
 
-> **132 → 134 em 2026-10-11** (D-d em `DECISIONS_LOG §2.1`): F-007 acrescentou `ACWI_BRL` e
-> `SP500_BRL`, as séries em BRL derivadas de MSCI ACWI (NETR) e `^GSPC`, com `fonte=DERIVADO` e
-> **`is_total_return` explícito em cada uma** — `ProcessedSeriesSchema` tem 8 colunas e nenhuma
-> é essa flag, então o lugar dela (CA-047) é o catálogo. Com isso `DERIVADO` vai de 7 para
-> **9** entradas e as `ok` de 99 para **101** (pacote mínimo: de 89 para **91**). O número
-> vivo é `N_SERIES_ESPERADAS` em `tests/unit/test_schemas_smoke.py`.
+> **132 → 134 → 138, as duas mudanças de 2026-10-11** (`DECISIONS_LOG §2.1`):
+> **D-d** — F-007 acrescentou `ACWI_BRL` e `SP500_BRL`, as séries em BRL derivadas de MSCI ACWI
+> (NETR) e `^GSPC`, com `fonte=DERIVADO` e **`is_total_return` explícito em cada uma**:
+> `ProcessedSeriesSchema` tem 8 colunas e nenhuma é essa flag, então o lugar dela (CA-047) é o
+> catálogo.
+> **D-i** — F-016 acrescentou **4** entradas (`CURVA_REAL_3A`, `CURVA_NOMINAL_3A`,
+> `INCLINACAO_REAL_5A_3A`, `INCLINACAO_NOMINAL_5A_3A`) porque CA-025 **não fecha** com o vértice
+> curto de 1 ano: a inclinação real 5a−1a existe em 60,53% das datas base de 2006 em diante (a grade
+> de vencimentos da NTN-B é alternada e 2021-2022 não tiveram título vencendo em menos de 1 ano),
+> enquanto a **5a−3a cobre 95,25%** e passa a ser a **variável principal de regime, em caráter
+> provisório**. O vértice de 3 anos já era nomeado por CA-023; as duas séries 5a−1a continuam
+> publicadas como **secundárias e declaradas**.
+> Com isso `DERIVADO` vai de 7 para **13** entradas (**2** em BRL + **11** da curva) e as `ok` de 99
+> para **105** (pacote mínimo: de 89 para **95**). O número vivo é `N_SERIES_ESPERADAS` em
+> `tests/unit/test_schemas_smoke.py`. **D-i é provisória: aguarda o aval do Edu** e uma nota em
+> ADR-004 §3, que ainda nomeia a 5a−1a como principal.
+>
+> **A alteração de 2026-10-11 (parte 2 da onda) não mexe na contagem:** **D-p** só muda **1**
+> entrada (`FOCUS_PIB_TOTAL`: `a_confirmar` → `descartada`, com `identificador` real e `obs` nova) e
+> **D-l** só acrescenta `is_total_return = False` a `BCB_SGS_1` (a PTAX, que virou o `asset_id`
+> `USDBRL` em §4). O catálogo segue com **138** entradas e `N_SERIES_ESPERADAS` não mudou.
 
 | Status | n | Leitura |
 |---|---|---|
-| `ok` | **99** | identificador real e série serve; **89** entram no pacote mínimo (as 10 FRED `ok` saem — fonte bloqueada). 70 cobrem 1T2006 com início medido, 12 não cobrem e **17 seguem sem início medido** (C-2 da auditoria, teste `xfail` declarado em `tests/unit/`) |
-| `a_confirmar` | **8** | identificador não confirmado pela pesquisa — **fora do caminho crítico** |
+| `ok` | **105** | identificador real e série serve; **95** entram no pacote mínimo (as 10 FRED `ok` saem — fonte bloqueada). 76 cobrem 1T2006 com início medido, 12 não cobrem e **17 seguem sem início medido** (C-2 da auditoria, teste `xfail` declarado em `tests/unit/`) |
+| `a_confirmar` | **7** | identificador não confirmado pela pesquisa — **fora do caminho crítico** |
 | `descontinuada` | **10** | morreram numa data (swap DI×pré, IMA no SGS, IMA-C, EMBI+, `DTWEXM`) |
-| `descartada` | **14** | existem mas não servem (janela curta, não cobrem 2006, fora do escopo mínimo, armadilha) |
+| `descartada` | **15** | existem mas não servem (janela curta, não cobrem 2006, fora do escopo mínimo, armadilha) — **+1 em D-p**: `FOCUS_PIB_TOTAL`, que ficou redundante quando G-04 fechou (o dado sai como `FOCUS_A_PIB_TOTAL_H0/H1` dentro de `FOCUS_ANUAIS`) |
 | `paga` | **1** | ANBIMA Feed (ETTJ histórica) — fora de escopo por decisão L4 |
 
 | Fonte | n | | Fonte | n |
@@ -137,14 +229,19 @@ e **não** contam no pacote mínimo. O plano B é Yahoo/MSCI/PTAX (S-09 no `DECI
 | `BCB_SGS` | 36 | | `YAHOO` | 12 |
 | `B3_API` | 13 | | `ANBIMA_S3` | 11 |
 | `FRED` | 13 | | `IBGE_SIDRA` | 9 |
-| `DERIVADO` | 7 | | `IPEADATA` | 7 |
+| `DERIVADO` | **13** | | `IPEADATA` | 7 |
 | `TEVA_GCS` | 6 | | `BCB_OLINDA` | 6 |
 | `MSCI` | 5 | | `ANBIMA_WEB` | 4 |
 | `TESOURO_CKAN` | 1 | | `CVM` / `MANUAL` | 1 / 1 |
 
-Confiança: `CONFIRMADO` 79 · `CONFIRMADO_SUB` 40 · `NAO_VERIFICADO` 13 (os 13 são, na maioria, as
-**séries derivadas por nós** — curva interpolada e inclinação — que exigem conferência numérica
-classe C antes de virar número em slide).
+As **13** entradas `DERIVADO`: **2** em BRL (`ACWI_BRL`, `SP500_BRL`, D-d) e **11** da curva
+(`CURVA_REAL_1A/3A/5A`, `CURVA_NOMINAL_1A/3A/5A`, `INCLINACAO_REAL_5A_3A`,
+`INCLINACAO_NOMINAL_5A_3A`, `INCLINACAO_REAL_5A_1A`, `INCLINACAO_NOMINAL_5A_1A`, `BREAKEVEN_5A`) —
+as 11 produzidas por F-016 em `data/processed/curva/`, 5.436 linhas cada.
+
+Confiança: `CONFIRMADO` 79 · `CONFIRMADO_SUB` 40 · `NAO_VERIFICADO` **19** (são, na maioria, as
+**séries derivadas por nós** — curva interpolada, inclinações e breakeven — que exigem conferência
+numérica classe C antes de virar número em slide).
 
 As 8 `a_confirmar`: `BCB_SGS_DBGG_PRE2008` (G-07), `BCB_SGS_21619` (rótulo Euro),
 `BCB_SGS_4192` (agregado monetário), `FOCUS_PIB_TOTAL` (G-04), `SIDRA_IPCA_GRUPOS_2006_2011` (L13),
@@ -174,6 +271,45 @@ Cada campo existe por causa de um risco catalogado em `docs/research/fontes-de-d
 (R1 erro com HTTP 200, R2 truncamento silencioso, R4 anti-bot, R8 janela rolante, R10 encoding,
 R21 tamanho de arquivo).
 
+### 2.4 Forma tabular: `SeriesCatalogSchema` (**20** colunas) × `SeriesCatalogMaterializedSchema` (**26**)
+
+São **dois** contratos, e a diferença é o que separa o **declarado** do **medido**:
+
+| Schema | O que é | Onde vale |
+|---|---|---|
+| `SeriesCatalogSchema` | o catálogo *declarado* — as **20** colunas de `SeriesCatalogEntry` em forma tabular (as 19 originais **+ `calendario`**, acrescentada em 2026-10-11) | qualquer leitura do catálogo como DataFrame |
+| `SeriesCatalogMaterializedSchema` | **subtipo** (acréscimo, não alteração): herda as 20 e soma **6** colunas do observado em disco → **26** no artefato | `data/canonical/series_catalog.parquet`, escrito por F-013 |
+
+As **6 colunas observadas**:
+
+| Coluna | Tipo | Regra |
+|---|---|---|
+| `presente_no_processed` | bool, não nulo | existe ≥ 1 linha desta série em `raw_series` |
+| `data_inicio_observada` | datetime, nulo | `min(date)` **medido**; nulo ⇔ série ausente |
+| `data_fim_observada` | datetime, nulo | `max(date)` medido; nulo ⇔ ausente |
+| `n_obs` | int ≥ 0, não nulo | linhas em `raw_series`; `0` ⇔ ausente |
+| `pct_nulos` | float 0..100, não nulo | % de `value` nulo **dentro da série**, gravado com `round(x, 6)` |
+| `cobre_1t2006` | bool, não nulo | `data_inicio_observada <= LIMIAR_COBERTURA_2006` (2006-01-31, PRD §7) |
+
+**Declarado e observado coexistem, nunca se sobrescrevem:** `data_inicio` (medido na pesquisa) e
+`data_inicio_observada` (medido em disco) ficam lado a lado, porque a **divergência é informação** —
+é assim que se vê que o IFIX começa em 2010-12-30 e que 33 séries `ok` do pacote mínimo ainda não
+têm extrator rodado. Três checks de DataFrame impedem o atalho de copiar um no outro:
+`ausente_nao_tem_observacao` (série ausente não carrega janela, contagem nem cobertura),
+`cobre_1t2006_derivado_do_observado` (a coluna é **derivada**, nunca digitada) e
+`janela_observada_coerente` (`fim >= inicio`).
+
+`cobre_1t2006` é **booleano**, diferente da propriedade `cobre_2006` de `SeriesCatalogEntry`, que é
+tri-estado (`None` = "início não medido"): aqui o início é sempre medido **ou** a série está
+ausente — e ausente é `False` com `presente_no_processed = False` ao lado, para que "não cobre"
+nunca se confunda com "não veio".
+
+> **O portão de schema é a escrita, não a leitura.** F-014 lê o materializado pelas **3 colunas que
+> consome** (`series_id`, `freq`, `data_inicio_observada`) em vez de revalidar as 26 — revalidar na
+> leitura transformaria um acréscimo legítimo de coluna numa falha de feature a jusante. O que
+> protege o alinhamento é mais específico: as 3 colunas existem, `series_id` é único e
+> `data_inicio_observada` é conferida **linha a linha** contra `raw_series`.
+
 ---
 
 ## 3. `macro_quarterly` — 83 trimestres (RF-021) · **classe C**
@@ -202,6 +338,27 @@ classificação entre as duas é **reportada** (RF-025); a dupla materializaçã
 Colunas nulas são **legítimas e informativas**: `ipca_meta` (série de metas é gap G-02),
 `embi_br_fim` após 30/07/2024, `curva_nominal_*` onde o vértice não existe. Nulo **nunca** é
 preenchido para "fechar" a linha.
+
+> **Unidade — `macro_quarterly` está em POR CENTO / pontos percentuais, nunca em fração** (**D-o**).
+> `ipca_tri = 1,4367` significa 1,4367 %. É o vocabulário do projeto (`UNIDADES_VALIDAS` tem `%`,
+> `%a.a.`, `pp` e nenhuma fração), é o que `LIMIAR_SELIC_PP = 0,25` pressupõe e é o que o canário
+> exige (`ipca_12m` de `2006Q1` **tem** de ser `5,32`, o número que o SGS publica). O mapa completo
+> por coluna vai no dado, em `relatorio_macro.json → unidades`. **`asset_returns_quarterly` (§4)
+> está em FRAÇÃO**, e as duas tabelas publicam `cdi_tri` e `ipca_tri` — mesmo nome, escalas
+> diferentes. Quem cruzar as duas sem ler a unidade erra por **100x**; a conversão é exatamente
+> `macro = 100 × retornos` (medido: `max |dif| = 0,0` nos 83 trimestres).
+
+> **Estado medido em 2026-10-11** (F-015, `python -m apps.pipeline.canonical.macro_quarterly
+> --offline`): **83 × 42**, `2006Q1..2026Q3`, materialização **`revised`** (`lag_adjusted=False`
+> nas 83), `sha256 dcded731…`. **5** colunas 100% nulas, **todas** por gap declarado: `ipca_meta` e
+> `ipca_desvio_meta` (G-02), `embi_br_fim` e `embi_delta_tri` (L8) e `termos_troca_yoy` (nenhum
+> índice de termos de troca foi extraído — proxy IC-Br em `TODO.md §6`). `ibcbr_yoy_trend` e
+> `ibcbr_gap` têm **16** nulos (`2006Q1..2009Q3` + `2026Q3`): **CA-007 não é satisfazível** com o
+> IBC-Br real, que começa em 2003 — ver **D-m**. `curva_real_1a` e `inclinacao_real_5a_1a` têm **33**
+> nulos (39,8%), e a inclinação **principal** de D-i (`INCLINACAO_REAL_5A_3A`, 95,25%) **não é
+> coluna** deste schema (**D-n**): F-019/F-021 leem a série. `is_estimated = True` só em `2026Q3`
+> (CA-060). Os 4 canários publicados: `ipca_12m` 2006Q1 = **5,32**, `selic_meta_fim` 2008Q4 =
+> **13,75**, `pib_yoy` 2010Q1 = **9,207417**, `focus_ipca_12m` 2026Q3 = **4,19**.
 
 ### 3.1 `macro_quarterly_provenance` — procedência por célula (RF-047 / CA-120)
 
@@ -233,6 +390,15 @@ tabela por 5 e ainda assim só valeria para o wide. O long resolve as duas coisa
 `asset_returns_quarterly` **não** precisa da companheira: é long por natureza e já carrega `source` e
 `series_id` na linha. `vintage`/`collected_at` de um retorno ficam em `raw_series`, pela PK
 `(series_id, date, vintage)`.
+
+> **Estado medido em 2026-10-11:** **2.548** linhas (1 por célula rastreável **preenchida**),
+> cobrindo **32** das 37 `COLUNAS_RASTREAVEIS` e **20** séries de origem distintas,
+> `sha256 4a582c1d…`. CA-120 verificado por **anti-join nas duas direções**: nenhuma célula
+> preenchida sem procedência e **nenhuma procedência para célula nula** (procedência de nulo seria
+> afirmação sobre dado que não existe). Todo `series_id` resolve em `series_catalog` — e para o
+> Focus a linha aponta para o **EntitySet** (`FOCUS_ANUAIS`, `FOCUS_INFLACAO_12M`), **não** para o
+> `series_id` por horizonte (`FOCUS_A_SELIC_H0`), que não é entrada do catálogo (**D-k**). O
+> horizonte fica na fórmula de `ORIGENS` e no relatório.
 
 ---
 
@@ -267,6 +433,28 @@ PK `(quarter, asset_id)`.
 do IFIX, `2007Q1..Q3` do IMOB e `2006Q1..Q3` do ICON — justamente os casos nomeados na Anti-SPEC
 §10.1.1 (corrigido em 2026-10-10, E-2 da auditoria). O trimestre que **contém** o início (2010Q4 do
 IFIX) é aceito pelo schema: é parcial, não anterior — quem o anula é a regra de `price_ini` em F-014.
+
+> **Unidade — `asset_returns_quarterly` está em FRAÇÃO** (**D-o**): `ret_tri = 0,0404` significa
+> +4,04 %. É a escala em que `(1+r)/(1+b) − 1` é a conta certa (ADR-006 §(b).5), e misturar escala
+> ali **produz número errado**, não só confuso. **`macro_quarterly` (§3) está em por cento**, e as
+> duas tabelas têm `cdi_tri`/`ipca_tri` com o mesmo nome: `macro = 100 × retornos`. As 11 fórmulas
+> vão no próprio artefato, em `relatorio_retornos.json → convencoes`, e o CDI/IPCA de cada trimestre
+> em `bases_por_trimestre` — dá para refazer qualquer linha com uma calculadora.
+
+> **Estado medido em 2026-10-11** (F-017, `python -m apps.pipeline.canonical.retornos --offline`):
+> **1.963** linhas · **24** `asset_id` dos 32 do enum · 83 trimestres (`2006Q1..2026Q3`) ·
+> `sha256 ab61eeca…`. `USDBRL` entrou por **D-l** (+83 linhas; `is_total_return = False`, porque
+> câmbio não tem carrego) e os **8** que seguem fora têm motivo nomeado em
+> `ATIVOS_FORA_DO_UNIVERSO`, publicado no relatório: os 5 `FII_*` (Teva/F-012 não rodou),
+> `SP500_HEDGE` (exige Fed Funds, FRED bloqueado), `UST10_BRL` (`YAHOO_TNX` é **taxa**, não
+> número-índice) e `GOLD_BRL` (não extraída). Nulos, todos com motivo: `is_total_return` **820**
+> (9 setoriais da B3 — G-01 — + CDI, para quem a flag não se aplica), `price_ini` **106**,
+> `price_fim` **83** (o CDI não tem nível de preço), e `ret_tri`/`ret_excesso_cdi`/`ret_real`/
+> `vol_intra_tri`/`dd_intra_tri`/`n_dias_uteis` **23** cada (o 1º trimestre de cada ativo de preço,
+> sem `T−1`). `ffill_dias_uteis = {0: 1.748, 1: 215}` — **nenhum** valor 2..5; `n_dias_uteis` entre
+> **58 e 66**. **O CDI é o único ativo com retorno em `2006Q1`**, porque a acumulação diária não
+> precisa de `T−1` — assimetria declarada. A tabela **não tem** flag de trimestre corrente
+> incompleto (`is_estimated` é de §3): ver `TODO.md §6`.
 
 ### 4.1 `RegimeAssetMetricsSchema` — métricas por regime × ativo (RF-032/040)
 
@@ -367,7 +555,88 @@ schema nasceu dentro do extrator e migrou para o pacote de schemas, porque é co
 
 ---
 
-## 8. Como evoluir um contrato
+## 8. `alinhado_trimestral` — a grade trimestral *long*, antes de qualquer cálculo (RF-023) · **classe C**
+
+`packages/shared/schemas/alinhado_trimestral.py` → `AlinhadoTrimestralSchema` · produzido por
+`apps/pipeline/canonical/alinhamento.py` (F-014, CLI
+`python -m apps.pipeline.canonical.alinhamento [--offline]`) · consumido por **F-015**
+(`macro_quarterly`), **F-016** (curva) e **F-017** (`asset_returns_quarterly`).
+**PK `(series_id, quarter)`**, 18 colunas em ordem fixa (`COLUNAS_ALINHADO`), 11 checks de DataFrame.
+
+**O que a tabela é.** Uma linha por `(quarter, series_id)` dizendo **qual observação da série
+representa aquele trimestre** — e, quando nenhuma representa, **por quê**. Nada é calculado: `value`
+é, bit a bit, o valor que `raw_series` tem em `date_obs` (sem interpolação, média de período,
+reescala ou preenchimento com `0` — Anti-SPEC §10.1.1/§10.1.4). É ela que dá **uma régua só** a
+F-015/F-016/F-017, em vez de três cópias da regra, e deixa o `ffill` **auditável por célula** antes
+de virar retorno.
+
+| Coluna | Tipo | Nulo? | Regra |
+|---|---|---|---|
+| `quarter` | str | não | `2006Q1`..`2026Q3` (mesmo regex de `macro_quarterly`) |
+| `quarter_end` | datetime | não | **último dia útil bancário** (ANBIMA) do trimestre — **igual em todas as linhas do trimestre** |
+| `series_id` | str | não | existe em `series_catalog` |
+| `grade` | str | não | `bancaria` \| `corrido` \| `civil` — a régua **desta** linha |
+| `date_alvo` | datetime | não | a data que esta linha buscou, segundo `grade` |
+| `date_obs` | datetime | **sim** | data da observação usada; nula ⇔ `value` nulo |
+| `value` | float | **sim** | o valor de `raw_series` em `date_obs`, sem transformação |
+| `ffill_dias_uteis` | int | não | 0..**5** (ADR-006 §(b).8); dias úteis de ffill **aproveitados**, `0` na célula nula |
+| `date_ultima_obs` | datetime | sim | última observação disponível até o alvo, **usada ou não** |
+| `lacuna_dias_uteis` | int ≥ 0 | não | dias úteis em `(date_ultima_obs, date_alvo]`, **medidos sempre** |
+| `motivo_nulo` | str | sim | `lacuna_acima_do_limite_de_ffill` \| `sem_observacao_ate_a_data_alvo` — os **dois** únicos |
+| `freq`, `unit`, `source` | str | não | mesmos enums de `raw_series`; constantes por série |
+| `vintage` | datetime | sim | safra usada nesta materialização (a **mais recente** — ver abaixo) |
+| `collected_at` | datetime | não | do dado, nunca do relógio da rodada |
+| `data_inicio_serie` | datetime | não | `data_inicio_observada` do catálogo materializado (CA-063) |
+| `fonte_versao` | str | não | `sha256` do código que alinhou a linha (RF-047/CA-121) |
+
+**As três grades, uma só chave de junção.** `quarter_end` é sempre o último dia útil bancário — é a
+grade única de ADR-006 e a chave com que `macro_quarterly` e `asset_returns_quarterly` se juntam. O
+que varia por série é `date_alvo`: `bancaria` (série `freq=D` de dia útil → `quarter_end`),
+`corrido` (série `freq=D` que o catálogo marca `calendario='corrido'` → último dia **civil**) e
+`civil` (`freq=M`/`Q`/`A`, cujo `date` já é fim de período civil por D-a → último dia civil). Em
+**24 dos 83** trimestres as duas datas divergem (1 a 3 dias civis, nunca dia útil), e a divergência
+fica **legível no dado, em duas colunas**. A régua `corrido` é **derivada de `calendario`** (§2), não
+de uma lista dentro do módulo.
+
+**Forward-fill: duas colunas, não uma.** `lacuna <= 5` → o valor é usado e
+`ffill_dias_uteis == lacuna_dias_uteis`. `lacuna > 5` → `value = NULL`, `date_obs = NULL`,
+`ffill = 0`, `motivo_nulo` preenchido e `date_ultima_obs`/`lacuna_dias_uteis` **registrando a lacuna
+rejeitada** (CA-067) — é o que separa "não há dado" de "havia dado longe demais para servir". Mês ou
+trimestre não divulgado cai na **mesma** regra, não numa exceção: um mês atrás são ~21 dias úteis e
+um trimestre ~65. **Nenhuma linha herda o período anterior.**
+
+**Materialização `revised`, declarada.** `selecionar_vintage` mantém, por série, **só o último
+`vintage`** — é o que impede duas linhas para a mesma `(series_id, quarter)` quando o IBGE revisa o
+PIB (D-b). A variante `asof` é **F-018** e esta tabela **não** a simula. Também **nenhuma linha é
+`is_estimated`**: aqui o trimestre incompleto aparece com `value = NULL` + `motivo_nulo`, e a flag é
+de F-015 (CA-060).
+
+**Checks de DataFrame (11).** `quarter_dentro_da_janela_de_83` ·
+`quarter_end_e_date_alvo_caem_no_trimestre` (CA-065) · **`quarter_end_unico_por_trimestre`** (é a
+opção **(a)** de D-h travada no contrato: virar para duas grades exige mudar o schema, não só o
+código) · `nulo_tem_motivo_e_nao_tem_data` · `ffill_e_a_lacuna_quando_ha_valor` ·
+`lacuna_acima_do_limite_nunca_tem_valor` (CA-067) · `observacao_nunca_depois_do_alvo` (base do
+`asof`, §10.2.7) · `date_obs_e_a_ultima_observacao_disponivel` ·
+**`sem_linha_antes_do_inicio_da_serie`** (CA-063 — é o que impede o backfill sintético de voltar por
+descuido) · `metadado_constante_por_serie` · unicidade da PK.
+
+**Quem fica fora, e por quê.** Toda série `source = DERIVADO` (`FONTES_FORA_DO_ALINHAMENTO`): a
+derivação tem convenção própria de data e de lacuna — um vértice pode ser `NULL` por não existir
+vencimento, o que **não** é lacuna de calendário —, então é a feature dona dela (F-016, F-017) que
+chama `alinhar_series` sobre o seu próprio resultado. O motivo está no dado
+(`relatorio_alinhamento.json → series_fora_do_alinhamento`), série a série.
+
+> **Estado medido em 2026-10-11:** **4.038** linhas (= 49 × 83 − 29 do painel desbalanceado), **49**
+> séries, **83** trimestres; por `grade` `bancaria` 2.793 · `civil` 1.162 · `corrido` 83;
+> `ffill_dias_uteis = {0: 3.823, 1: 215}` — **nenhum valor 2..5**, e os 215 são exatamente a conta de
+> **D-h** (11 séries `B3_API` × 20 quartos trimestres de 2006 a 2025); **7** células nulas (PIB e
+> IBC-Br em 3T2026, com `lacuna` 65 e 42); **0** PK duplicada. Companheiro:
+> `relatorio_alinhamento.json`, com a grade dos 83, o ffill por série **e** por trimestre, 1 bloco
+> por série e a escolha de D-h escrita em `decisao_d_h`.
+
+---
+
+## 9. Como evoluir um contrato
 
 1. Feature Contract **classe C** no `TODO.md` (schema canônico = classe C, `AGENTS.md §2`).
 2. Altere o schema em `packages/shared/schemas/` **primeiro**.

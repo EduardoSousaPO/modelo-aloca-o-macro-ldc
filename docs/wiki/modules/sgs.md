@@ -1,8 +1,9 @@
-# Módulo `sgs` — BCB (SGS + Olinda/Focus)
+# Módulo `sgs` — BCB SGS (séries históricas)
 
 > Verdade: `apps/pipeline/extract/bcb_sgs.py` + `research/fontes-de-dados.md §A1-A2`.
-> **Estado (2026-10-11): SGS implementado** (F-003, aguardando QA da Onda 1); **Focus não** (F-010).
-> Núcleo macro dos 20 anos — inflação, atividade, juros, câmbio. Maior cobertura, menor esforço.
+> **Estado (2026-10-11): implementado, QA APROVADO** após as correções do P1 da Onda 1
+> (`ONDA-1-QA-A.md`). Núcleo macro dos 20 anos — inflação, atividade, juros, câmbio. Maior
+> cobertura, menor esforço. **O Focus (Olinda/OData) tem página própria: [`focus.md`](./focus.md).**
 
 ## `data/processed/sgs/` — 15 séries, 44.447 linhas, 0,00% de nulos, todas cobrindo 1T2006
 
@@ -22,12 +23,22 @@ SIDRA `v/63` casa em **273 meses** e PIB 22109 × SIDRA `t/1621` em **90 trimest
 (`tests/unit/test_contract_sgs_sidra.py`). `--todas` traz mais 9 séries `ok` (núcleos do IPCA, IGP,
 DLSP, IC-Br) **nunca rodadas ao vivo** e sem canário declarado.
 
+A PTAX de venda (**SGS 1**) é, desde **D-l**, também o `asset_id` **`USDBRL`** de
+`asset_returns_quarterly`, com `is_total_return = False` declarado no catálogo (câmbio não tem
+carrego). Ver `modules/canonical.md`.
+
 ## Convenções, bordas e armadilhas (medidas, não herdadas)
 
 - **`date` de série M/Q = fim de período civil** (`fim_do_periodo`, D-a) — a API devolve o 1º dia.
-  Efeito medido: a linha do **mês corrente parcial** de 4390/4189 (01/10/2026 = 0,36% contra ~1,08%
-  de mês cheio) vira `2026-10-31`, cai no truncamento de data futura e é **descartada com log**.
-- **`vintage` = data do `collected_at` do manifesto do bruto** (D-b) → `--offline` byte-idêntico.
+- **Guarda de período parcial, explícita** (P1-1 do QA da Onda 1): observação de série `M`/`Q` cujo
+  período **ainda não encerrou** em `collected_at` é **recusada, contada e logada** — não depende
+  mais de o fim de período cair no truncamento de data futura. O QA provou que dependia: com
+  `--fim <último dia civil do mês>` (ou rodando no último dia do mês, sem flag), a linha do **mês
+  corrente** de **4390** (01/10/2026 = **0,36%** contra ~1,08% de mês cheio) e de **4189** (13,65)
+  entrava como se fosse o mês **fechado** — risco de Anti-SPEC §10.1.1. O SIDRA não é afetado (só
+  publica período fechado).
+- **`vintage` = data do `collected_at` do manifesto do bruto** (D-b) → `--offline` byte-idêntico; e
+  bruto **sem** manifesto é **recusado** (`ManifestoAusente`), nunca datado pelo relógio da rodada.
 - **`para_float_ponto_decimal`, nunca `para_float_ptbr`:** o JSON usa ponto decimal e trocar não
   explode — muda a escala em silêncio (`"6.930"` → 6930,0). Travado em teste.
 - **`janela_maxima_dias` é o que liga o fatiamento** (diária ~5 anos → 5 fatias; M/Q = 1 fatia); o
@@ -37,8 +48,16 @@ DLSP, IC-Br) **nunca rodadas ao vivo** e sem canário declarado.
 - **Meta Selic (432) é série de calendário corrido:** mesmo valor em sábado, domingo e feriado
   (`SERIES_DIARIAS_DE_CALENDARIO`), com continuidade **mais forte** — nenhum dia corrido ausente. Com
   `dataFinal` futuro devolve até a próxima reunião do Copom; `truncar_em` corta (CA-013).
+- **A grade de publicação agora está no catálogo, no campo `calendario`** (P1-2 do QA da Onda 1):
+  **2.377 dos 8.319 pontos da 432 (28,6%) caem em fim de semana**, e a distinção vivia só na
+  constante deste módulo — quem lê catálogo + Parquet (F-014, F-017, qualquer média sobre `freq='D'`)
+  sairia enviesado em 28,6% dos pontos. Hoje **7** séries `freq=D` declaram: `BCB_SGS_432 = corrido`
+  e as seis de dia útil (11, 1178, 12, 4389, 1, 10813 = `dias_uteis`); nas demais o campo é **nulo**.
+  É de `calendario` que F-014 **deriva** a régua `corrido`, e há teste de contrato afirmando que as
+  **três** declarações (catálogo, derivação de F-014 e esta constante) coincidem — `CONTRACTS.md §2`.
 - `/metadados` → 404 e `sgspub` → 502: códigos versionados no catálogo. Rate limit (429) existe.
 - **R16 · descontinuadas:** swaps 7801-7806 (2019) e IMA 12461-12469 (22/05/2023) **não entram**
   (S-02, S-04); o portão é `status=ok` no catálogo, com teste.
 
-**Features:** **F-003** (implementado) · **F-010** · **F-011** · **F-013**/**F-015**/**F-017**.
+**Features:** **F-003** (QA aprovado) · **F-011** · **F-013**/**F-015**/**F-017** ·
+**F-010** (Focus, em [`focus.md`](./focus.md)).

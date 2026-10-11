@@ -36,6 +36,11 @@ from packages.shared.schemas.alinhado_trimestral import (
 )
 from packages.shared.schemas.asset_returns_quarterly import (
     ASSET_IDS_VALIDOS,
+    ATIVOS_ACOES_B3,
+    ATIVOS_FII,
+    ATIVOS_INTERNACIONAIS,
+    ATIVOS_RENDA_FIXA,
+    N_MINIMO_ATIVOS,
     AssetReturnsQuarterlySchema,
     RegimeAssetMetricsSchema,
 )
@@ -81,6 +86,10 @@ from packages.shared.schemas.series_catalog import (
 
 __all__ = [
     "ASSET_IDS_VALIDOS",
+    "ATIVOS_ACOES_B3",
+    "ATIVOS_FII",
+    "ATIVOS_INTERNACIONAIS",
+    "ATIVOS_RENDA_FIXA",
     "COLUNAS_ALINHADO",
     "COLUNAS_RASTREAVEIS",
     "FEATURES_V3",
@@ -96,6 +105,7 @@ __all__ = [
     "MOTIVOS_VALIDOS",
     "MOTIVO_LACUNA_ACIMA_DO_LIMITE",
     "MOTIVO_SEM_OBSERVACAO",
+    "N_MINIMO_ATIVOS",
     "N_TRIMESTRES_JANELA",
     "PK_ALINHADO",
     "AlinhadoTrimestralSchema",

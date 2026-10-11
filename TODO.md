@@ -6,13 +6,13 @@
 > **v3.2 — Feedback Hardened + Project Wiki:** cada feature B/C/D traz o **Feature Contract inline**
 > (DoR + escopo + arquivos + CAs + testes + matriz). Features A podem ter apenas a descrição mínima.
 
-**Última revisão:** 2026-10-10
-**Fase:** SPEC + Anti-SPEC + contratos (pandera/pydantic) prontos · **40 features mapeadas** ·
-execução pode começar pelos extratores (classe B) sem esperar as 8 decisões bloqueantes
+**Última revisão:** 2026-10-11 (fechamento documental da Onda 2, parte 1)
+**Fase:** **Onda 2 — camada canônica (classe C)**. Ondas 0 e 1 concluídas e **aprovadas** no QA
+(9 features em §3) · **40 features mapeadas** · publicação segue travada por ADR-001
 **Tipo:** ferramenta interna (dados / quant — não SaaS, não web, roda local)
-**Foco atual:** §1 Em andamento = **F-009** (job diário ANBIMA — cada dia sem ele é série perdida)
-e **F-001** (infra de extração, pré-requisito de todos os extratores). Em seguida, **F-002 → F-008**
-(extratores de esforço baixo, caminho crítico de 2026-10-14)
+**Foco atual:** §1 Em andamento = **F-013, F-014, F-016** implementadas e aguardando
+QA/revisão numérica, com **F-015, F-017 e F-010** em implementação em paralelo. `data/canonical/`
+existe: 62 séries, 278.439 linhas, catálogo de 138 séries
 
 ---
 
@@ -57,10 +57,40 @@ qualquer mudança na camada canônica — ver `AGENTS.md §2`.
 
 > Máximo 2 itens simultâneos. Se tiver mais, você está dispersando.
 
-**Nada em implementação em 2026-10-11 (madrugada).** A Onda 1 fechou as 7 features de extração
-(F-002..F-008) e a consolidação alinhou as convenções divergentes entre elas; as 7 estão
-`[~] implementada — aguardando QA` em §2, e o próximo passo é o **subagente de QA** escrever
-`docs/plans/qa/ONDA-1-QA.md`. Só com o veredito `APROVADO` lá os itens descem para §3.
+**Onda 2 IMPLEMENTADA, QA pendente (2026-10-11).** A **Onda 1 está completa e aprovada**: QA
+independente em dois lotes (`docs/plans/qa/ONDA-1-QA-A.md`, `ONDA-1-QA-B.md`), **0 × P0**, e as 7
+features de extração desceram para **§3 Concluído**. As **6** features da Onda 2 estão
+**implementadas e aguardando QA/revisão numérica independente**:
+
+| Feature | O que entregou | Estado |
+|---|---|---|
+| **F-013** | `raw_series` + catálogo materializado | `MUDANÇAS_SOLICITADAS` do QA atendidas em `3265499` — **re-QA pendente** |
+| **F-014** | `alinhado_trimestral` (régua temporal única) | QA pendente |
+| **F-016** | curva: 11 séries, **D-i** | QA pendente |
+| **F-010** | Focus/Olinda: 5 EntitySets, 197 séries, 150.120 linhas | QA pendente · **D-k, D-p, D-q** |
+| **F-015** | `macro_quarterly` **83 × 42** + `macro_quarterly_provenance` (2.548) | QA + **revisão numérica** pendentes · **D-m, D-n, D-o** |
+| **F-017** | `asset_returns_quarterly` **1.963 × 16**, 24 ativos | QA + **revisão numérica** pendentes · **D-l, D-o** |
+
+**Próximo passo: Onda 3 — regimes** (F-019 V1 → F-020 V2 → F-021 V3 → F-022 métricas). Os insumos
+estão prontos e são os dois artefatos de F-015/F-017; ver `docs/wiki/modules/regimes.md`.
+
+**`data/canonical/` depois do rebuild sincronizado de 2026-10-11** (ordem obrigatória:
+`build_raw_series` → `alinhamento` → `macro_quarterly` → `retornos`, todos `--offline`; `curva`
+roda **antes**, porque escreve em `data/processed/`), **2 rodadas com hashes idênticos**:
+
+| Artefato | Estado medido | `sha256` |
+|---|---|---|
+| `raw_series.parquet` | **278.439** linhas · **62** séries · 1979-12-31 → 2026-10-10 · **7** tabelas excluídas (D-k) | `0d23df7a…` |
+| `series_catalog.parquet` | **138 × 26** · 62 presentes · 59 cobrem 1T2006 | `f56f207e…` |
+| `alinhado_trimestral.parquet` | **4.038** linhas · 49 séries · 83 trimestres · 215 ffill · 7 nulos | `ac0d9842…` |
+| `macro_quarterly.parquet` | **83 × 42** · `revised` · 5 colunas 100% nulas · 16 nulos em `ibcbr_gap` | `dcded731…` |
+| `macro_quarterly_provenance.parquet` | **2.548** linhas · 32 colunas · 20 séries | `4a582c1d…` |
+| `asset_returns_quarterly.parquet` | **1.963** linhas · **24** ativos · 83 trimestres | `ab61eeca…` |
+
+Os 4 `relatorio_*.json` têm `versao_build` **conferido contra o código em disco** (`e48262bb…`,
+`ae18c930…`, `5cd7bdaf…`, `20b812f2…`). Decisões da onda: **D-h (opção a)**, **D-i**, **D-j** (parte
+1) e **D-k..D-q** (parte 2) — todas em `DECISIONS_LOG §2.3`, **provisórias**, com o que precisa de
+ratificação do Edu tabulado em **§4**.
 
 **Consolidação da Onda 1 — o que mudou depois dos 7 relatórios** (decisões D-a..D-h, todas
 registradas em `docs/plans/DECISIONS_LOG.md §2.1` como **provisórias, aval de Edu pendente**):
@@ -140,323 +170,36 @@ divergência explicada + reconstrução completa de `data/canonical/`.
 
 ## PACOTE MÍNIMO — caminho crítico para 2026-10-14
 
-### [~] F-002 — Extrator ANBIMA S3: índices IMA — **implementada — aguardando QA (`docs/plans/qa/ONDA-1-QA.md`)**
+> **F-002..F-008 (os 7 extratores da Onda 1) saíram desta seção em 2026-10-11:** o QA independente
+> foi concluído (`docs/plans/qa/ONDA-1-QA-A.md` e `docs/plans/qa/ONDA-1-QA-B.md`) e as 7 desceram
+> para **§3 Concluído**, cada uma com o veredito e o que ficou pendente. O Feature Contract inline
+> de cada uma — inclusive as notas de ajuste de caminho/nome de arquivo — fica no histórico do git
+> (até o commit `3265499`); o conhecimento permanente está em `docs/wiki/modules/`.
 
-- **Risco:** B · **CI alvo:** N1 · **Branch:** `data/anbima-ima`
-- **Cobre:** RF-011 · e-mail: **B1, B2**
-- **CAs da SPEC:** CA-030, CA-031, CA-032, CA-033
+### [~] F-010 — Extrator Focus (BCB Olinda / OData v4) — **implementada — QA pendente**
 
-**DoR específica** — [x] SLUGs confirmados e hard-coded no catálogo (listagem do bucket é `AccessDenied`);
-[x] amostras já baixadas em `data/raw/anbima-ima/`; [x] sem decisão humana pendente.
-
-**Escopo incluído:** `IMAB`, `IMAB5`, `IMAB5MAIS`, `IRFM`, `IRFM1`, `IRFM1MAIS`, `IMAGERAL`, `IMAS`
-(+ `IMAGERALEXC`); leitura via `io.BytesIO` com `engine="openpyxl"`; normalização do rótulo da coluna
-`Índice`; output em `ProcessedSeriesSchema`.
-**Excluído:** `IMAC` (descontinuado 2021) e `IHFA` (fora do e-mail); reconciliação com SGS 12461-12469
-(fica em F-030 como teste de contrato opcional).
-
-**Arquivos (reais, como implementado):** `apps/pipeline/extract/anbima_s3.py`,
-`apps/pipeline/extract/__init__.py` (docstring do pacote, compartilhado com F-003..F-008),
-`tests/unit/test_extract_anbima_s3.py`, `tests/fixtures/anbima-ima/` (3 recortes reais +
-`imab__erro_accessdenied.xml` + `README.md` de procedência), `docs/wiki/modules/anbima.md`.
-**Saída:** `data/raw/anbima-ima/<SLUG>__2026-10-09.xlsx` (+ `.meta.json`) e
-`data/processed/anbima-ima/ANBIMA_<SLUG>.parquet` — 9 séries, 5.407-6.700 linhas cada.
-**Comando:** `python -m apps.pipeline.extract.anbima_s3 [--indices IMAB IRFM] [--offline]`
-
-> **Ajuste do Feature Contract — nomes de arquivo (2026-10-11, consolidação da Onda 1).** O
-> contrato pedia `tests/contract/test_<fonte>.py` e `tests/fixtures/<fonte_com_underscore>/`.
-> A implementação seguiu o briefing da onda e `tests/fixtures/README.md`: **um** arquivo de
-> teste `tests/unit/test_extract_<modulo>.py` e fixture em `tests/fixtures/<fonte-com-hifen>/`,
-> casando com a pasta de `data/raw/`. Não existe `tests/contract/`: o contrato vivo contra a
-> fonte é o teste `@pytest.mark.network`, que o CI N1 exclui. Vale para F-002..F-008 e não
-> muda nenhum CA.
-
-| Teste | Tipo | Cobre CA |
-|---|---|---|
-| magic bytes `PK` → lê com openpyxl | contract | CA-030 |
-| **valor-canário IMA-B 16/09/2003 = 723,070317** | contract | CA-031 |
-| rótulos `IMA-B` e `IMA - B` colapsam em 1 `asset_id` | unit | CA-032 |
-| os 8 índices do e-mail têm `data_inicio <= 2006-01-02` | unit | CA-033 |
-
-**Anti-SPEC específica:** §10.1.6 (não usar o SGS descontinuado como se vivo), base.
-
----
-
-### [~] F-003 — Extrator BCB SGS: IPCA, IBC-Br, Selic, CDI, PTAX — **implementada — aguardando QA (`docs/plans/qa/ONDA-1-QA.md`)**
-
-- **Risco:** B · **CI alvo:** N1 · **Branch:** `data/bcb-sgs`
-- **Cobre:** RF-001, RF-003, RF-005, RF-006, RF-015 · e-mail: **A1, A2, A4, B3, C1**
-- **CAs da SPEC:** CA-001..003, CA-006, CA-007, CA-011..016, CA-043, CA-044
-
-**DoR específica** — [x] 36 séries SGS no catálogo com código, início e pegadinha;
-[x] fatiamento ≤ 10 anos definido em F-001; [x] sem decisão humana pendente.
-
-**Escopo incluído:** séries 433, 13522, 24364, 24363, 11, 1178, 432, 4390, 4189, 12, 4389, 1, 10813
-(+ 22109, 22099 como espelho de PIB); fatiamento de séries diárias; truncamento da série 432 em `today`;
-acumulação geométrica do CDI/Selic por trimestre.
-**Excluído:** séries `a_confirmar` (21619, 4192, DBGG pré-2008) e `descartada` (13762, 24369);
-Focus (→ F-010).
-
-**Arquivos (reais, como implementado):** `apps/pipeline/extract/bcb_sgs.py`,
-`tests/unit/test_extract_bcb_sgs.py`, `tests/fixtures/sgs/` (9 fixtures reais + `README.md`),
-`tests/unit/test_contract_sgs_sidra.py` (reconciliação SGS × SIDRA por `date`, criada na
-consolidação da onda), `docs/wiki/modules/sgs.md`.
-**Saída:** `data/raw/sgs/<codigo>_<inicio>__<fim>.json` (43 fatias + manifesto) e
-`data/processed/sgs/<series_id>.parquet` — 15 séries, 44.447 linhas, frequência nativa.
-**Comando:** `python -m apps.pipeline.extract.bcb_sgs [--series BCB_SGS_433] [--todas] [--offline]`
-
-> **Ajuste do Feature Contract — nomes de arquivo e escopo (2026-10-11).** Vale a nota de
-> renomeação de F-002 (`tests/unit/test_extract_bcb_sgs.py` + `tests/fixtures/sgs/`, sem
-> `tests/contract/`). Além dela: **`apps/pipeline/transform/acumulacao.py` e
-> `tests/unit/test_acumulacao.py` não foram criados** — a acumulação geométrica de CDI/Selic
-> em produção (CA-014/015/016) é **F-017**; aqui ficaram a série diária na frequência nativa e
-> os testes que travam o fator acumulado de 2006 e 2015 sobre o Parquet.
-> `apps/pipeline/transform/` passou a existir na consolidação da onda, com `cambio.py` (D-g), e
-> é lá que F-017 entra. **`date` de série mensal/trimestral é fim de período** desde a
-> consolidação (D-a): o SGS devolve o 1º dia do período e `fim_do_periodo` converte.
-
-| Teste | Tipo | Cobre CA |
-|---|---|---|
-| série diária > 10 anos é fatiada, sem duplicata nem lacuna | integration | CA-011 |
-| **valor-canário Selic over 03/01/2005 = 0.064826** | contract | CA-012 |
-| **CDI 2006 acumulado = 15,0271%** (249 d.u.) | unit | CA-014 |
-| esquecer o `/100` da série 12 faz o teste falhar | unit negativo | CA-016 |
-| SGS 432 com data futura é truncada em `today` | unit | CA-013 |
-| IPCA 433 bate com SIDRA 1737 v63 em ago e set/2026 | contract | CA-002 |
-| **valor-canário PTAX 09/10/2026 = 4.9892** | contract | CA-043 |
-
-**Anti-SPEC específica:** §10.1.4 (não preencher com `0`), §10.1.5, base.
-
----
-
-### [~] F-004 — Extrator IBGE SIDRA: IPCA número-índice e PIB trimestral — **implementada — aguardando QA (`docs/plans/qa/ONDA-1-QA.md`)**
-
-- **Risco:** B · **CI alvo:** N1 · **Branch:** `data/ibge-sidra`
-- **Cobre:** RF-002, RF-004 · e-mail: **A1, A7**
-- **CAs da SPEC:** CA-004, CA-005, CA-008, CA-009, CA-010
-
-**DoR específica** — [x] tabelas/variáveis confirmadas (`t/1737` v63/v2265/v2266; `t/1621` v584
-`c11255/90707`; `t/5932` v6564); [x] encoding UTF-8 declarado; [x] sem decisão humana pendente.
-
-**Escopo incluído:** IPCA número-índice (deflator), IPCA mensal e 12m (reconciliação com SGS),
-PIB índice de volume dessazonalizado e variação T/T−1; tratamento da **primeira linha como cabeçalho**.
-**Excluído:** abertura setorial do PIB por `c11255` (fase 2); IPCA por grupos (L13, `a_confirmar`);
-desemprego (L9).
-
-**Arquivos (reais, como implementado):** `apps/pipeline/extract/ibge_sidra.py`,
-`tests/unit/test_extract_ibge_sidra.py`, `tests/fixtures/sidra/` (4 recortes reais feitos pela
-**fonte** via `p/` + 3 fixtures de erro reais + `README.md`), `docs/wiki/modules/sidra.md`.
-**Saída:** `data/raw/sidra/<slug>__<data_ref>.json` (+ `.meta.json`) e
-`data/processed/sidra/<series_id>.parquet` — 6 séries (562 obs mensais, 122 trimestrais).
-**Comando:** `python -m apps.pipeline.extract.ibge_sidra [--series SIDRA_1737_V63] [--offline]`
-
-> **Ajuste do Feature Contract — nomes de arquivo (2026-10-11, consolidação da Onda 1).** O
-> contrato pedia `tests/contract/test_<fonte>.py` e `tests/fixtures/<fonte_com_underscore>/`.
-> A implementação seguiu o briefing da onda e `tests/fixtures/README.md`: **um** arquivo de
-> teste `tests/unit/test_extract_<modulo>.py` e fixture em `tests/fixtures/<fonte-com-hifen>/`,
-> casando com a pasta de `data/raw/`. Não existe `tests/contract/`: o contrato vivo contra a
-> fonte é o teste `@pytest.mark.network`, que o CI N1 exclui. Vale para F-002..F-008 e não
-> muda nenhum CA.
-
-| Teste | Tipo | Cobre CA |
-|---|---|---|
-| primeira linha é cabeçalho, não dado | unit | CA-004 |
-| **valores-canário PIB 2006T1/T2/T3 = 131.74 / 132.14 / 134.36** | contract | CA-008 |
-| SIDRA `t/1621` ≡ SGS 22109 trimestre a trimestre | contract | CA-009 |
-| IPCA trimestral por razão do nº-índice ≡ encadeamento de 433 | unit | CA-005 |
-| acento não corrompe com `encoding="utf-8"` explícito | unit | CA-004 |
-
-**Anti-SPEC específica:** §10.4.26 (encoding), base.
-
----
-
-### [~] F-005 — Extrator Tesouro Direto (taxas e PUs de títulos públicos) — **implementada — aguardando QA (`docs/plans/qa/ONDA-1-QA.md`)**
-
-- **Risco:** B · **CI alvo:** N1 · **Branch:** `data/tesouro-direto`
-- **Cobre:** RF-008 · e-mail: **A5**
-- **CAs da SPEC:** CA-020, CA-021, CA-022
-
-**DoR específica** — [x] URL do recurso CKAN confirmada e arquivo já baixado (14,6 MB, 177.260 linhas);
-[x] formato medido (`;`, decimal vírgula, latin-1, `dd/mm/aaaa`); [x] UA de browser obrigatório.
-
-**Escopo incluído:** download do CSV único, parse tipado, split por tipo de título e vencimento,
-gravação em `data/processed/tesouro/`.
-**Excluído:** interpolação de vértices e inclinação (→ **F-016, classe C**); ANBIMA `ms*.txt` (→ F-009).
-
-**Arquivos (reais, como implementado):** `apps/pipeline/extract/tesouro_direto.py`,
-`tests/unit/test_extract_tesouro_direto.py`, `tests/fixtures/tesouro-direto/` (recorte real de
-171 linhas, HTML de erro real do CKAN, 1 fixture sintética de acento nomeada como tal +
-`README.md`), `docs/wiki/modules/tesouro.md`.
-**Saída:** `data/raw/tesouro-direto/precotaxatesourodireto__AAAA-MM-DD.csv` (14,6 MB, ETag e
-Last-Modified no manifesto) e `data/processed/tesouro-direto/td_painel.parquet` — **886.300
-linhas, 750 `series_id`** no padrão `TD_<SIGLA>_<AAAAMMDD do vencimento>_<METRICA>`.
-**Comando:** `python -m apps.pipeline.extract.tesouro_direto [--offline] [--forcar]`
-
-> **Ajuste do Feature Contract — caminhos (2026-10-11).** O contrato dizia
-> `data/processed/tesouro/`, `tests/contract/test_tesouro_direto.py` e
-> `tests/fixtures/tesouro/td_amostra.csv`. Implementado em `data/processed/tesouro-direto/`,
-> `tests/unit/test_extract_tesouro_direto.py` e `tests/fixtures/tesouro-direto/` — o slug com
-> hífen é a convenção de `tests/fixtures/README.md` e casa com `data/raw/`. CA-021, que o
-> contrato marcava `integration`, ficou como guarda unitária + teste `@pytest.mark.network`
-> sobre o arquivo completo. **Um** Parquet de painel, não um por `series_id`: 750 arquivos de
-> 5 KB seriam piores para o DuckDB (ADR-006) e para o join do canônico.
-
-| Teste | Tipo | Cobre CA |
-|---|---|---|
-| parse de 200 linhas: 8 tipos, nenhuma taxa `NaN` | contract | CA-020 |
-| cobertura de 2006 >= 240 dias úteis e `min(data) <= 2005-01-03` | integration | CA-021 |
-| encoding latin-1 explícito (acento em "Tesouro Prefixado") | unit | CA-022 |
-| CKAN sem UA → erro tratado | unit negativo | CA-020 |
-
-**Anti-SPEC específica:** §10.4.26, base.
-
----
-
-### [~] F-006 — Extrator API B3: índices amplos, setoriais e IFIX — **implementada — aguardando QA (`docs/plans/qa/ONDA-1-QA.md`)**
-
-- **Risco:** B · **CI alvo:** N1 · **Branch:** `data/b3-indices`
-- **Cobre:** RF-012, RF-013 · e-mail: **B4, B5**
-- **CAs da SPEC:** CA-034..039
-- **Decisão provisória que carrega:** `[PROVISÓRIO D12, L1]` — best-effort, janelas próprias (ADR-005)
-
-**DoR específica** — [x] endpoint `indexStatisticsProxy` re-testado na pesquisa; [x] códigos confirmados
-(**`IEEX`**, não `IEE`); [x] data-base medida índice a índice; [ ] **D12/L1 em aberto** — o padrão
-provisório (best-effort + janela própria) está em ADR-005 e **não bloqueia** a extração.
-
-**Escopo incluído:** `IBOV`, `IDIV`, `SMLL`, `INDX`, `IMAT`, `IEEX`, `IFNC`, `UTIL`, `ICON`, `IMOB`,
-`IFIX`; **unpivot** da matriz dia×mês; normalização de número pt-BR; `data_inicio` por série no catálogo.
-**Excluído:** `IFIL` (não é segmento, é liquidez); COTAHIST (fase 2); FII por segmento (→ F-012);
-confirmação de retorno total índice a índice (gap **G-01**, fica como pendência declarada).
-
-**Arquivos (reais, como implementado):** `apps/pipeline/extract/b3_indices.py`,
-`apps/pipeline/extract/__init__.py` (compartilhado), `tests/unit/test_extract_b3_indices.py`,
-`tests/fixtures/b3/` (7 respostas reais + 3 de erro/borda, todas de 2026-10-10 + `README.md`),
-`docs/wiki/modules/b3.md`.
-**Saída:** `data/raw/b3/<COD>/<ano>.json` (231 respostas + 231 manifestos) e
-`data/processed/b3/B3_<COD>.parquet` — 11 séries, **54.650 linhas**.
-**Comando:** `python -m apps.pipeline.extract.b3_indices [--codigos IBOV IFIX] [--anos 2006 2026] [--offline]`
-
-> **Ajuste do Feature Contract — nomes de arquivo (2026-10-11).** Vale a nota de renomeação de
-> F-002 (`tests/unit/test_extract_b3_indices.py`, sem `tests/contract/`). O nome do bruto é
-> `<ano>.json` dentro da pasta do índice, não o `<id>__<AAAA-MM-DD>` de `nome_arquivo_raw`: o
-> arquivo é a matriz de um ano inteiro, então a referência é o ano e o índice já é o diretório.
-
-| Teste | Tipo | Cobre CA |
-|---|---|---|
-| unpivot: **IBOV 01/02/2006 = 38.484,84**, 246 pontos em 2006 | contract | CA-034 |
-| `"38.484,84"` nunca vira `38.48` | unit | CA-035 |
-| `ICON`/`IMOB` em 2006/2007 trazem só o ponto-base | contract | CA-036 |
-| célula vazia → omitida ou `NULL`, nunca `0` | unit negativo | CA-037 |
-| `IFIX` 2010 só ponto-base; 2011 com 249 pontos | contract | CA-038 |
-
-**Anti-SPEC específica:** §10.1.1 (sem backfill sintético de IFIX/ICON/IMOB), §10.1.4, §10.4.27 (não
-scrapear o shell Angular), base.
-
----
-
-### [~] F-007 — Extrator internacional: Yahoo `^GSPC` + MSCI ACWI (NETR) em BRL — **implementada — aguardando QA (`docs/plans/qa/ONDA-1-QA.md`)**
-
-- **Risco:** B · **CI alvo:** N1 · **Branch:** `data/internacional`
-- **Cobre:** RF-016 · e-mail: **C1**
-- **CAs da SPEC:** CA-045, CA-046, CA-047
-
-**DoR específica** — [x] endpoints confirmados; [x] PTAX disponível via F-003; [x] proibição do FRED
-`SP500` registrada no catálogo (`status: descartada`); [ ] **D6 em aberto** — não bloqueia a extração
-(só a formulação da recomendação, F-026).
-
-**Escopo incluído:** `^GSPC` (com `period1`/`period2` em epoch), MSCI `892400` variante `NETR`
-(+ `990100`, `984000` como alternativas), conversão a BRL pela PTAX do **mesmo dia útil**,
-marcação de `is_total_return`.
-**Excluído:** ouro (`GOLD_BRL` depende do gap **G-03** — sem fonte confirmada, retorna
-`BLOQUEADO — FONTE INDISPONÍVEL`); ETFs `ACWI`/`URTH`/`IVVB11` (não cobrem 2006); FRED (→ F-011).
-
-**Arquivos (reais, como implementado):** `apps/pipeline/extract/yahoo.py`,
-`apps/pipeline/extract/msci.py`, `apps/pipeline/transform/cambio.py` +
-`apps/pipeline/transform/__init__.py` (a conversão a BRL, movida na consolidação — D-g),
-`packages/shared/schemas/series_catalog_data.py` (**+2 entradas**: `ACWI_BRL` e `SP500_BRL`,
-`fonte=DERIVADO`; o catálogo passou de 132 para **134** séries),
-`tests/unit/test_extract_yahoo.py`, `tests/unit/test_extract_msci.py`,
-`tests/fixtures/yahoo/` (6 respostas reais), `tests/fixtures/msci/` (4 respostas reais),
-`docs/wiki/modules/internacional.md`.
-**Saída:** `data/processed/yahoo/{YAHOO_GSPC,YAHOO_TNX,YAHOO_VIX,YAHOO_DXY,SP500_BRL}.parquet`
-e `data/processed/msci/{MSCI_ACWI_NETR,MSCI_WORLD_NETR,MSCI_USA_NETR,MSCI_EM_NETR,ACWI_BRL}.parquet`.
-**Comando:** `python -m apps.pipeline.extract.yahoo [--tickers GSPC] [--offline] [--sem-brl]`
-e `python -m apps.pipeline.extract.msci [--offline]`
-
-> **Ajuste do Feature Contract — nomes de arquivo e 2 arquivos a mais (2026-10-11).** Vale a
-> nota de renomeação de F-002 (`tests/unit/test_extract_{yahoo,msci}.py`, sem
-> `tests/contract/`). Dois acréscimos **sancionados** na consolidação: (i) as 2 entradas de
-> catálogo das séries derivadas em BRL (D-d), cada uma com `is_total_return` explícito, porque
-> `ProcessedSeriesSchema` não tem essa flag e o lugar dela é o catálogo; (ii)
-> `apps/pipeline/transform/cambio.py`, para onde desceram `converter_para_brl` e
-> `carregar_ptax` (D-g) — antes `msci.py` importava `yahoo.py` só por causa delas.
-
-| Teste | Tipo | Cobre CA |
-|---|---|---|
-| sem UA → 429 (documentado); com UA → 200 | unit negativo | CA-045 |
-| **valor-canário MSCI ACWI NETR 31/01/2006 = 121,3858** | contract | CA-046 |
-| `range=max` mensal trunca → usar `period1/period2` | unit | CA-045 |
-| conversão a BRL usa PTAX do mesmo dia útil | unit | CA-047 |
-| price return x total return sem flag → falha | unit negativo | CA-047 |
-
-**Anti-SPEC específica:** §10.2.12 (não misturar total e price return), §10.1.3 (janela rolante), base.
-
----
-
-### [~] F-008 — Calendário de dias úteis (ANBIMA) — **implementada — aguardando QA (`docs/plans/qa/ONDA-1-QA.md`)**
-
-- **Risco:** B · **CI alvo:** N1 · **Branch:** `data/calendario`
-- **Cobre:** RF-018 · e-mail: **A4, B3**
-- **CAs da SPEC:** CA-051, CA-052
-
-**DoR específica** — [x] arquivo confirmado (HTTP 200, 111.104 bytes, sem auth); [x] fallback `bizdays`
-mapeado; [x] sem decisão humana pendente.
-
-**Escopo incluído:** carga do `feriados_nacionais.xls`, API `ultimo_dia_util(ano, mes)` e
-`dias_uteis(inicio, fim)`, usada por **toda** acumulação e alinhamento.
-**Excluído:** calendário de outras praças; feriados estaduais.
-
-**Arquivos (reais, como implementado):** `apps/pipeline/extract/calendario_anbima.py`,
-`packages/shared/schemas/calendario.py` (`CalendarioDiasUteisSchema`, migrado na consolidação
-— D-f) + export em `packages/shared/schemas/__init__.py`,
-`tests/unit/test_extract_calendario_anbima.py`, `tests/fixtures/anbima-feriados/` (4 páginas
-reais + 404 real de 2000 + 512 bytes reais do cabeçalho BIFF da planilha + `README.md`),
-`docs/wiki/modules/calendario.md`.
-**Saída:** `data/raw/anbima-feriados/<ano>__<ano>-12-25.html` (30 páginas + manifesto) +
-`feriados_nacionais__2099-12-31.xls` (a planilha da SPEC, arquivada como **fonte de registro**)
-e `data/processed/calendario/dias_uteis_anbima.parquet` — 10.957 dias civis, 2001→2030,
-7.530 dias úteis, 367 feriados.
-**Comando:** `python -m apps.pipeline.extract.calendario_anbima [--anos 2006 2026] [--offline]`
-
-> **Ajuste do Feature Contract — pasta, nomes e formato da fonte (2026-10-11).** O contrato
-> pedia `apps/pipeline/transform/calendario.py` + `tests/unit/test_calendario.py` +
-> `tests/fixtures/anbima/feriados.xls`. Implementado em `apps/pipeline/extract/` porque o
-> módulo **baixa** da fonte (o que se faz com o calendário depois é F-014), com a renomeação de
-> teste e fixture de F-002. O dado vem das páginas HTML `fer_nacionais/<ano>.asp` da **mesma**
-> fonte, e não do `.xls` que a SPEC nomeia — que é XLS/BIFF real e exigiria dependência nova;
-> decisão **ratificada** na consolidação e registrada em `DECISIONS_LOG §2`. O schema do
-> DataFrame nasceu dentro do extrator e foi migrado para `packages/shared/schemas/calendario.py`
-> (D-f), porque é contrato de dado e F-014/F-017 vão importá-lo sem depender do extrator.
-
-| Teste | Tipo | Cobre CA |
-|---|---|---|
-| 2006 tem **249 dias úteis** (confere com a contagem do CDI) | unit | CA-051 |
-| fim de trimestre em feriado → dia útil anterior | unit | CA-052 |
-| datas-armadilha (01/02 vs 02/01, Carnaval, 31/12 no fim de semana) | unit | CA-052 |
-
-**Anti-SPEC específica:** base.
-
----
-
-### [ ] F-010 — Extrator Focus (BCB Olinda / OData v4)
+> **Estado (2026-10-11):** implementada, **QA pendente**. `data/processed/focus/` com **5
+> EntitySets**, **197 `series_id`**, **150.120 linhas**, **0,00%** de nulos, 2004-01-02 →
+> **2026-10-02** (a fonte publica com defasagem; o máximo de `Data` não é "hoje"). As 11 séries
+> densas têm **5.710** observações contra **5.714** dias úteis da ANBIMA, com as 4 ausências todas
+> em 2004 e **nenhuma** data fora do calendário de dia útil — é a conferência de contagem mais forte
+> que esta fonte permite. **G-04 e G-05 resolvidos** (ver `DECISIONS_LOG` **D-q**): o rótulo é
+> `PIB Total` e `baseCalculo=1` **só existe de 2014 em diante**, logo `0` é a única base com os 20
+> anos do e-mail. **O Focus fica fora de `raw_series`** (**D-k**, 5 entradas em
+> `TABELAS_FORA_DO_RAW_SERIES`): os 197 `series_id` são **compostos**
+> (`FOCUS_<ESCOPO>_<INDICADOR>_<CHAVE>`) e não são entradas do catálogo — o catálogo registra o
+> EntitySet, exatamente como no painel do Tesouro. F-015 o consome direto de
+> `data/processed/focus/`. **`FOCUS_PIB_TOTAL` do catálogo virou `descartada`** (**D-p**), porque
+> ficou redundante com G-04 resolvido. 2 rodadas `--offline` byte-idênticas.
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `data/focus`
 - **Cobre:** RF-007 · e-mail: **A3**
 - **CAs da SPEC:** CA-017, CA-018, CA-019
 
 **DoR específica** — [x] 5 EntitySets confirmados com data de início; [x] pegadinhas mapeadas
-(`$top` trunca, `$apply`/`$count` ignorados, capitalização variável); [ ] **G-05** (convenção de
-`baseCalculo`) e **G-04** (rótulo de `PIB Total`) a confirmar — resolvê-los é parte desta feature.
+(`$top` trunca, `$apply`/`$count` ignorados, capitalização variável); [x] **G-05** (`baseCalculo=0`,
+porque `1` só existe desde 2014) e **G-04** (`PIB Total`, enumerado em `INDICADORES_ENUMERADOS`)
+**resolvidos nesta feature** — D-q.
 
 **Escopo incluído:** `ExpectativasMercadoAnuais`, `ExpectativaMercadoMensais`,
 `ExpectativasMercadoTrimestrais`, `ExpectativasMercadoSelic`, `ExpectativasMercadoInflacao12Meses`;
@@ -464,15 +207,39 @@ filtro de `baseCalculo` único; normalização de nomes de campo; enumeração d
 (resolve G-04).
 **Excluído:** Top5; V1b vs. Focus (→ F-033); surpresa como feature de regime (fica em F-015/F-021).
 
-**Arquivos:** `apps/pipeline/extract/bcb_focus.py`, `tests/contract/test_bcb_focus.py`,
-`tests/fixtures/focus/*.json`, `docs/wiki/modules/sgs.md` (seção Focus).
+**Arquivos (reais, como implementado):** `apps/pipeline/extract/bcb_focus.py`,
+**`tests/unit/test_extract_bcb_focus.py`** (68 testes sem rede, 2 sob `-m network`),
+`tests/fixtures/focus/` (12 fixturas reais + `README.md`),
+**`docs/wiki/modules/focus.md`** (página própria, ≤ 60 linhas),
+`apps/pipeline/canonical/build_raw_series.py` (+5 entradas de exclusão, D-k),
+`tests/unit/test_canonical_raw_series.py` (fixture + teste de conjunto exato, renomeado),
+`tests/contract/test_curva_contract.py` (o mesmo conjunto exato),
+`packages/shared/schemas/series_catalog_data.py` (**1** entrada alterada, D-p).
+**Saída:** `data/processed/focus/<EntitySet>.parquet` (5 arquivos, 628 KB) +
+`data/raw/focus/` (184 páginas + 184 manifestos, 66 MB, no `.gitignore`).
+**Comando:** `python -m apps.pipeline.extract.bcb_focus [--offline] [--series <EntitySet>] [--detalhar-series]`
+**Doc do orquestrador:** `docs/wiki/modules/focus.md`, `DECISIONS_LOG §2.3` (D-k, D-p, D-q).
+
+> **Ajuste do Feature Contract — caminhos e nomes (2026-10-11).** O contrato pedia
+> `tests/contract/test_bcb_focus.py` e uma **seção Focus** em `docs/wiki/modules/sgs.md`; o briefing
+> da onda mandou `tests/unit/test_extract_bcb_focus.py` + `tests/fixtures/focus/` + context pack, e
+> **congelou** `docs/wiki/modules/`. Seguiu o briefing; no fechamento o conteúdo permanente foi para
+> **`modules/focus.md`** (página nova, não seção da `sgs.md`, que ficou grande demais) e `sgs.md`
+> passou a só apontar para ela. Nenhum CA mudou de enunciado.
+>
+> **Três acréscimos sancionados no fechamento:** as 5 entradas de `TABELAS_FORA_DO_RAW_SERIES`
+> (**D-k**), `FOCUS_PIB_TOTAL` → `descartada` (**D-p**) e a renomeação de
+> `test_descoberta_exclui_calendario_e_painel_do_tesouro` → `..._painel_do_tesouro_e_focus`, que é o
+> teste do conjunto **exato** de exclusões (o nome mentia depois de D-k).
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
-| `baseCalculo` 0 e 1 na mesma data → 1 linha no output | contract | CA-017 |
-| exatamente 20.000 linhas → assert de truncamento falha | unit negativo | CA-018 |
-| nomes de campo normalizados nos 5 EntitySets | unit | CA-019 |
-| `Indicador` enumerado e registrado (G-04) | integration | CA-019 |
+| `baseCalculo` 0 e 1 na mesma data → 1 linha no output | unit (seção de parse) | CA-017 |
+| exatamente 20.000 linhas → `recusar_truncamento_silencioso` levanta | unit negativo | CA-018 |
+| nomes de campo normalizados nos 5 EntitySets (`CAMPOS_CANONICOS`) | unit | CA-019 |
+| `Indicador` enumerado e registrado (`INDICADORES_ENUMERADOS`, G-04) | unit + `network` | CA-019 |
+| `$orderby` com `+` → HTTP 400 (fixture real do erro) | unit negativo | base |
+| corpo `/*{erro}*/` sem `Content-Type` recusado por `validar_corpo_odata` | unit negativo | base |
 
 **Anti-SPEC específica:** §10.1.5, base.
 
@@ -536,24 +303,56 @@ filtro de `baseCalculo` único; normalização de nomes de campo; enumeração d
 
 ---
 
-### [ ] F-013 — Camada `raw_series` + `series_catalog` materializado — **classe C**
+### [~] F-013 — Camada `raw_series` + `series_catalog` materializado — **classe C** — **implementada — QA/revisão numérica**
 
-- **Risco:** **C** · **CI alvo:** N2 · **Branch:** `feat/camada-raw-series`
+> **Estado (2026-10-11):** implementada; o QA independente deu **`MUDANÇAS_SOLICITADAS`**
+> (`docs/plans/qa/ONDA-2-QA-F013.md`: 3 × P1, 7 × P2, **0 × P0**, com o número central confirmado) e
+> as **MUDANÇAS_SOLICITADAS foram atendidas no commit `3265499`** — P1-1 (`versao_build` cego ao
+> catálogo → hash do **conjunto** `MODULOS_DO_BUILD` + `versao_build_componentes` +
+> `catalogo_sha256`), P1-2 (`calendario` fora do materializado → coluna no `SeriesCatalogSchema`,
+> artefato com **26** colunas), P1-3 (dedup cegando CA-077 → divergência medida nas **8** colunas e
+> guardas antes do dedup) e P2-1/P2-2/P2-3/P2-7, cada um com teste de regressão. `data/canonical/`
+> foi **reconstruído** depois de F-014/F-016: **62** séries, **278.439** linhas,
+> `versao_build 867ecc90…`. **Falta o re-QA** (os números de `docs/plans/qa/ONDA-2-QA-F013.md` são do
+> acervo de 51 séries) e a P2-4 (limiar de `pct_nulos`) segue aberta em §6.
+
+- **Risco:** **C** · **CI alvo:** N2 (parcial — marker `integration` inexistente, ver §6) · **Branch:** `feat/camada-raw-series`
 - **Cobre:** RF-019, RF-020, RF-026, RF-047 · e-mail: todos
 - **CAs da SPEC:** CA-053..058, CA-075..077, CA-120
 
 **DoR específica** — [x] schemas prontos (`raw_series.py`, `series_catalog.py`, `series_catalog_data.py`
-com 132 séries validadas); [x] ADR-006 (Parquet + DuckDB) proposto; [ ] ADR-006 **validado pelo Edu**
-antes do merge (é a base da camada canônica).
+— **138** séries validadas na reconstrução de 2026-10-11); [x] ADR-006 (Parquet + DuckDB) proposto;
+[ ] ADR-006 **validado pelo Edu** antes do merge (é a base da camada canônica) — **desenvolvimento
+liberado, aceite formal pendente** (§4).
 
 **Escopo incluído:** carga de todos os `data/processed/` para `raw_series` (Parquet) na granularidade
 nativa; materialização do `series_catalog`; portão pandera na entrada/saída de `data/canonical/`;
 coluna de origem obrigatória; DuckDB derivado (opcional, regenerável).
 **Excluído:** qualquer agregação trimestral (→ F-014/F-015).
 
-**Arquivos:** `apps/pipeline/load/raw_series.py`, `apps/pipeline/load/catalog.py`,
-`packages/shared/schemas/*` (acréscimos), `tests/contract/test_raw_series_schema.py`,
-`tests/integration/test_camada_raw.py`, `docs/contracts/CONTRACTS.md`, `docs/wiki/modules/canonical.md`.
+**Arquivos (reais, como implementado):** `apps/pipeline/canonical/__init__.py`,
+`apps/pipeline/canonical/build_raw_series.py` (o build inteiro: descoberta, carga, consolidação, as
+4 guardas, catálogo materializado, escrita, DuckDB, relatório, CLI),
+`packages/shared/schemas/series_catalog.py` (**+`SeriesCatalogMaterializedSchema`** e **+ coluna
+`calendario`** em `SeriesCatalogSchema`; `RawSeriesSchema` intocado),
+`packages/shared/schemas/__init__.py` (+1 export), `tests/unit/test_canonical_raw_series.py`
+(34 testes em 3 seções + regressões pós-QA), `tests/contract/test_raw_series_schema.py` (25 testes —
+**primeiro** arquivo de `tests/contract/` do projeto), `tests/fixtures/canonical/README.md`.
+**Saída:** `data/canonical/{raw_series.parquet, series_catalog.parquet, relatorio_build.json,
+ldc.duckdb}` — 278.439 linhas / 62 séries / 1979-12-31 → 2026-10-10; catálogo **138 × 26**; DuckDB
+com as **views** `raw_series` e `series_catalog`.
+**Comando:** `python -m apps.pipeline.canonical.build_raw_series [--offline] [--sem-duckdb]`
+**Doc do orquestrador:** `docs/contracts/CONTRACTS.md §1.1/§2.4`, `docs/wiki/modules/canonical.md`.
+
+> **Ajuste do Feature Contract — caminhos (2026-10-11).** O contrato pedia
+> `apps/pipeline/load/raw_series.py` + `apps/pipeline/load/catalog.py`; o briefing da onda fixou
+> `apps/pipeline/canonical/` e a CLI `python -m apps.pipeline.canonical.build_raw_series` — a pasta
+> casa com a saída e com `docs/wiki/modules/canonical.md`. **Um** módulo, não dois, porque a
+> materialização do catálogo lê o **mesmo** DataFrame consolidado (separar criaria uma segunda
+> travessia de `data/processed/`). `tests/integration/test_camada_raw.py` virou a **seção C** de
+> `tests/unit/test_canonical_raw_series.py`: o marker `integration` não existe em `pyproject.toml`
+> (congelado nesta onda, com `--strict-markers`) e `@pytest.mark.integration` falharia a coleta —
+> dívida em §6. Nenhum CA muda; o QA da Onda 2 aceitou os três desvios.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -570,17 +369,27 @@ independente** (quem escreveu não confere).
 
 ---
 
-### [ ] F-014 — Alinhamento trimestral (fim de período, ffill <= 5 d.u.) — **classe C**
+### [~] F-014 — Alinhamento trimestral (fim de período, ffill <= 5 d.u.) — **classe C** — **implementada — QA/revisão numérica**
 
-- **Risco:** **C** · **CI alvo:** N2 · **Branch:** `feat/alinhamento-trimestral`
+> **Estado (2026-10-11):** implementada, **QA pendente**. Materializa a tabela intermediária
+> **`alinhado_trimestral`** (`data/canonical/alinhado_trimestral.parquet`, **4.038** linhas · 49
+> séries · 83 trimestres) + `relatorio_alinhamento.json`. **D-h decidida: opção (a)** — grade
+> bancária única, com **215** células de `ffill_dias_uteis = 1` (5,325% de 4.038), todas em séries
+> `B3_API`, nos 20 quartos trimestres de 2006 a 2025, **nenhuma** com ffill 2..5. **7** células
+> nulas (PIB SGS/SIDRA e IBC-Br em 3T2026), todas com `motivo_nulo` e a lacuna registrada. O
+> contrato novo está em `docs/contracts/CONTRACTS.md §8`.
+
+- **Risco:** **C** · **CI alvo:** N2 (parcial — ver §6) · **Branch:** `feat/alinhamento-trimestral`
 - **Cobre:** RF-023 · e-mail: base de A/B/C
-- **CAs da SPEC:** CA-065..068
+- **CAs da SPEC:** CA-065..068 **+** CA-061/063/076/077/120 **por tabela** (nenhum CA novo criado)
 - **Depende de:** F-008 (calendário), F-013 (raw_series)
 
 **DoR específica** — [x] convenção congelada em ADR-006 (último dia útil, ffill <= 5, encadeamento
 geométrico); [x] calendário ANBIMA disponível (`data/processed/calendario/dias_uteis_anbima.parquet`,
-F-008: 2001→2030, 7.530 d.u.); [ ] ADR-006 validado pelo Edu; **[ ] decisão explícita sobre a grade
-das séries da B3 (D-h) — ver abaixo, é item de DoR, não detalhe de implementação.**
+F-008: 2001→2030, 7.530 d.u.); [ ] ADR-006 validado pelo Edu — **desenvolvimento liberado, aceite
+formal pendente** (§4), e **esta feature é a parte (b) do ADR**; **[x] decisão explícita sobre a
+grade das séries da B3 (D-h): escolhida a opção (a)**, registrada em `DECISIONS_LOG §2.1` e no dado
+(`relatorio_alinhamento.json → decisao_d_h`).
 
 > **D-h — a B3 fecha em dias que o calendário bancário considera úteis.** Medido por F-008 contra
 > 20 anos de série: o conjunto de dias úteis da ANBIMA é **idêntico** ao do CDI (SGS 12) e ao do
@@ -606,14 +415,50 @@ das séries da B3 (D-h) — ver abaixo, é item de DoR, não detalhe de implemen
 > Escolher **(b) é decisão de alinhamento, classe C, e não é do extrator**. O calendário entrega as
 > duas: `ajustar_para_tras` dá a grade bancária e `dia_util_anterior(d, 1)` dá o passo de ffill.
 > Detalhe completo em `docs/wiki/modules/calendario.md` e `docs/wiki/modules/canonical.md`.
+>
+> **RESOLVIDO em 2026-10-11 — escolhida a (a)** (orquestrador, provisória, aval do Edu pendente;
+> `DECISIONS_LOG §2.1`). Custo medido no acervo: **215** células com `ffill_dias_uteis = 1` de 4.038
+> (**5,325%**), em **11** séries `B3_API` e **20** trimestres (`2006Q4..2025Q4`); **zero** célula com
+> ffill 2..5, **zero** série não-B3 com ffill. (b) trocaria um erro de **1 dia útil, medido e visível
+> por linha**, por **duas réguas de tempo** no mesmo dataset — toda tabela e toda figura passariam a
+> ter de declarar qual grade a linha usa, e o `join` entre `macro_quarterly` e
+> `asset_returns_quarterly` deixaria de ser por `quarter_end`. O check
+> `quarter_end_unico_por_trimestre` de `AlinhadoTrimestralSchema` **trava** a escolha no contrato:
+> virar para (b) exige mudar o schema, não só o código. Os 215 ffill vão para a página de limitações
+> (F-028).
 
 **Escopo incluído:** cálculo do `quarter_end` dos 83 trimestres; reindexação de séries diárias/mensais
 para a grade; `ffill_dias_uteis`; `NULL` registrado acima de 5 d.u.; detecção de data duplicada/fora
 de ordem.
 **Excluído:** cálculo de retorno (→ F-017); regra anti-look-ahead (→ F-018).
 
-**Arquivos:** `apps/pipeline/transform/alinhamento.py`, `tests/unit/test_alinhamento.py`,
-`tests/integration/test_grade_trimestral.py`.
+**Arquivos (reais, como implementado):** `apps/pipeline/canonical/alinhamento.py` (grade, as 3
+réguas, ffill, painel desbalanceado, guardas, relatório, CLI),
+`packages/shared/schemas/alinhado_trimestral.py` (**+1 módulo**: `AlinhadoTrimestralSchema`, 18
+colunas, 11 checks de DataFrame), `packages/shared/schemas/__init__.py` (+1 import / +12 `__all__`),
+`tests/unit/test_canonical_alinhamento.py` (**72** testes em 5 seções),
+`tests/contract/test_alinhamento_schema.py` (**34** testes — 1 regra quebrada por teste).
+**Saída:** `data/canonical/alinhado_trimestral.parquet` (4.038 linhas, 55.813 B) +
+`data/canonical/relatorio_alinhamento.json` (grade dos 83, ffill por série **e** por trimestre,
+1 bloco por série, `decisao_d_h`).
+**Comando:** `python -m apps.pipeline.canonical.alinhamento [--offline]`
+**Doc do orquestrador:** `docs/contracts/CONTRACTS.md §8`, `docs/wiki/modules/canonical.md`.
+
+> **Ajuste do Feature Contract — caminhos, nomes e artefato novo (2026-10-11).** (i) O contrato
+> pedia `apps/pipeline/transform/alinhamento.py`; implementado em
+> `apps/pipeline/canonical/alinhamento.py`, que é onde F-013 mora e de onde `alinhar_series` é
+> importado (`transform/` ficou com `cambio.py`, D-g). (ii) `tests/unit/test_alinhamento.py` →
+> **`tests/unit/test_canonical_alinhamento.py`**, casando com `test_canonical_raw_series.py` (F-013)
+> e `test_canonical_curva.py` (F-016). (iii) `tests/integration/test_grade_trimestral.py` virou as
+> seções D e E do teste unitário — mesma causa de F-013 (marker `integration` inexistente, §6).
+> (iv) **A tabela `alinhado_trimestral` é nova no contrato:** o `TODO.md` descrevia F-014 como
+> "reindexação", sem nomear artefato. Materializá-la (em vez de alinhar dentro de F-015/F-017) foi
+> escolha do implementador, por três motivos — o diff numérico de classe C passa a ser uma
+> **igualdade** verificável célula a célula contra `raw_series`; F-015/F-016/F-017 consomem **a
+> mesma** régua em vez de três cópias da regra; e o `ffill` fica auditável **por célula** antes de
+> virar retorno (é o que a página de limitações de F-028 precisa citar). Custo: 55 KB em
+> `data/canonical/` e a §8 nova em `CONTRACTS.md`. **Aceito pelo orquestrador.** Se algum dia
+> preferir a tabela só em memória, basta não gravar: `alinhar_series` já é pura.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -627,7 +472,27 @@ de ordem.
 
 ---
 
-### [ ] F-015 — `macro_quarterly` com 83 trimestres — **classe C**
+### [~] F-015 — `macro_quarterly` com 83 trimestres — **classe C** — **implementada — QA/revisão numérica**
+
+> **Estado (2026-10-11):** implementada, **QA e revisão numérica independente pendentes**.
+> `macro_quarterly.parquet` com **83 × 42** (`2006Q1..2026Q3`, materialização **`revised`**,
+> `sha256 dcded731…`), a companheira `macro_quarterly_provenance.parquet` com **2.548** linhas
+> (**32** colunas rastreáveis, **20** séries de origem, CA-120 por anti-join nas **duas** direções)
+> e `relatorio_macro.json` com nulos **por coluna com motivo**, unidades, 4 canários, bloco
+> anti-look-ahead e a sensibilidade do hiato. 2 rodadas byte-idênticas.
+> **Só 5 colunas são 100% nulas**, todas por gap declarado: `ipca_meta`/`ipca_desvio_meta` (G-02),
+> `embi_br_fim`/`embi_delta_tri` (L8) e `termos_troca_yoy` (sem fonte; proxy IC-Br em §6).
+> **CA-007 não é satisfazível** com o IBC-Br real (começa em 2003): `ibcbr_gap` fica com **16**
+> nulos e a V1 de F-019 classifica **67** dos 83 trimestres — **D-m**, SPEC **não** editada, a
+> alternativa (`min_periods = 8`, recupera 12) está **medida** no relatório. Decisões que carregam
+> número: grade de **apoio** `2001Q1..2005Q4` conferida célula a célula contra F-014 (**913
+> células, 0 divergências**); **todo nível é a célula de F-014 bit a bit**; acumulação **geométrica**
+> e só com trimestre completo (**0** incompletos nos 83); Focus lido de `data/processed/focus/` com
+> a régua "coleta do início de T" e troca `H0`→`H1` no 1º trimestre; `ciclo_selic` é **função
+> publicada, não coluna**. **`INCLINACAO_REAL_5A_3A` não ganhou coluna** (**D-n**) — F-019/F-021
+> leem a série. **Unidade: por cento/pp** (**D-o**), contra a fração de F-017.
+> **Evidência cruzada mais forte:** F-017 recalculou `cdi_tri` e `ipca_tri` em **outro módulo, por
+> outro agente**, sem ler esta tabela → `max |macro − 100 × retornos| = 0,0` nos **83** trimestres.
 
 - **Risco:** **C** · **CI alvo:** N2 · **Branch:** `feat/macro-quarterly`
 - **Cobre:** RF-021 · e-mail: **A1-A7**
@@ -635,8 +500,9 @@ de ordem.
 - **Depende de:** F-003, F-004, F-010, F-013, F-014, F-016
 
 **DoR específica** — [x] schema `MacroQuarterlySchema` pronto; [x] todas as colunas com série de origem
-mapeada no catálogo; [ ] colunas que dependem de gap aberto (`ipca_meta` → G-02; `embi_br_fim` → L8;
-`termos_troca_yoy` → proxy IC-Br) entram **nulas e declaradas**, nunca estimadas.
+mapeada no catálogo; [x] colunas que dependem de gap aberto (`ipca_meta` → G-02; `embi_br_fim` → L8;
+`termos_troca_yoy` → proxy IC-Br) entraram **nulas e declaradas**, nunca estimadas — são as 5 colunas
+100% nulas, cada uma com o motivo no `relatorio_macro.json`.
 
 **Escopo incluído:** montagem das ~40 colunas; `ibcbr_gap` (desvio da média móvel de 20 trimestres);
 `ipca_12m_delta`; `selic_meta_delta`; `juro_real_exante`; `is_estimated` para `2026Q3`; `fonte_versao`;
@@ -644,42 +510,111 @@ mapeada no catálogo; [ ] colunas que dependem de gap aberto (`ipca_meta` → G-
 como CA-120 é cumprido numa tabela wide (`CONTRACTS.md §3.1`).
 **Excluído:** classificação de regime (→ F-019); materialização `asof` (→ F-018).
 
-**Arquivos:** `apps/pipeline/transform/macro_quarterly.py`, `tests/contract/test_macro_quarterly.py`,
-`tests/integration/test_build_macro.py`, `docs/wiki/modules/canonical.md`.
+**Arquivos (reais, como implementado):** `apps/pipeline/canonical/macro_quarterly.py` (a feature
+inteira: transformações puras, grade de apoio, acumulação, procedência, relatório, CLI),
+`tests/unit/test_canonical_macro_quarterly.py` (4 seções → **68** testes),
+`tests/contract/test_macro_quarterly_contract.py` (3 seções → **69** testes).
+**Nenhum schema alterado** (`MacroQuarterlySchema` e `MacroQuarterlyProvenanceSchema` já estavam
+exportados e nenhuma constante nova foi necessária).
+**Saída:** `data/canonical/macro_quarterly.parquet` (83 × 42) +
+`macro_quarterly_provenance.parquet` (2.548 × 8) + `relatorio_macro.json`.
+**Comando:** `python -m apps.pipeline.canonical.macro_quarterly --offline`
+**Doc do orquestrador:** `docs/contracts/CONTRACTS.md §3/§3.1`, `docs/wiki/modules/canonical.md`,
+`DECISIONS_LOG §2.3` (D-m, D-n, D-o).
 
-| Teste | Tipo | Cobre CA |
-|---|---|---|
-| exatamente 83 linhas, `2006Q1`..`2026Q3`, sem repetir | contract | CA-059 |
-| `2026Q3` com `is_estimated=True`, demais `False` | unit | CA-060 |
-| coluna sem cobertura → `NULL`, nunca interpolada | unit negativo | CA-061 |
-| `ibcbr_gap` existe nos 83 trimestres ou marca `is_estimated` | unit | CA-007 |
-| toda célula não nula de coluna rastreável tem linha em `macro_quarterly_provenance` (anti-join vazio) | contract | CA-120 |
+> **Ajuste do Feature Contract — caminhos e nomes (2026-10-11).** O contrato pedia
+> `apps/pipeline/transform/macro_quarterly.py`, `tests/contract/test_macro_quarterly.py` e
+> `tests/integration/test_build_macro.py`; o briefing da onda mandou `apps/pipeline/canonical/`
+> (onde F-013/F-014/F-016 moram e de onde `alinhar_series` é importado) e os nomes
+> `test_canonical_macro_quarterly.py` / `test_macro_quarterly_contract.py`. A cobertura de
+> integração está nas seções C (build e2e em `tmp_path`) e D (acervo real) do teste unitário —
+> `tests/integration/` segue vazio e o marker `integration` **não existe** em `pyproject.toml`
+> (congelado, com `--strict-markers`): é a mesma nota de F-013 §7, F-014 §7.1 e F-017.
+> Nenhum CA mudou de enunciado.
+
+| Teste | Tipo | Cobre CA | Resultado |
+|---|---|---|---|
+| exatamente 83 linhas, `2006Q1`..`2026Q3`, sem repetir | contract | CA-059 | ✔ |
+| `2026Q3` com `is_estimated=True`, demais `False` | unit | CA-060 | ✔ |
+| coluna sem cobertura → `NULL`, nunca interpolada | unit negativo | CA-061 | ✔ (5 colunas) |
+| `ibcbr_gap` existe nos 83 trimestres ou marca `is_estimated` | unit | CA-007 | **não fecha — D-m**, 16 nulos aceitos e medidos; a aritmética está travada em teste |
+| toda célula não nula de coluna rastreável tem linha em `macro_quarterly_provenance` (anti-join vazio) | contract | CA-120 | ✔ nas 2 direções |
+| variação por **razão** difere da diferença de níveis | unit negativo | CA-044 | ✔ |
+| acumulação geométrica **não** é soma (`ipca_tri`, `cdi_tri`) | unit negativo | CA-070 | ✔ |
+| média móvel de 20 exige **janela cheia** (`min_periods`) | unit negativo | CA-007 | ✔ |
+| o módulo de produção **não lê o relógio** | unit | CA-121 | ✔ |
+| apoio divergente de `alinhado_trimestral` **para o build** | unit negativo | CA-061 | ✔ (`ApoioDivergente`) |
 
 **Anti-SPEC específica:** §10.1.1, §10.4.24.
-**Extra de classe C:** diff numérico + reconstrução + revisão independente.
+**Extra de classe C:** diff numérico + reconstrução + revisão independente — **o material da revisão
+está em `docs/wiki/context/F-015.md §5`** (4 canários conferidos na fonte, diff numérico por conta
+independente, reprodução cruzada por F-017, hashes de 2 rodadas).
 
 ---
 
-### [ ] F-016 — Curva: vértices fixos interpolados + inclinação — **classe C**
+### [~] F-016 — Curva: vértices fixos interpolados + inclinação — **classe C** — **implementada — QA/revisão numérica**
 
-- **Risco:** **C** · **CI alvo:** N2 · **Branch:** `feat/curva-inclinacao`
+> **Estado (2026-10-11):** implementada, **QA pendente**. Grava **11** séries em
+> `data/processed/curva/` (5.436 linhas cada, `fonte=DERIVADO`) + `relatorio_curva.json`, e já entrou
+> no rebuild do canônico (62 séries). **CA-025 não fechava** com o vértice curto de 1 ano (60,53% das
+> datas base de 2006 em diante, contra os ≥ 95% do CA) — resolvido por **D-i**: o catálogo foi de
+> **134 → 138** (`CURVA_REAL_3A`, `CURVA_NOMINAL_3A`, `INCLINACAO_REAL_5A_3A`,
+> `INCLINACAO_NOMINAL_5A_3A`) e **`INCLINACAO_REAL_5A_3A` (95,25%) passa a ser a variável principal
+> de regime**, com as duas 5a−1a publicadas como **secundárias e declaradas**. Os dois números estão
+> **travados por teste**; a SPEC **não** foi editada. **D-i é provisória: aguarda o Edu** e uma nota
+> em ADR-004 §3 (§4). As 7 séries que já existiam saíram com `sha256` **idêntico** — o acréscimo não
+> mexeu em nenhum número publicado.
+
+- **Risco:** **C** · **CI alvo:** N2 (parcial — ver §6) · **Branch:** `feat/curva-inclinacao`
 - **Cobre:** RF-009 · e-mail: **A6**
-- **CAs da SPEC:** CA-023..026
+- **CAs da SPEC:** CA-023..026 — **CA-023 cumprido na íntegra** (os 6 vértices de 1, 3 e 5 anos no
+  catálogo e gravados), **CA-024 quantificado** (nominal 10a: 36,81% das datas base de 2006+, medido
+  e **não** gravado, `VERTICES_FORA_DO_CATALOGO`), **CA-025 fechado pela série nova de D-i**
 - **Decisão provisória que carrega:** `[PROVISÓRIO L4]` — ADR-004 (Tesouro Direto em vez de ETTJ ANBIMA).
   **Item de DoR:** se o Edu optar por contratar o ANBIMA Feed, esta feature vira **classe D**
   (credencial/API paga) e a implementação da fonte muda.
 - **Depende de:** F-005
 
 **DoR específica** — [x] método definido (A5.4 da pesquisa); [x] limitação L5 (sem vértice nominal de
-10 anos antes de ~2010) registrada; [ ] **L4 em aberto** — ADR-004 em Proposta.
+10 anos antes de ~2010) registrada e **quantificada**; [ ] **L4 em aberto** — ADR-004 em Proposta,
+**desenvolvimento liberado, aceite formal pendente** (§4). **Depois de gravar `data/processed/curva/`,
+reexecutar o build de F-013** — `raw_series.parquet` é reescrito inteiro, não há `append` (feito em
+2026-10-11).
 
 **Escopo incluído:** interpolação para 1, 3 e 5 anos (real e nominal) por data; flag
-`vertice_extrapolado`; `NULL` quando o prazo-alvo não existe; `inclinacao_real_5a_1a` (principal),
-`inclinacao_nominal_5a_1a`, `breakeven_5a` (por razão); agregação para o último dia útil do trimestre.
-**Excluído:** curva Svensson oficial da ANBIMA (paga); DI futuro via `pyield` (fase 2 — exige Python 3.12).
+`vertice_extrapolado`; `NULL` quando o prazo-alvo não existe; `inclinacao_real_5a_3a` (**principal
+desde D-i**), `inclinacao_real_5a_1a` e `inclinacao_nominal_5a_1a` (secundárias),
+`inclinacao_nominal_5a_3a`, `breakeven_5a` (por razão); agregação para o último dia útil do trimestre.
+**Excluído:** curva Svensson oficial da ANBIMA (paga); DI futuro via `pyield` (fase 2 — exige Python 3.12);
+vértices de **10 anos** (medidos, **não** gravados — CA-024/CA-055).
 
-**Arquivos:** `apps/pipeline/transform/curva.py`, `tests/unit/test_curva.py`,
-`tests/contract/test_curva_vertices.py`, `docs/wiki/modules/tesouro.md`.
+**Arquivos (reais, como implementado):** `apps/pipeline/canonical/curva.py` (núcleo `interpolar`,
+famílias, derivadas, CLI), `tests/unit/test_canonical_curva.py` (36 funções → **59** casos),
+`tests/contract/test_curva_contract.py` (13 funções → **31** casos: schema, catálogo e **as 4 guardas
+de F-013**), `packages/shared/schemas/series_catalog_data.py` (**+4 entradas**, D-i — só acréscimo;
+mais a substituição do `obs` de `INCLINACAO_REAL_5A_1A`, feita pelo orquestrador no fechamento),
+`tests/unit/test_schemas_smoke.py` (`N_SERIES_ESPERADAS` 134 → **138**).
+**Saída:** `data/processed/curva/<series_id>.parquet` (11 séries × 5.436 linhas) +
+`data/processed/curva/relatorio_curva.json` (flag `vertice_extrapolado`, motivos, `%` de nulos por
+ano, cobertura, canários).
+**Comando:** `python -m apps.pipeline.canonical.curva [--offline] [--metrica-prazo dias_uteis]`
+**Doc do orquestrador:** `docs/contracts/CONTRACTS.md §2.1`, `docs/wiki/modules/tesouro.md`.
+
+> **Ajuste do Feature Contract — caminhos e nomes (2026-10-11).** O contrato pedia
+> `apps/pipeline/transform/curva.py`, `tests/unit/test_curva.py` e
+> `tests/contract/test_curva_vertices.py`; o briefing da onda mandou
+> `apps/pipeline/canonical/curva.py`, `tests/unit/test_canonical_curva.py` e
+> `tests/contract/test_curva_contract.py` — é onde F-013 vive e onde o build varre. Seguiu o
+> briefing. Dois acréscimos **sancionados**: as 4 entradas de catálogo de D-i (acréscimo puro) e o
+> bump de `N_SERIES_ESPERADAS`. Nenhum CA muda de enunciado.
+>
+> **Prazo em dias corridos (ACT), não em dias úteis — decisão de método, registrada como D-j.** Os
+> dois métodos estão implementados (`MetricaPrazo`); o padrão é ACT por **cobertura**, não por
+> preferência: o calendário de F-008 cobre 2001→2030 e **levanta** fora disso, enquanto os
+> vencimentos do painel chegam a 2060 — devolver `NULL` por limite do *nosso* calendário, e não por
+> ausência de título, seria mentir sobre o suporte do dado. Custo medido: mediana de **0,14 a 0,41
+> bps** de diferença entre as duas métricas, contra **dezenas** de bps de spread de varejo que
+> ADR-004 já declara; em dias úteis as séries de 5 anos **perderiam 298 a 700 datas base**.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -695,7 +630,24 @@ substituição de fonte), §10.3.14 (nada pago).
 
 ---
 
-### [ ] F-017 — `asset_returns_quarterly`: retornos, excesso sobre CDI e real — **classe C**
+### [~] F-017 — `asset_returns_quarterly`: retornos, excesso sobre CDI e real — **classe C** — **implementada — QA/revisão numérica**
+
+> **Estado (2026-10-11):** implementada, **QA e revisão numérica independente pendentes**.
+> `asset_returns_quarterly.parquet` com **1.963 linhas** · **24** ativos · 83 trimestres
+> (`sha256 ab61eeca…`) + `relatorio_retornos.json` (cobertura por ativo, nulos **por coluna com
+> motivo**, CDI e IPCA por trimestre em `bases_por_trimestre`, as 11 convenções em texto).
+> **`USDBRL` entrou por D-l** (+83 linhas, `is_total_return = False` declarado no catálogo — câmbio
+> não tem carrego): é o que RF-038 precisa, e a PTAX já tinha os 83 trimestres alinhados. Os **8**
+> `asset_id` que seguem fora têm motivo nomeado em `ATIVOS_FORA_DO_UNIVERSO`, publicado no
+> relatório. Decisões que carregam número: níveis **sempre** de `alinhado_trimestral` (nunca
+> relidos de `raw_series`); **1º trimestre de cada série sem retorno** (23 linhas, `NULL` com motivo,
+> mas **com** `price_fim`); **CDI por acumulação diária** da SGS 12, por isso é o **único** ativo com
+> retorno em `2006Q1`; excesso e real pela **mesma** função de razão `(1+r)/(1+b)−1`; `ret_real`
+> pelo IPCA dos 3 meses de **referência**, aplicado uma vez; `is_total_return` **propagado do
+> catálogo, nunca inferido** (820 nulos nomeados — G-01 + CDI); painel **desbalanceado** (ICON
+> 2006Q4, IMOB 2007Q4, IFIX 2010Q4). **Unidade: fração** (**D-o**), contra o por cento de F-015.
+> 2 rodadas byte-idênticas. **Pendência que bloqueia merge, não implementação: ADR-006 e ADR-005
+> seguem em `Proposta`** (§4).
 
 - **Risco:** **C** · **CI alvo:** N2 · **Branch:** `feat/asset-returns`
 - **Cobre:** RF-022, RF-024, RF-026 · e-mail: **B1-B5, C1**
@@ -703,30 +655,68 @@ substituição de fonte), §10.3.14 (nada pago).
 - **Depende de:** F-002, F-003, F-006, F-007, F-012, F-013, F-014
 
 **DoR específica** — [x] schema pronto com 32 `asset_id`; [x] CDI trimestral validado (F-003);
-[x] convenção de razão congelada em ADR-006; [ ] `is_total_return` dos setoriais da B3 = **G-01**,
-entra `None` e declarado.
+[x] convenção de razão congelada em ADR-006 (**mas o ADR segue em `Proposta`** — §4);
+[x] `is_total_return` dos setoriais da B3 = **G-01**, entrou `None` e declarado (820 linhas, motivo
+nomeado no relatório).
 
 **Escopo incluído:** `ret_tri` por razão de preços no último DU; `ret_excesso_cdi` e `ret_real` **por
 razão**; `vol_intra_tri` e `dd_intra_tri` do diário; `n_dias_uteis`; `ffill_dias_uteis`;
-`data_inicio_serie`; painel **desbalanceado** (sem linha antes do início da série).
-**Excluído:** métricas por regime (→ F-022); hedge cambial detalhado (D7 → fase 2 parcial em F-026).
+`data_inicio_serie`; painel **desbalanceado** (sem linha antes do início da série); **`USDBRL`
+(D-l)**. `SP500_BRL`/`ACWI_BRL` são alinhadas **aqui**, porque F-014 deixa `source=DERIVADO` fora do
+build dela de propósito e quem alinha é a feature dona da derivação.
+**Excluído:** métricas por regime (→ F-022); hedge cambial detalhado (D7 → fase 2 parcial em F-026);
+anualização e Sharpe (Anti-SPEC §10.2.11).
 
-**Arquivos:** `apps/pipeline/transform/retornos.py`, `tests/unit/test_retornos.py`,
-`tests/contract/test_asset_returns.py`, `tests/integration/test_build_retornos.py`.
+**Arquivos (reais, como implementado):** `apps/pipeline/canonical/retornos.py` (universo, razão de
+níveis, CDI por acumulação, excesso/real por razão, métricas intra, relatório, CLI),
+`tests/unit/test_canonical_retornos.py` (**56** testes em 5 seções),
+`tests/contract/test_asset_returns_contract.py` (**37** testes — 1 regra quebrada por teste),
+`packages/shared/schemas/__init__.py` (**acréscimo** de 5 nomes já definidos em
+`asset_returns_quarterly.py`: `ATIVOS_*`, `N_MINIMO_ATIVOS` — **nenhum schema alterado**),
+`packages/shared/schemas/series_catalog_data.py` (`is_total_return=False` em `BCB_SGS_1`, D-l).
+**Saída:** `data/canonical/asset_returns_quarterly.parquet` (1.963 × 16) +
+`relatorio_retornos.json`.
+**Comando:** `python -m apps.pipeline.canonical.retornos --offline`
+**Doc do orquestrador:** `docs/contracts/CONTRACTS.md §4`, `docs/wiki/modules/canonical.md`,
+`DECISIONS_LOG §2.3` (D-l, D-o).
 
-| Teste | Tipo | Cobre CA |
-|---|---|---|
-| >= 18 `asset_id` distintos, todos no catálogo | contract | CA-062 |
-| nenhuma linha antes de `data_inicio_serie` (IFIX, ICON, IMOB) | contract negativo | CA-063 |
-| **excesso por razão: r=0,10 e cdi=0,0325 → 0,06538**, não 0,0675 | unit | CA-069 |
-| subtração no lugar da razão **faz o teste falhar** | unit negativo | CA-069 |
-| acumulação intra-trimestre é geométrica, não soma | unit | CA-070 |
-| IPCA aplicado uma única vez (teste de dupla deflação) | unit negativo | CA-071 |
-| price x total return sem flag → falha | unit negativo | CA-064 |
+> **Ajuste do Feature Contract — caminhos, nomes e colunas (2026-10-11).** O contrato pedia
+> `apps/pipeline/transform/retornos.py`, `tests/unit/test_retornos.py`,
+> `tests/contract/test_asset_returns.py` e `tests/integration/test_build_retornos.py`; o briefing da
+> onda mandou `apps/pipeline/canonical/retornos.py`, `test_canonical_retornos.py` e
+> `test_asset_returns_contract.py`, e a cobertura de integração está nas seções D (build e2e em
+> `tmp_path`, com as **27 séries sintéticas** necessárias para os ≥ 18 `asset_id`) e E (acervo real)
+> — `tests/integration/` segue vazio e o marker `integration` **não existe** em `pyproject.toml`.
+> **Coluna:** o contrato citava `excesso_cdi` / `ret_cdi_tri`; o schema é `strict` com 16 colunas
+> fixas e a coluna é **`ret_excesso_cdi`** — **`ret_cdi_tri` não existe**, porque o CDI do trimestre
+> é uma **linha** (o `asset_id` CDI) e também está no relatório (`bases_por_trimestre`).
+> **CAs:** os 6 do contrato **+** CA-014/015/016, reaproveitados sobre a acumulação de produção do
+> CDI. Nenhum CA mudou de enunciado, e **nenhuma edição de contrato foi necessária** em
+> `CONTRACTS.md §4` além da nota de unidade e do estado medido, acrescentados no fechamento.
+>
+> **Acréscimo sancionado no fechamento: D-l** — `USDBRL` no universo (23 → **24** ativos,
+> 1.880 → **1.963** linhas) com `is_total_return=False` no catálogo. Zero mudança de schema e de
+> regra; o único ajuste de teste foi deduplicar `BCB_SGS_1` no acervo sintético, que agora está no
+> universo **e** no portão `SERIES_EXIGIDAS` de F-014.
+
+| Teste | Tipo | Cobre CA | Resultado |
+|---|---|---|---|
+| >= 18 `asset_id` distintos, todos no catálogo | contract | CA-062 | ✔ 24 |
+| nenhuma linha antes de `data_inicio_serie` (IFIX, ICON, IMOB) | contract negativo | CA-063 | ✔ |
+| **excesso por razão: r=0,10 e cdi=0,0325 → 0,06538**, não 0,0675 | unit | CA-069 | ✔ |
+| subtração no lugar da razão **faz o teste falhar** | unit negativo | CA-069 | ✔ (no acervo: 0,138 pp médios, 1,495 pp máx.) |
+| acumulação intra-trimestre é geométrica, não soma | unit | CA-070 | ✔ (produto dos fatores diários == `ret_tri`, erro ≤ 1e-15) |
+| IPCA aplicado uma única vez (teste de dupla deflação) | unit negativo | CA-071 | ✔ |
+| price x total return sem flag → falha | unit negativo | CA-064 | ✔ |
+| CDI de 2006 encadeado = **15,027140 %** em **249** d.u. | unit (fixture versionada) | CA-014/015 | ✔ bate com os 15,03 % publicados |
+| CDI 4T2008 pela **SGS 4389** (outra série, outra unidade) | unit | CA-016 | ✔ `dif = 4,8e-6 pp` |
+| janela do CDI == `(quarter_end(T−1), quarter_end(T)]` | unit (acervo) | CA-070 | ✔ 82/82, 0 divergências |
 
 **Anti-SPEC específica:** §10.2.13 (razão), §10.2.12 (TR vs. PR), §10.1.1, §10.2.11 (Sharpe não é
 implementável).
-**Extra de classe C:** diff numérico + reconstrução + revisão independente.
+**Extra de classe C:** diff numérico + reconstrução + revisão independente — **o material da revisão
+está em `docs/wiki/context/F-017.md §5`**, e §6 lista onde o cálculo pode estar errado **sem o teste
+pegar** (9 itens, para o Validation Mode).
 
 ---
 
@@ -1222,6 +1212,53 @@ trimestre anterior. Sem dashboard hospedado (fora de escopo). CI N1.
       migração da camada HTTP para `apps.pipeline.common` (§6). Permanente em
       `docs/wiki/modules/anbima.md` + `docs/wiki/runbooks/job-diario-anbima.md`
 
+**Onda 1 — os 7 extratores (2026-10-11, classe B).** QA independente em dois lotes por **dois
+subagentes distintos**, nenhum deles implementador: `docs/plans/qa/ONDA-1-QA-A.md` (F-002, F-003,
+F-004, F-008) e `docs/plans/qa/ONDA-1-QA-B.md` (F-005, F-006, F-007). **0 × P0 nos dois lotes.**
+Convenções da onda (D-a..D-h) em `DECISIONS_LOG §2.1`; permanente em `docs/wiki/modules/`.
+
+- [x] **F-002 — Extrator ANBIMA S3 (índices IMA)** — `apps/pipeline/extract/anbima_s3.py`: 9 índices,
+      5.407-6.700 linhas cada, 2000-02-01→, 0,00% de nulos. **QA: APROVADO** — "o lote mais bem
+      fechado" junto com F-008; 4/4 CAs com evidência do revisor (fonte viva **e** Parquet), canário
+      IMA-B 16/09/2003 = 723,070317, nenhuma tentativa de quebra passou
+- [x] **F-003 — Extrator BCB SGS** — `apps/pipeline/extract/bcb_sgs.py`: 15 séries, 44.447 linhas,
+      CDI 2006 = 15,0271% reproduzido do Parquet. **QA: MUDANÇAS_SOLICITADAS → APROVADO após as
+      correções em `65d2fb9`** — P1-1 (observação de período **parcial** podia entrar como mês
+      fechado com `--fim` no último dia civil) e P1-2 (a 432 é calendário corrido e nada no dado
+      dizia isso → campo **`calendario`** no catálogo, `CONTRACTS.md §2`) resolvidos, cada um com
+      teste
+- [x] **F-004 — Extrator IBGE SIDRA** — `apps/pipeline/extract/ibge_sidra.py`: 6 séries, IPCA
+      nº-índice 562 meses e PIB 122 trimestres; reconciliação valor a valor contra SGS 433 e 22109
+      (`max|dif| = 0`). **QA: APROVADO, com D-e pendente do Edu** — CA-004 (monotonia ≥ 99%) e CA-005
+      (tolerância ≤ 1e-6) **medidamente não fecham** no dado real (0,9626 e 3,52e-04 pp, contra um
+      teto analítico de 3,97e-04 pp que vem das 2 casas do IBGE). O implementador fez o certo: mediu,
+      registrou **D-e**, travou o número no teste e **não editou a SPEC**. Item aberto em §4
+- [x] **F-005 — Extrator Tesouro Direto** — `apps/pipeline/extract/tesouro_direto.py`:
+      `td_painel.parquet` com 886.300 linhas e 750 `series_id`, 2004-12-31→2026-10-09, cache
+      condicional com HTTP **304 de 0 byte**. **QA: MUDANÇAS_SOLICITADAS → APROVADO após as correções
+      em `65d2fb9`** — P1-1 (`--offline` sobre bruto **sem manifesto** caía no relógio da rodada e
+      quebrava D-b/CA-121) resolvido
+- [x] **F-006 — Extrator API B3** — `apps/pipeline/extract/b3_indices.py`: 11 índices, 54.650 linhas,
+      0,00% de nulos (célula vazia é **linha omitida**), janelas próprias de ICON/IMOB/IFIX iguais ao
+      catálogo em 100% dos casos. **QA: APROVADO** — 0 P1; **G-01** (`is_total_return` dos 9
+      setoriais) segue declarado, não é issue desta feature
+- [x] **F-007 — Extrator internacional (Yahoo + MSCI + câmbio)** — `extract/{yahoo,msci}.py` +
+      `transform/cambio.py` (D-g): 8 séries + `SP500_BRL`/`ACWI_BRL` pela PTAX do mesmo dia útil, sem
+      `ffill` (`(datas USD ∩ datas PTAX) == datas BRL`, igualdade exata). Catálogo 132 → **134**
+      (D-d). **QA: APROVADO** — 0 P1
+- [x] **F-008 — Calendário de dias úteis (ANBIMA)** — `apps/pipeline/extract/calendario_anbima.py` +
+      `packages/shared/schemas/calendario.py` (D-f): 10.957 dias civis 2001→2030, 7.530 úteis, 367
+      feriados, Parquet **byte-idêntico** entre execuções. **QA: APROVADO** — 249 d.u. de 2006 por
+      **3** caminhos independentes e coerência calendário × CDI nos 20 anos; 4 payloads adversariais
+      recusados com mensagem específica. Achado **D-h** (B3 ⊂ ANBIMA em 69 datas) virou DoR de F-014
+
+> **P1/P2 remanescentes do QA da Onda 1, não bloqueantes:** **D-e** aguarda o Edu (§4); o **job N2
+> que reconstrói uma `data/processed/` mínima das fixtures** para que `test_contract_sgs_sidra.py` e
+> `test_processed_layer_conventions.py` deixem de **pular** no CI (P1-4 do lote A) está em §6;
+> `YAHOO_DXY` com 1.210 nulos (17,41%, domingos) e `YAHOO_GSPC` com `is_total_return = None` (P2-2 e
+> P2-3 do lote B), `vintage` em data **UTC** não comparável entre features (P2-5) e os markers de
+> `tests/` (P2-6) também em §6.
+
 ---
 
 ## 4. Bloqueios
@@ -1260,6 +1297,86 @@ O que isso muda e o que **não** muda:
       "parecidas". **Proposta:** CA-004 → 90% (ou reescrita como "não é série de variação");
       CA-005 → 1e-3 pp. **Quem decide:** Edu. Até lá, `MONOTONIA_MINIMA = 0,90` e a tolerância de
       1e-3 pp estão no código de F-004, com o desvio escrito no docstring e no `DECISIONS_LOG`.
+
+- [ ] **SPEC CA-025 — a inclinação real de 5a−1a não chega a 95% dos dias úteis; resolvido em
+      caráter provisório por `D-i` em `DECISIONS_LOG §2.1`.** CA-025 pede valor para **≥ 95%** dos
+      dias úteis de 2006→2026 na inclinação real. Medido por F-016 sobre as 5.184 datas base de
+      2006-01-01 a 2026-10-09: `INCLINACAO_REAL_5A_1A` existe em **60,53%** — e **nenhuma
+      implementação chega a 95%** com o vértice curto de 1 ano, porque a grade de vencimentos da
+      NTN-B é de 15/05 e 15/08 de anos **alternados** e **2021 e 2022 inteiros** não tiveram título
+      vencendo em menos de 1 ano. Chegar a 95% exigiria extrapolar, o que a Anti-SPEC §10.1.1
+      proíbe. A premissa do CA olha a **ponta longa** (de fato 100%); o que limita é a **curta**.
+      **Resolução do orquestrador (D-i, provisória):** acrescentar ao catálogo o vértice de **3
+      anos** — que **CA-023 já nomeia** ("interpola para 1, 3 e 5 anos"), portanto não é escopo novo
+      — e promover **`INCLINACAO_REAL_5A_3A` (95,25% ✔)** a variável principal de regime, mantendo
+      as duas 5a−1a publicadas como **secundárias com a cobertura declarada**. Catálogo 134 → **138**.
+      Os dois números estão travados por teste
+      (`test_cobertura_da_inclinacao_real_1a_e_a_medida_e_nao_atinge_os_95_de_ca025` e
+      `test_inclinacao_real_5a_3a_e_a_que_fecha_ca025`) e **a SPEC não foi editada** (`AGENTS.md §8`).
+      **Quem decide:** Edu — e **ADR-004 §3 nomeia a 5a−1a como principal**, então o ADR precisa de
+      uma **nota editorial** quando for aceito. As duas alternativas recusadas ficam registradas em
+      `docs/wiki/context/F-016.md §4.3`: usar a inclinação **nominal** 5a−1a como principal (97,57%,
+      mas inverte ADR-004 §3) ou manter como está e declarar que ~40% dos trimestres podem cair num
+      dia sem valor.
+
+- [ ] **SPEC CA-007 — o hiato do IBC-Br não pode existir nos 83 trimestres; 16 nulos aceitos por
+      `D-m` em `DECISIONS_LOG §2.3`.** CA-007 pede `ibcbr_gap` para **todos** os 83 trimestres **ou**
+      o trimestre marcado `is_estimated=True`; CA-060 permite `is_estimated=True` **só** em
+      `2026Q3`. As duas não podem valer juntas, e a aritmética mostra por quê: o IBC-Br dessaz.
+      (SGS 24364) **começa em 2003** (a série da fonte; o extrator pega de 2004) → `ibcbr_yoy`, que
+      precisa de `T−4`, só existe de **2005Q1** → a média móvel de **20 trimestres com janela
+      cheia** só fecha em **2009Q4**. Para ter hiato em `2006Q1` seria preciso IBC-Br desde
+      **2000Q2**, e **a série não existe**. Nenhuma grade de apoio resolve.
+      **Resolução do orquestrador (D-m, provisória):** aceitar `ibcbr_yoy_trend`/`ibcbr_gap` nulos
+      em `2006Q1..2009Q3` + `2026Q3` (**16**), com o motivo publicado em `relatorio_macro.json`.
+      **Consequência a jusante, que precisa ir à página de limitações (F-028):** a V1 de F-019
+      classifica **67** dos 83 trimestres — **2006-2009, inclusive a crise de 2008, fica fora do
+      eixo de crescimento** com a regra estrita. A alternativa está **medida** no relatório
+      (`sensibilidade_ibcbr_gap`): `min_periods = 8` recuperaria **12** trimestres com
+      `max |diferença| = 0,0 pp` no trecho comum, e **não** foi adotada porque média de janela
+      parcial é outro estimador, cujo significado muda ao longo do tempo (o hiato de 2006 deixaria
+      de ser comparável ao de 2015) — está em §6 como opção, não como dívida.
+      **A SPEC não foi editada** (`AGENTS.md §8`). **Quem decide:** Edu — 3 saídas: aceitar os 16
+      nulos (o que está publicado), adotar `min_periods = 8`, ou mudar o eixo de crescimento da V1.
+
+### Aceites das decisões da parte 2 da Onda 2 (D-k..D-q, 2026-10-11)
+
+> Registradas em `DECISIONS_LOG §2.3` com data e **"aguarda Edu"** onde couber. Nenhuma toca SPEC,
+> PRD, Anti-SPEC ou o e-mail de escopo. O que precisa de ratificação, em uma linha cada:
+
+| # | Decisão | Quem decide | O que acontece se o Edu discordar |
+|---|---|---|---|
+| **D-k** | Focus **fora** de `raw_series` (5 exclusões, pelo precedente do painel do Tesouro); F-015 o lê de `data/processed/focus/` e a procedência aponta para o EntitySet | ratificação de **contrato** (CA-055/CA-120) | a alternativa é desdobrar os 197 `series_id` compostos no catálogo — mudança de contrato, não de implementação |
+| **D-l** | `USDBRL` no universo de `asset_returns_quarterly` (24 ativos, 1.963 linhas), `is_total_return=False` | **Edu** — muda o universo de uma tabela canônica | remover é 1 linha em `UNIVERSO` + rebuild; RF-038 volta a ficar sem o retorno do dólar |
+| **D-m** | CA-007 não satisfazível; 16 nulos em `ibcbr_gap`, SPEC intacta | **Edu** | `min_periods = 8` (recupera 12, medido) ou outro eixo de crescimento → re-roda os 83 `ibcbr_gap` |
+| **D-n** | `INCLINACAO_REAL_5A_3A` sem coluna em `MacroQuarterlySchema`; F-019/F-021 leem a série | orquestrador, com dívida em §6 | acrescentar a coluna é feature **classe C** própria (alteração de schema) |
+| **D-o** | Unidade: `macro_quarterly` em por cento/pp, `asset_returns_quarterly` em fração | registro (é o estado medido) | unificar escala re-roda as duas tabelas e muda todo canário publicado |
+| **D-p** | `FOCUS_PIB_TOTAL` → `status: descartada` (G-04 resolvido) | orquestrador | nenhuma consequência numérica: a série nunca foi extraída por essa entrada |
+| **D-q** | Achados do Focus registrados: G-04, G-05, exceção a **D-a**, `%20` × `+`, `ibcbr_yoy` em fim de período | registro de **achado**, não escolha | só (e) é reversível: trocar `ibcbr_yoy` para média do trimestre muda os 83 `ibcbr_gap` |
+
+### Aceites formais pendentes dos ADRs da camada canônica (2026-10-11)
+
+> **Desenvolvimento liberado, aceite formal pendente** — a autorização do Edu de 2026-10-10
+> (`DECISIONS_LOG §2`) vale para implementar; o **merge** de uma classe C com o ADR em `Proposta` é
+> chamada do orquestrador, e a **publicação** segue travada por ADR-001 (`AGENTS.md §14`).
+
+- [ ] **ADR-006 (Parquet por camada + DuckDB + convenção de alinhamento/retorno) — `Proposta`.**
+      F-013 depende da parte **(a)** (armazenamento) e **F-014 é a parte (b)** (fim de período +
+      ffill ≤ 5), já **materializada** em `alinhado_trimestral`. O que o Edu precisa ratificar, em 3
+      perguntas: (1) **último dia útil**, não média de período; (2) ffill ≤ **5** d.u.; (3) a opção
+      **(a)** de D-h, com os **215** ffill na página de limitações. Pendência editorial do próprio
+      ADR: §(a).2 escreve `data/canonical/macro.duckdb` e o implementado é **`ldc.duckdb`** —
+      decisão do orquestrador: **manter `ldc.duckdb` e corrigir o ADR quando for aceito** (§6).
+- [ ] **ADR-004 (curva via Tesouro Direto, não ETTJ ANBIMA paga) — `Proposta` (L4).** F-005 e F-016
+      implementadas sobre ele. Duas notas a incorporar no aceite: **D-i** (a variável principal passa
+      a ser a inclinação **5a−3a**; §3 do ADR ainda diz 5a−1a) e **D-j** (prazo em **dias corridos**,
+      com o custo medido em fração de bp). `confianca = NAO_VERIFICADO` nas 11 entradas da curva
+      **continua correto** até a revisão numérica independente aprovar, e **nenhum número de F-016 é
+      publicável** fora do fluxo classe D.
+- [x] **D-h — grade das séries da B3: escolhida a opção (a)** (grade bancária única + 1 d.u. de ffill
+      no 4T), **provisória**. Custo medido: **215** células de 4.038 (5,325%), 11 séries `B3_API`, 20
+      trimestres, **zero** ffill de 2..5. Travada no contrato pelo check
+      `quarter_end_unico_por_trimestre`: virar para (b) é mudança de schema, não de código.
 
 > **8 decisões de Edu/Alexandre seguem abertas** (bloqueavam o início da implementação — ver o estado de
 > 2026-10-10 acima). Origem: `docs/product/PRD.md §13.2`
@@ -1370,6 +1487,130 @@ confirmadas na consolidação):
   sobre o catálogo). Com D-g o acoplamento pesado saiu; este resto desce quando F-011 tocar os dois.
 - **Retenção de `data/raw/`:** 14,6 MB por download efetivo do Tesouro e 2,2 MB de respostas da B3.
   Sem política de expurgo — também F-030.
+
+**Dívidas levantadas pelo QA da Onda 1** (nenhuma bloqueia a Onda 2):
+
+- **CI · a evidência da consolidação pula no CI** (P1-4 do lote A). `test_contract_sgs_sidra.py` e
+  `test_processed_layer_conventions.py` são a **única** trava regressível de D-a, D-b, PK única e da
+  reconciliação SGS × SIDRA, e **pulam** no `actions/checkout` porque `data/` não está no git
+  (9 skipped, medido pelo revisor). Caminho: job **N2** que monte uma `data/processed/` mínima **das
+  fixtures** (que estão no git) e rode as duas varreduras de verdade.
+- **`YAHOO_DXY` leva 1.210 linhas com `value = NULL` (17,41%) e o comentário que as justifica está
+  errado** (P2-2 do lote B): o revisor mediu **1.188 domingos**, não "feriado da praça". Domingo é
+  dia sem sessão, que F-006 na mesma onda **omite** (CA-037). `DX-Y.NYB` é RF-017 (`should`) e não é
+  insumo de nenhuma coluna do pacote mínimo. Caminho: descartar os dias sem sessão **ou** corrigir o
+  comentário e declarar a convenção — antes de a série entrar em qualquer figura.
+- **`YAHOO_GSPC` tem `is_total_return = None`, não `False`** (P2-3 do lote B): a derivada `SP500_BRL`
+  declara `False` corretamente, mas quem consumir a série em USD direto não tem como saber que é
+  price return — e é por essa flag que a Anti-SPEC §10.2.12 funciona. 1 linha no catálogo.
+- **`vintage` é a data **UTC** do fetch, e isso não é comparável entre features** (P2-5 do lote B):
+  B3 (`2026-10-10T23:49Z`) e Yahoo/MSCI (`2026-10-11T00:14Z`) foram coletados a 25 min de distância e
+  ficaram com safras **diferentes**. D-b está cumprida ao pé da letra; falta decidir se a safra é UTC
+  ou hora local — 1 linha em `DECISIONS_LOG §2.1`.
+- **Markers de `tests/` descrevem a dependência errada** (P2-6 do lote B): 2 testes
+  `@pytest.mark.network` de F-005 **não abrem socket** (leem `data/raw/`), e um `pytest.skip`
+  condicional pode apagar em silêncio a única prova viva do HTTP 304. Sugestão do revisor: marker
+  próprio (`requires_raw`) e `pytest.fail` em vez de `skip`.
+
+**Dívidas da Onda 2 — F-013, F-014 e F-016** (nenhuma bloqueia o QA; todas são escolha do
+orquestrador, não bug):
+
+- **O marker `integration` não existe e `pyproject.toml` está congelado.**
+  `[tool.pytest.ini_options] markers` tem só `network` e `slow`, e `addopts` traz `--strict-markers`:
+  `@pytest.mark.integration` **falharia a coleta**. Por isso `tests/integration/` segue vazio e a
+  cobertura de integração de F-013/F-014 está em seções declaradas dos arquivos de `tests/unit/`
+  (padrão já aceito em `test_processed_layer_conventions.py`), que **pulam** sem `data/processed/`.
+  Fechar é **1 linha** no `pyproject` + mover as seções — e aí o N2 passa a existir de verdade,
+  junto com o job do P1-4 acima.
+- **`ldc.duckdb` × `macro.duckdb` — DECIDIDO: manter `ldc.duckdb`.** ADR-006 §(a).2 escreve
+  `data/canonical/macro.duckdb`; o briefing da Onda 2 pediu e F-013 implementou **`ldc.duckdb`**
+  (constante `NOME_DUCKDB`, um lugar só). É divergência de **nome**, zero semântica. Decisão do
+  orquestrador: **fica `ldc.duckdb`**, e o **ADR-006 recebe a correção editorial quando for aceito**
+  (§4) — não se renomeia um artefato vivo para casar com um ADR em `Proposta`.
+- **`ldc.duckdb` não tem view de `alinhado_trimestral`.** `construir_duckdb` vive em
+  `build_raw_series.py` (congelado para o agente de F-014) e cria só as duas views de F-013. É 1
+  linha lá, ou um passo novo no build; **zero** efeito em dado, porque as views são `SELECT * FROM
+  read_parquet(...)` e o Parquet já está escrito.
+- **A flag `vertice_extrapolado` de CA-023 não é coluna do canônico.** `ProcessedSeriesSchema` tem 8
+  colunas e nenhuma é booleana, então F-016 materializou a flag em **três** lugares equivalentes: a
+  linha existe com `value` nulo (a ausência está no dado), `relatorio_curva.json → motivos` traz a
+  contagem por motivo e `pct_nulos_por_ano`, e o quadro de diagnóstico em memória tem a coluna. Se
+  F-019/F-026 precisarem dela **como coluna** de `raw_series`, é **alteração** de schema → feature
+  **classe C** própria, não acréscimo.
+- **A largura do intervalo de interpolação é registrada mas não limita nada.** Medido: mediana 458 d
+  e **máximo 1.461 d** em `CURVA_REAL_1A`; mediana 731 d e máximo 2.191 d em `CURVA_REAL_5A`. Um
+  vértice interpolado entre títulos de 1 e 5 anos é mais frágil que um entre 11 e 13 meses, e hoje os
+  dois saem indistinguíveis no Parquet. Definir um **teto** é escolha metodológica nova — não foi
+  implementada por conta própria e precisa de decisão (candidata a nota em ADR-004).
+- **`pct_nulos` não tem limiar** (P2-4 do QA de F-013, **em aberto**): uma série 100% nula passa o
+  build com `pct_nulos = 100.0` e **sem aviso**. Não corrigido de propósito — um limiar é **check
+  novo de schema**, portanto mudança de contrato (classe C), e nenhuma série real passa de 17,41%
+  (`YAHOO_DXY`). Se virar risco, o lugar é o schema, nunca o build.
+
+**Dívidas da Onda 2 — F-015, F-017 e F-010** (nenhuma bloqueia o QA; todas são escolha do
+orquestrador ou de Edu, não bug):
+
+- **Coluna `inclinacao_real_5a_3a` em `MacroQuarterlySchema` (D-n).** A inclinação **principal** de
+  D-i é a 5a−3a (95,25% de cobertura, a que fecha CA-025) e o schema só prevê a 5a−1a, que
+  `macro_quarterly` publica com **33 nulos (39,8%)**. Acrescentar coluna a tabela canônica é
+  **alteração de schema classe C** → feature própria, depois do Comitê. Até lá F-019/F-021 leem a
+  **série** de `raw_series`/`data/processed/curva/` via `alinhar_series`. Provavelmente vai junto a
+  `inclinacao_nominal_5a_3a`, para o par ficar simétrico.
+- **`termos_troca_yoy` segue 100% nula, sem fonte.** O proxy **IC-Br do BCB** (SGS **27574/27575**)
+  resolveria com um extrator de **1 série** — é o escopo de **F-037** (pacote estendido). Hoje a
+  coluna existe, é 100% nula e o motivo está no `relatorio_macro.json`; **nada é estimado**. Decidir
+  é escolher entre (a) trazer o IC-Br para dentro do pacote mínimo, ou (b) manter a coluna nula e
+  declará-la na página de limitações (F-028).
+- **`min_periods = 8` no hiato do IBC-Br está MEDIDO e não adotado (D-m).** `relatorio_macro.json →
+  sensibilidade_ibcbr_gap` mostra que recuperaria **12** dos 16 trimestres nulos com
+  `max |diferença| = 0,0 pp` no trecho comum. Não é dívida de implementação (já está medido) e sim
+  **decisão de método do Edu** (§4): média de janela parcial é outro estimador, cujo significado
+  muda ao longo do tempo. Adotar é 1 constante + re-rodar os 83 `ibcbr_gap`.
+- **`asset_returns_quarterly` não tem flag de trimestre corrente incompleto.** `is_estimated` é de
+  `macro_quarterly` (CA-060) e `AssetReturnsQuarterlySchema` é `strict` com 16 colunas — acrescentar
+  é alteração de schema. Hoje **nenhuma linha é parcial** (`2026Q3` está fechado: CDI com 65 d.u.,
+  IPCA com 3 meses, níveis em 30/09/2026), mas se o acervo for reextraído **no meio** de um
+  trimestre o `ret_tri` corrente sai calculado contra o último fechamento, com `n_dias_uteis` baixo
+  como **único** sinal. Duas saídas: (a) o build de entrega roda só com trimestre fechado — **regra
+  de operação, recomendada para 2026-10-14**, e é a que vai para
+  `runbooks/reconstruir-dataset.md`; (b) F-022 junta por `quarter` e filtra pelo `is_estimated` de
+  F-015, na fase 2.
+- **Top5 e V1b do Focus seguem fora de escopo** (F-033 / SPEC §10.5), como o contrato de F-010
+  manda: o extrator traz a **mediana** do consenso, não a distribuição nem o Top5. `surpresa_ipca`,
+  `surpresa_pib` e `surpresa_selic` **já existem** em `macro_quarterly` como colunas; o que falta é
+  a **lente** V1b que as usa como eixo em vez da tendência.
+- **`ExpectativasMercadoInflacao24Meses` não foi extraído** (não está no Feature Contract de F-010).
+  É o **mesmo `EntityType`** do de 12 meses: **1 entrada em `PLANO`** + 1 no catálogo. O horizonte
+  de 24 meses é o que a metodologia usa para expectativa "ancorada"; com 12 meses o juro real
+  ex-ante fica mais sensível ao choque corrente.
+- **Indicadores do Focus fora do pacote mínimo:** `IPCA Livres`, `IPCA Serviços`,
+  `IPCA Administrados`, `IGP-M`, `Taxa de desocupação`, `PIB Indústria/Serviços/Agropecuária`,
+  `Resultado primário`, `Dívida bruta`… Estão **enumerados** em `INDICADORES_ENUMERADOS` e entram com
+  **1 linha em `PLANO`** cada. Fora do e-mail A3, logo fora do caminho crítico de 2026-10-14.
+- **Horizonte anual `HM1` do Focus existe e não é gravado:** é sazonal (só no começo de janeiro) e
+  produziria série com vão de ~11 meses; está **contado** em `fora_do_horizonte`. Se a surpresa de
+  IPCA do **ano fechado** virar insumo de regime, é 1 chave em `PLANO` + afrouxar a continuidade
+  daquela série.
+- **`ldc.duckdb` não tem view de `macro_quarterly` nem de `asset_returns_quarterly`.**
+  `construir_duckdb` vive em `build_raw_series.py` e cria só as duas views de F-013 — são 2 linhas
+  lá (ou um passo novo no orquestrador de F-029), **zero** efeito em dado, porque as views são
+  `SELECT * FROM read_parquet(...)` sobre Parquet já escrito. Mesma dívida de
+  `alinhado_trimestral`, acima.
+- **`ciclo_selic` é função publicada, não coluna.** O rótulo mora em `RegimesSchema` (F-019) e o
+  insumo (`selic_meta_delta`) em `macro_quarterly`; a função `ciclo_selic(delta_pp)` vive no módulo
+  de F-015 e o relatório publica a distribuição medida (`CORTE 29 · NEUTRO 30 · ALTA 24`,
+  `sem_delta 0`). Quem implementar F-020 **importa a função**, não reimplementa o limiar.
+- **Limitação medida do schema wide:** `coerce=True` roda **antes** do check de nulidade, então um
+  `None` em `vertice_extrapolado` entra como `False` em vez de ser rejeitado — e `False` significa
+  "nenhum vértice faltou", o **oposto** da ausência. Está travado em teste
+  (`test_vertice_extrapolado_nulo_e_coagido_para_false_e_nao_rejeitado`); a guarda real é o build,
+  que sempre calcula a flag dos 4 vértices. Fechar de verdade exige mudar a ordem de validação do
+  pandera ou tornar a coluna anulável — alteração de schema.
+- **Convenção de unidade duplicada (D-o).** `macro_quarterly` (por cento) e
+  `asset_returns_quarterly` (fração) publicam `cdi_tri`/`ipca_tri` com o **mesmo nome**. Não há bug
+  hoje (F-017 nunca lê `macro_quarterly`; `max |macro − 100 × retornos| = 0,0`), mas o próximo
+  consumidor que cruzar as duas erra por 100x. Caminho da fase 2: consumidor único, ou sufixo de
+  escala no nome.
 
 ---
 

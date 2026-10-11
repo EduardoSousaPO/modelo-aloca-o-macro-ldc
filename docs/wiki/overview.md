@@ -6,7 +6,7 @@
 > (imutável). **Fonte de verdade do produto:** [`docs/product/PRD.md`](../product/PRD.md) (v1.0, 2026-10-10).
 > Esta página **resume** o PRD — não o duplica. Em conflito, vale o PRD; em conflito de escopo, vale o e-mail.
 
-**Última revisão:** 2026-10-10 (housekeeping — §8 atualizada para o estado pós-SDD)
+**Última revisão:** 2026-10-11 (§8 atualizada para a Onda 2 **completa** — implementada, QA pendente)
 **Versão refletida:** PRD v1.0 + SPEC v1.0 (gerados em modo autônomo; **aprovação do Edu pendente**)
 
 ---
@@ -85,22 +85,35 @@ truncamento sem aviso, filtros ignorados) · janela rolante e descontinuações 
 anti-bot (FRED pode estar bloqueado) · unidade/escala/formato mentirosos · overfitting e confusão
 descritivo × preditivo.
 
-## 8. Estado atual (2026-10-11, pós-consolidação da Onda 1)
+## 8. Estado atual (2026-10-11, Onda 2 implementada — QA pendente)
 
-- **Fase:** **extração pronta, canônico não começou** — escopo → pesquisa → PRD v1.0 → SPEC v1.0 +
-  Anti-SPEC → contratos → TODO (40 features) → PLAN (ondas) → Onda 0 (F-001, F-009, QA aprovado) →
-  Onda 1 (F-002..F-008, **aguardando QA**). **Aprovação do Edu ainda pendente** no PRD e na SPEC.
-- **Pipeline implementado:** 8 extratores em `apps/pipeline/extract/` + o job diário em `jobs/` + a
-  infra em `common/` + o início da transformação em `transform/cambio.py`; `apps/analysis/` segue
-  vazio. Contratos em `packages/shared/schemas/` (7 módulos pandera/pydantic + **134** séries).
-- **Dataset canônico:** não existe (é classe C, de F-013 em diante). Mas `data/processed/` tem **53
-  Parquets** — ~219 mil linhas de `processed_series` em 51 arquivos, o painel do Tesouro Direto
-  (886.300 linhas) e o calendário de dias úteis (2001→2030) —, todos reconstruíveis sem rede com
-  `--offline` e byte-idênticos entre rodadas.
+- **Fase:** **Onda 1 completa e aprovada; camada canônica COMPLETA, aguardando QA** — escopo →
+  pesquisa → PRD v1.0 → SPEC v1.0 + Anti-SPEC → contratos → TODO (40 features) → PLAN (ondas) →
+  Onda 0 (F-001, F-009) → Onda 1 (F-002..F-008), **todas com QA independente aprovado**
+  (`docs/plans/qa/`, 0 × P0) → **Onda 2: as 6 features implementadas** (F-013, F-014, F-016, F-010,
+  F-015, F-017) e **aguardando QA/revisão numérica independente**. **Aprovação do Edu ainda
+  pendente** no PRD e na SPEC.
+- **Pipeline implementado:** **9** extratores em `apps/pipeline/extract/` (o 9º é o Focus/Olinda) +
+  job diário em `jobs/` + infra em `common/` + `transform/cambio.py` + **`apps/pipeline/canonical/`**
+  (`build_raw_series.py`, `alinhamento.py`, `curva.py`, **`macro_quarterly.py`**, **`retornos.py`**);
+  `apps/analysis/` segue vazio. Contratos em `packages/shared/schemas/` (8 módulos pandera/pydantic +
+  **138** séries).
+- **Dataset canônico: completo para a Onda 3.** `data/canonical/` tem `raw_series.parquet`
+  (**278.439** linhas, **62** séries, 1979-12-31 → 2026-10-10), `series_catalog.parquet`
+  materializado (**138 × 26**), `alinhado_trimestral.parquet` (**4.038** linhas),
+  **`macro_quarterly.parquet` (83 × 42)** + **`macro_quarterly_provenance.parquet` (2.548)**,
+  **`asset_returns_quarterly.parquet` (1.963 linhas, 24 ativos)**, os 4 relatórios de build e o
+  `ldc.duckdb` derivado. `data/processed/` tem **69 Parquets** (51 de `processed_series`, as 11 da
+  curva, as **5** do Focus, o painel do Tesouro Direto e o calendário), todos reconstruíveis sem rede
+  com `--offline` e byte-idênticos entre rodadas. **Falta só a camada de regimes** (F-019..F-022).
 - **Pesquisa:** concluída — fontes (`fontes-de-dados.md`) e metodologia (`metodologia-regimes-macro.md`).
 - **Decisões de fonte e convenção:** 12 substituições + as **8 convenções da Onda 1** (D-a..D-h:
-  `date` em fim de período, `vintage` do manifesto, catálogo 134, calendário por HTML…) registradas
-  como **provisórias** em
+  `date` em fim de período, `vintage` do manifesto, catálogo 134, calendário por HTML, grade bancária
+  única) + as **7 + 2 da Onda 2**: **D-i** (vértice de 3 anos, catálogo **138**), **D-j** (prazo em
+  dias corridos), **D-k** (Focus fora de `raw_series`), **D-l** (`USDBRL` no universo de retornos),
+  **D-m** (CA-007 não satisfazível — 16 nulos em `ibcbr_gap`), **D-n** (inclinação 5a−3a sem coluna),
+  **D-o** (unidade: por cento × fração), **D-p** (`FOCUS_PIB_TOTAL` descartada) e **D-q** (achados do
+  Focus: G-04, G-05, exceção a D-a, `%20` × `+`). Todas **provisórias** em
   [`docs/plans/DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md); **ADR-001..006 em Proposta**.
 - **Ambiente:** `uv sync --extra dev` entrega o ambiente completo (deps corrigidas em 2026-10-10).
   **FRED bloqueado nesta máquina** → bloco internacional pelo plano B (Yahoo + MSCI + PTAX).
@@ -109,8 +122,11 @@ descritivo × preditivo.
   (**D1** lente oficial, **D3** eixo inflação, **D5** métrica do heatmap, **D6** forma do internacional,
   **D12** setoriais/FII no pacote mínimo, **L1** IFIX 2011+, **L2** FII segmentado via terceiro, **L4**
   contratar ANBIMA Feed ou não). **Extração e camada canônica não estão bloqueadas.**
-- **Próximo passo:** Onda 0 do `PLAN.md` — **F-009** (job diário ANBIMA, urgente) e **F-001** (infra de
-  extração); em paralelo, responder as 8 decisões.
+- **Próximo passo: Onda 3 — regimes** (F-019 V1 → F-020 V2 → F-021 V3 → F-022 métricas por regime ×
+  ativo), cujos insumos únicos são `macro_quarterly` e `asset_returns_quarterly`, já em disco. Em
+  paralelo: **QA/revisão numérica das 6 features da Onda 2**, responder as 8 decisões e ratificar
+  D-h..D-q (as que precisam do Edu estão tabuladas em `TODO.md §4`). Lembrete de escopo: a V1
+  classificará **67** dos 83 trimestres, não 83 — **D-m**, e vai à página de limitações (F-028).
 
 ## 9. Próximo grande objetivo
 

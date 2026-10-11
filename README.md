@@ -21,21 +21,34 @@ imutável**. Toda feature se justifica ali; o que estiver fora exige pausa e reg
 qualquer número para o Comitê é operação **classe D** (revisão humana + dataset congelado + 3 valores por
 série conferidos na fonte + linha em `docs/wiki/log.md`).
 
-## Estado atual (2026-10-10)
+## Estado atual (2026-10-11)
 
-**Camada de extração pronta e conferida; camada canônica não começou.**
+**Onda 1 completa e aprovada; Onda 2 (camada canônica) IMPLEMENTADA e aguardando QA — `data/canonical/` está completo. Próximo: Onda 3 — regimes.**
 
 - Documentação completa: escopo → pesquisa → PRD → SPEC/Anti-SPEC → contratos → TODO (40 features) → PLAN.
-- Contratos de dados em `packages/shared/schemas/` (7 módulos pandera/pydantic + catálogo de **134**
+- Contratos de dados em `packages/shared/schemas/` (8 módulos pandera/pydantic + catálogo de **138**
   séries).
-- **9 features implementadas:** F-001 (infra) e F-009 (job diário) com **QA aprovado**; F-002..F-008
-  (ANBIMA IMA, BCB SGS, IBGE SIDRA, Tesouro Direto, API B3, Yahoo/MSCI, calendário de dias úteis)
-  **implementadas e aguardando QA** (`docs/plans/qa/ONDA-1-QA.md`). A camada de transformação nasceu
-  com `apps/pipeline/transform/cambio.py`; `apps/analysis/` segue vazio e `data/canonical/` também —
-  é tudo **classe C**, de F-013 em diante.
-- `data/processed/` tem **53 Parquets** reconstruíveis com um comando por fonte: ~219 mil linhas de
-  `processed_series` em 51 arquivos, mais o painel do Tesouro Direto (886.300 linhas, 750 `series_id`)
-  e o calendário de dias úteis (10.957 dias, 2001→2030). `data/raw/` tem o bruto de cada fonte com
+- **Onda 0 e Onda 1 — 9 features com QA aprovado:** F-001 (infra), F-009 (job diário) e os 7
+  extratores F-002..F-008 (ANBIMA IMA, BCB SGS, IBGE SIDRA, Tesouro Direto, API B3, Yahoo/MSCI,
+  calendário de dias úteis). QA independente em `docs/plans/qa/` (`ONDA-0-QA.md`, `ONDA-1-QA-A.md`,
+  `ONDA-1-QA-B.md`), **0 × P0**; F-004 fica com **D-e pendente do Edu** (dois CAs da SPEC não fecham
+  no dado real) e as pendências P1/P2 estão em `TODO.md §6`.
+- **Onda 2 (classe C) — as 6 features implementadas, aguardando QA/revisão numérica:** **F-013**
+  (`raw_series` + catálogo materializado), **F-014** (`alinhado_trimestral`), **F-016** (curva: 11
+  séries interpoladas), **F-010** (Focus/Olinda: 5 EntitySets, 197 séries, 150.120 linhas), **F-015**
+  (`macro_quarterly` **83 × 42** + `macro_quarterly_provenance` **2.548**) e **F-017**
+  (`asset_returns_quarterly` **1.963** linhas, **24** ativos). `apps/analysis/` segue vazio — é a
+  Onda 3.
+- `data/processed/` tem **69 Parquets** reconstruíveis com um comando por fonte: ~219 mil linhas de
+  `processed_series` em 51 arquivos, as **11** séries da curva (F-016), as **5** fatias do Focus
+  (F-010), o painel do Tesouro Direto (886.300 linhas, 750 `series_id`) e o calendário de dias úteis
+  (10.957 dias, 2001→2030). `data/canonical/` tem `raw_series.parquet` (**278.439** linhas, **62**
+  séries, 1979-12-31 → 2026-10-10), `series_catalog.parquet` (**138 × 26**),
+  `alinhado_trimestral.parquet` (4.038 linhas), `macro_quarterly.parquet` + a companheira de
+  procedência, `asset_returns_quarterly.parquet`, os **4** relatórios de build e o `ldc.duckdb`
+  derivado. O rebuild tem **ordem obrigatória**: `build_raw_series` → `alinhamento` →
+  `macro_quarterly` → `retornos` (a `curva` roda antes de tudo, porque escreve em
+  `data/processed/`); 2 rodadas dão hashes idênticos. `data/raw/` tem o bruto de cada fonte com
   manifesto (`sha256`, URL, hora da coleta) e a janela rolante arquivada pelo job F-009. **Nada de
   `data/` vai para o git** — a fonte de verdade é o script.
 - Reprodutível sem rede: `python -m apps.pipeline.extract.<fonte> --offline` reconstrói o Parquet a
@@ -44,7 +57,11 @@ série conferidos na fonte + linha em `docs/wiki/log.md`).
   12 substituições de fonte registradas como **provisórias** em
   [`docs/plans/DECISIONS_LOG.md`](docs/plans/DECISIONS_LOG.md).
 - CI: N1 (lint + unit) configurado em `.github/workflows/ci.yml`; N2/N3 comentados até existirem testes.
-- **8 decisões de Edu/Alexandre bloqueiam o início** — ver abaixo.
+- **8 decisões de Edu/Alexandre bloqueiam a publicação** (não o desenvolvimento) — ver abaixo; e as
+  decisões provisórias das Ondas 1-2 (**D-a..D-q**, com **D-h..D-m** à espera de aval) estão
+  tabuladas em [`TODO.md §4`](TODO.md). Duas delas mudam o que se pode afirmar: **D-m** (a V1 vai
+  classificar **67** dos 83 trimestres, não 83, porque o IBC-Br começa em 2003) e **D-o** (unidade:
+  `macro_quarterly` em por cento, `asset_returns_quarterly` em fração).
 
 ## Como configurar o ambiente
 
@@ -75,12 +92,14 @@ internacional usa Yahoo + MSCI + PTAX (S-09 no `DECISIONS_LOG`).
 ```
 AGENTS.md · CLAUDE.md · TODO.md · README.md · pyproject.toml · .gitignore
 .github/workflows/ci.yml        ← CI N1 ativo; N2/N3 comentados
-apps/pipeline/                  ← common/ · extract/ · transform/ · jobs/
+apps/pipeline/                  ← common/ · extract/ · canonical/ · transform/ · jobs/
 apps/analysis/                  ← notebooks, regimes, figuras           (vazio)
-packages/shared/schemas/        ← FONTE DE VERDADE dos contratos (pandera + pydantic, 134 séries)
+packages/shared/schemas/        ← FONTE DE VERDADE dos contratos (pandera + pydantic, 138 séries)
 data/raw/<fonte>/               ← resposta crua da fonte, imutável      (não versionado)
-data/processed/                 ← 53 Parquets, frequência nativa        (não versionado)
-data/canonical/                 ← dataset-base trimestral alinhado      (não versionado)
+data/processed/                 ← 69 Parquets, frequência nativa        (não versionado)
+                                  (inclui curva/ — 11 séries de F-016 — e focus/ — 5 de F-010)
+data/canonical/                 ← raw_series · series_catalog · alinhado_trimestral
+                                  macro_quarterly (+ _provenance) · asset_returns_quarterly · ldc.duckdb
 tests/unit|integration|contract|e2e/
 infra/                          ← scripts auxiliares de ambiente
 docs/product/                   ← ESCOPO-EMAIL-ALEXANDRE.md (imutável) + PRD.md

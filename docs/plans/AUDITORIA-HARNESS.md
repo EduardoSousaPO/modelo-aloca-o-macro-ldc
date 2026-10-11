@@ -13,13 +13,20 @@
 > validação **executada** do catálogo (132 entradas, contagens por fonte/status/item) e execução real de
 > `ruff check`, `ruff format --check` e `pytest tests/unit`.
 
-> **Nota do orquestrador, 2026-10-11 (não reescreve o laudo).** Tudo que este laudo diz sobre o
-> catálogo foi medido em **132 séries**. Em 2026-10-11 o catálogo passou a ter **134**: F-007
-> acrescentou `ACWI_BRL` e `SP500_BRL` (`fonte=DERIVADO`, `is_total_return` explícito), aceito como
-> **D-d** em `docs/plans/DECISIONS_LOG.md §2.1`. Onde se lê 132, leia 134; `ok` vai de 99 para 101 e o
-> pacote mínimo de 89 para 91. As contagens por status, fonte e item do e-mail **não mudam no resto**,
-> e nenhuma conclusão do laudo depende do total. O número vivo é `N_SERIES_ESPERADAS` em
-> `tests/unit/test_schemas_smoke.py`.
+> **Nota do orquestrador, atualizada em 2026-10-11 (não reescreve o laudo).** Tudo que este laudo diz
+> sobre o catálogo foi medido em **132 séries**. O catálogo passou a ter **138** em duas etapas, as
+> duas registradas em `docs/plans/DECISIONS_LOG.md`: **D-d** (§2.1) — F-007 acrescentou `ACWI_BRL` e
+> `SP500_BRL` (`fonte=DERIVADO`, `is_total_return` explícito) → 134; **D-i** (§2.3) — F-016
+> acrescentou `CURVA_REAL_3A`, `CURVA_NOMINAL_3A`, `INCLINACAO_REAL_5A_3A` e
+> `INCLINACAO_NOMINAL_5A_3A`, porque CA-025 não fecha com o vértice curto de 1 ano → **138**.
+> Onde se lê 132, leia **138**: `ok` vai de 99 para **105**, o pacote mínimo de 89 para **95** e
+> `DERIVADO` de 7 para **13** (2 em BRL + 11 da curva). As contagens por status, fonte e item do
+> e-mail **não mudam no resto**, e nenhuma conclusão do laudo depende do total. O número vivo é
+> `N_SERIES_ESPERADAS` em `tests/unit/test_schemas_smoke.py`.
+>
+> **Estado do projeto em 2026-10-11, para quem ler o laudo hoje:** Onda 1 **completa e aprovada**
+> (F-001, F-009 e os 7 extratores, QA em `docs/plans/qa/`); Onda 2 com **F-013/F-014/F-016
+> implementadas** (QA pendente) e **F-015/F-017/F-010 em execução**. `data/canonical/` existe.
 
 ---
 

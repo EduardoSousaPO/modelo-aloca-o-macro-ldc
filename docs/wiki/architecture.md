@@ -5,10 +5,10 @@
 > **Fonte de verdade:** `docs/specs/SPEC.md` + `packages/shared/schemas/`.
 > Esta página existe para que qualquer agente entenda a topologia em < 5 min sem ler todo o SPEC.
 
-**Última revisão:** 2026-10-11 (consolidação da Onda 1)
+**Última revisão:** 2026-10-11 (Onda 2 **completa**: F-013/F-014/F-016 + F-010/F-015/F-017 entregues)
 **Versão do SPEC refletida:** **v1.0** (52 RFs → 128 CAs + Anti-SPEC §10, sagrada)
-**Status do código (2026-10-11):** contratos escritos (`packages/shared/schemas/`, **7** módulos + catálogo de **134** séries) e a **camada de extração pronta** — `apps/pipeline/common/` (infra), `extract/` (8 extratores), `jobs/` (job diário), `transform/cambio.py` (1ª peça da transformação); `data/processed/` tem 53 Parquets reconstruíveis com `--offline`. `data/canonical/` e `apps/analysis/` seguem vazios (classe C, de F-013 em diante).
-Ondas 0 e 1 fechadas: F-001 e F-009 com **QA aprovado**, F-002..F-008 **aguardando QA** (`docs/plans/qa/ONDA-1-QA.md`). As convenções da camada processada (`date` em fim de período, `vintage` do manifesto) estão em `docs/plans/DECISIONS_LOG.md §2.1`, ainda **provisórias**.
+**Status do código (2026-10-11):** contratos escritos (`packages/shared/schemas/`, **8** módulos + catálogo de **138** séries); **camada de extração pronta e aprovada** — `apps/pipeline/common/` (infra), `extract/` (**9** extratores, com o Focus/Olinda), `jobs/` (job diário), `transform/cambio.py`; e **a camada canônica está completa** — `apps/pipeline/canonical/` com `build_raw_series.py` (F-013), `alinhamento.py` (F-014), `curva.py` (F-016), `macro_quarterly.py` (F-015) e `retornos.py` (F-017). `data/processed/` tem **69** Parquets e `data/canonical/` tem `raw_series` (278.439 linhas, 62 séries), `series_catalog` materializado (138 × 26), `alinhado_trimestral` (4.038 linhas), **`macro_quarterly` (83 × 42)** + **`macro_quarterly_provenance` (2.548)**, **`asset_returns_quarterly` (1.963 linhas, 24 ativos)**, 4 relatórios e o `ldc.duckdb` derivado — tudo reconstruível com `--offline`, na ordem `build_raw_series` → `alinhamento` → `macro_quarterly` → `retornos` (a `curva` roda antes de tudo, porque escreve em `data/processed/`). `apps/analysis/` segue vazio — é a Onda 3.
+Ondas 0 e 1 **fechadas e aprovadas** (`docs/plans/qa/ONDA-0-QA.md`, `ONDA-1-QA-A.md`, `ONDA-1-QA-B.md`); **Onda 2: as 6 features implementadas, aguardando QA/revisão numérica**. As convenções (`date` em fim de período, `vintage` do manifesto, grade bancária única de D-h, vértice de 3 anos de D-i, prazo em dias corridos de D-j, Focus fora de `raw_series` de D-k, `USDBRL` no universo de D-l, unidade por cento × fração de D-o) estão em `docs/plans/DECISIONS_LOG.md §2.1/§2.3`, ainda **provisórias**.
 
 ---
 
@@ -49,29 +49,31 @@ produz o mesmo **hash** (RF-048). Nada volta para a esquerda. Persistência: **P
 | Qualidade | pytest + ruff (line-length 100) | N1 lint+unit · N2 +integration/contract+build canônico · N3 +e2e+hash |
 | Execução | local (Windows, máquina do Edu) | **sem** servidor, deploy, auth, cloud |
 
-## 3. Módulos (previstos; nenhum implementado)
+## 3. Módulos (previstos; `common/`, `extract/`, `jobs/` e `canonical/` implementados)
 
 | Módulo | Responsabilidade | Classe | Features |
 |---|---|---|---|
 | `extract/http`, `parsing` | UA, retry, shape, número pt-BR, magic bytes, encoding | B | F-001 |
-| `extract/bcb_sgs`, `bcb_focus` | SGS (IPCA, Selic, CDI, IBC-Br, PTAX) + Focus | B | F-003, F-010 |
+| `extract/bcb_sgs` · `extract/bcb_focus` | SGS (IPCA, Selic, CDI, IBC-Br, PTAX) + Focus/Olinda (5 EntitySets, 197 séries) | B | F-003, **F-010** |
 | `extract/ibge_sidra` | IPCA nº-índice, PIB trimestral | B | F-004 |
 | `extract/anbima_s3`, `anbima_diario` | índices IMA; arquivamento de janela rolante | B | F-002, F-009 |
 | `extract/tesouro_direto` | taxas e PUs de títulos públicos | B | F-005 |
 | `extract/b3_indices` | índices amplos, setoriais e IFIX | B | F-006 |
 | `extract/yahoo`, `msci`, `fred` | bloco internacional | B | F-007, F-011 |
 | `extract/teva` | FII por segmento (2019+) | B | F-012 |
-| `transform/calendario`, `alinhamento` | dias úteis, fim de trimestre, ffill ≤ 5 d.u. | **C** | F-008, F-014 |
-| `transform/curva` | vértices interpolados + inclinação | **C** | F-016 |
-| `transform/retornos` | `ret_tri`, excesso CDI, real (sempre razão) | **C** | F-017 |
-| `transform/macro_quarterly`, `asof` | 83 trimestres + anti-look-ahead | **C** | F-015, F-018 |
-| `load/raw_series`, `catalog` | camada canônica + catálogo materializado | **C** | F-013 |
+| `extract/calendario_anbima` · `canonical/alinhamento` | dias úteis, fim de trimestre, ffill ≤ 5 d.u. | **C** | F-008, F-014 |
+| `canonical/curva` | vértices interpolados + inclinação | **C** | F-016 |
+| `canonical/retornos` | `ret_tri`, excesso CDI, real (sempre razão) — **em fração** (D-o) | **C** | **F-017** |
+| `canonical/macro_quarterly` · `asof` | 83 trimestres + procedência por célula — **em por cento/pp** (D-o); `asof` é F-018 | **C** | **F-015**, F-018 |
+| `canonical/build_raw_series` | camada canônica + catálogo materializado + DuckDB | **C** | F-013 |
 | `analysis/regimes_v1|v2|v3` | V1 quadrantes, V2 ciclo Selic, V3 vizinhos | **C** | F-019..021 |
 | `analysis/metricas_regime` | métricas por regime × ativo | **C** | F-022 |
 | `analysis/figuras`, `tabelas`, `internacional` | heatmap, timeline, ranking, risk-off | B / **C** | F-023..026 |
 | `pipeline` (CLI), `deliver/pacote` | um comando + pacote do Comitê | **C** / **D** | F-029, F-031 |
 
-`transform/`, `load/` e `analysis/regimes*` são o coração do risco: **classe C** (`AGENTS.md §2`).
+`canonical/`, `transform/` e `analysis/regimes*` são o coração do risco: **classe C** (`AGENTS.md §2`).
+Nota de caminho: **F-013, F-014, F-015, F-016 e F-017** moram em **`apps/pipeline/canonical/`**, não em `load/`/`transform/`
+como o `TODO.md` previa — ajuste registrado no Feature Contract de cada uma, sem efeito em CA.
 
 ## 4. Fronteiras de validação (onde o pandera **tem** que estar)
 
@@ -79,9 +81,10 @@ produz o mesmo **hash** (RF-048). Nada volta para a esquerda. Persistência: **P
 |---|---|
 | saída de cada extrator → `data/processed/` | `ProcessedSeriesSchema` |
 | `data/processed/` → `data/canonical/` | `RawSeriesSchema` + schema da tabela destino |
+| catálogo materializado · grade trimestral | `SeriesCatalogMaterializedSchema` · `AlinhadoTrimestralSchema` |
 | entrada/saída de `data/canonical/` | `MacroQuarterlySchema`, `AssetReturnsQuarterlySchema`, `RegimeAssetMetricsSchema`, `RegimesSchema`, `RegimeNeighborsSchema`, `SeriesCatalogSchema` |
 | config de extrator / janela | `ExtractorConfig` (pydantic) |
-| catálogo de séries | `SeriesCatalogEntry` (pydantic) + `series_catalog_data.py` (**134** séries) |
+| catálogo de séries | `SeriesCatalogEntry` (pydantic) + `series_catalog_data.py` (**138** séries) |
 
 **Regra:** para documentar um contrato em `docs/contracts/CONTRACTS.md`, **primeiro** crie o schema em
 `packages/shared/schemas/`. O CONTRACTS.md é espelho legível, não fonte.
@@ -103,6 +106,10 @@ Invariantes que os schemas impõem (e que nenhum código contorna): 83 trimestre
 | ADR-006 | **Parquet por camada + DuckDB para consulta** e convenção de retornos/alinhamento | **Proposta** |
 
 ADR-006 substitui os três ADRs "pendentes" do kickoff (armazenamento, cliente HTTP, convenção de período).
+**Duas correções editoriais pendentes para quando ADR-004 e ADR-006 forem aceitos** (nenhuma muda a
+decisão): ADR-006 §(a).2 escreve `macro.duckdb` e o implementado é **`ldc.duckdb`** (decisão: mantém
+`ldc.duckdb`); e ADR-004 §3 nomeia a inclinação real **5a−1a** como variável principal, papel que
+**D-i** passou à **5a−3a** (`DECISIONS_LOG §2.3`).
 **ADR-001 é gate de publicação:** enquanto estiver em Proposta, `regimes.especificacao_congelada = False`
 e nenhum número vai ao Comitê (RF-031 / CA-090).
 Trocas de fonte e convenções operacionais vão para `docs/plans/DECISIONS_LOG.md`, não para ADR.

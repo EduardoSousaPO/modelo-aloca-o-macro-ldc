@@ -3,9 +3,11 @@
 O que este módulo faz, e **só** isto:
 
 1. **Descobre** os Parquet de série em `data/processed/*/` (`data/` nunca é lido por glob na mão em
-   outro lugar), deixando de fora as duas tabelas que não são `processed_series` —
-   `calendario/dias_uteis_anbima.parquet` e `tesouro-direto/td_painel.parquet` (ver
-   `TABELAS_FORA_DO_RAW_SERIES`, cada uma com o motivo no próprio dado).
+   outro lugar), deixando de fora as tabelas que não entram no canônico —
+   `calendario/dias_uteis_anbima.parquet` (não é série de valores),
+   `tesouro-direto/td_painel.parquet` e as **5** fatias de `focus/` (painéis de `series_id`
+   compostos que não são entradas do catálogo; ver `TABELAS_FORA_DO_RAW_SERIES`, cada uma com o
+   motivo no próprio dado).
 2. **Valida a entrada** com `ProcessedSeriesSchema`, arquivo por arquivo: Parquet que não é
    `processed_series` derruba o build em vez de entrar no canônico (CA-057, CA-075).
 3. **Guarda procedência e fonte única no concatenado**, *antes* de qualquer dedup: procedência
@@ -117,6 +119,16 @@ MODULOS_DO_BUILD: tuple[str, ...] = (
 
 #: Tabelas de `data/processed/` que **não** são `processed_series` e por quê.
 #: A chave é o sufixo do caminho POSIX relativo a `data/processed/`.
+#: Motivo das 5 tabelas do Focus (F-010), por EntitySet. É o mesmo caso de `td_painel.parquet`:
+#: o catálogo registra a **fonte** (o EntitySet), e os `series_id` gravados são compostos.
+_MOTIVO_FOCUS = (
+    "Fatia do painel do Focus (F-010) com {n} series_id compostos "
+    "FOCUS_<ESCOPO>_<INDICADOR>_<CHAVE> que NAO sao entradas do series_catalog: o catalogo "
+    "registra o EntitySet ({es}) como fonte, e a serie canonica derivada e de F-015, que consome "
+    "o Focus direto de data/processed/focus/ (mesmo ProcessedSeriesSchema). Admitir os 197 aqui "
+    "violaria CA-055/CA-120 — mesma situacao de td_painel.parquet. Ver D-k."
+)
+
 TABELAS_FORA_DO_RAW_SERIES: dict[str, str] = {
     "calendario/dias_uteis_anbima.parquet": (
         "CalendarioDiasUteisSchema (4 colunas): grade de datas com dois atributos, não série de "
@@ -131,6 +143,11 @@ TABELAS_FORA_DO_RAW_SERIES: dict[str, str] = {
         "F-016. Admitir os 750 aqui violaria CA-055/CA-120 — toda linha do canônico tem de "
         "resolver para uma URL do catálogo."
     ),
+    "focus/FOCUS_ANUAIS.parquet": _MOTIVO_FOCUS.format(es="FOCUS_ANUAIS", n=8),
+    "focus/FOCUS_MENSAIS.parquet": _MOTIVO_FOCUS.format(es="FOCUS_MENSAIS", n=2),
+    "focus/FOCUS_TRIMESTRAIS.parquet": _MOTIVO_FOCUS.format(es="FOCUS_TRIMESTRAIS", n=3),
+    "focus/FOCUS_SELIC.parquet": _MOTIVO_FOCUS.format(es="FOCUS_SELIC", n=182),
+    "focus/FOCUS_INFLACAO_12M.parquet": _MOTIVO_FOCUS.format(es="FOCUS_INFLACAO_12M", n=2),
 }
 
 #: Colunas acrescentadas ao catálogo materializado (`SeriesCatalogMaterializedSchema`).

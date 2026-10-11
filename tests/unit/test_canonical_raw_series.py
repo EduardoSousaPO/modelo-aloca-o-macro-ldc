@@ -118,6 +118,17 @@ def mini_serie(
     )[list(COLUNAS_RAW_SERIES)]
 
 
+def _mini_focus(entityset: str, series_id: str) -> pd.DataFrame:
+    """Fatia do Focus como F-010 a grava: `processed_series` **válida**, com `series_id` composto.
+
+    O EntitySet (`FOCUS_ANUAIS`, …) está no catálogo; o `series_id` composto
+    (`FOCUS_A_IPCA_H0`, …) **não** — é justamente o que exige a exclusão de D-k.
+    """
+    return mini_serie(entityset, ["2006-01-02", "2006-01-03"], [4.5, 4.6]).assign(
+        series_id=series_id
+    )
+
+
 def painel_de_controle() -> pd.DataFrame:
     """Três séries válidas (D, M, Q) — o controle sem o qual um teste de rejeição não prova nada."""
     return pd.concat(
@@ -172,13 +183,29 @@ def registros_do_build() -> Iterator[list[str]]:
 
 @pytest.fixture
 def processed_minimo(tmp_path: Path) -> Path:
-    """`data/processed/` sintético com 3 séries + as 2 tabelas que o build tem de ignorar."""
+    """`data/processed/` sintético com 3 séries + as 7 tabelas que o build tem de ignorar.
+
+    As 5 de `focus/` são `processed_series` **válidas** (D-k): o que as exclui não é o schema, e
+    sim o `series_id` composto que não resolve no catálogo — por isso entram aqui como série de
+    verdade, com `series_id` de Focus, e não como quadro de 3 colunas.
+    """
     nao_serie = pd.DataFrame(
         {"data": pd.to_datetime(["2006-01-02"]), "dia_util": [True], "fonte": ["ANBIMA_WEB"]}
     )
+    focus = {
+        f"focus/{entityset}.parquet": _mini_focus(entityset, series_id)
+        for entityset, series_id in (
+            ("FOCUS_ANUAIS", "FOCUS_A_IPCA_H0"),
+            ("FOCUS_MENSAIS", "FOCUS_M_IPCA_H0"),
+            ("FOCUS_TRIMESTRAIS", "FOCUS_Q_PIB_TOTAL_H0"),
+            ("FOCUS_SELIC", "FOCUS_RCOPOM_SELIC_R1-2007"),
+            ("FOCUS_INFLACAO_12M", "FOCUS_I12_IPCA_N"),
+        )
+    }
     _gravar_mini_processed(
         tmp_path,
         {
+            **focus,
             "b3/B3_IBOV.parquet": mini_serie(
                 SERIE_D, ["2006-01-02", "2006-01-03", "2006-02-01"], [36000.0, 36100.0, 38484.84]
             ),
@@ -210,8 +237,12 @@ def test_controle_painel_valido_passa_em_todas_as_guardas() -> None:
     assert len(raw) == 7
 
 
-def test_descoberta_exclui_calendario_e_painel_do_tesouro(processed_minimo: Path) -> None:
-    """As 2 tabelas de schema próprio ficam fora, **com motivo registrado** (não em silêncio)."""
+def test_descoberta_exclui_calendario_painel_do_tesouro_e_focus(processed_minimo: Path) -> None:
+    """As 7 tabelas fora do canônico ficam fora, **com motivo registrado** (não em silêncio).
+
+    O calendário sai por **schema** (não é série de valores); o painel do Tesouro e as 5 fatias do
+    Focus saem por **catálogo** — `series_id` composto que não resolve em `series_catalog` (D-k).
+    """
     alvos, excluidas = descobrir_parquets_de_serie(
         raiz_processed=processed_minimo / "data" / "processed"
     )
@@ -535,7 +566,7 @@ def test_build_completo_grava_os_quatro_artefatos(processed_minimo: Path) -> Non
     assert relatorio["raw_series"]["sha256"] == _sha256(canonical / NOME_RAW_SERIES)
     assert relatorio["series_catalog"]["sha256"] == _sha256(canonical / NOME_CATALOGO)
     assert relatorio["series_catalog"]["linhas"] == 138  # D-i: 134 + 4 (F-016)
-    assert len(relatorio["tabelas_excluidas"]) == 2
+    assert len(relatorio["tabelas_excluidas"]) == len(TABELAS_FORA_DO_RAW_SERIES) == 7
     assert len(relatorio["series"]) == 3
     assert len(relatorio["versao_build"]) == 64
     assert relatorio["linhas_dedup"] == 0

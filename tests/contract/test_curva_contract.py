@@ -174,14 +174,21 @@ def test_valor_nulo_e_o_unico_campo_que_pode_faltar(
 def test_a_pasta_curva_nao_esta_na_lista_de_exclusao_de_f013() -> None:
     """`data/processed/curva/` é absorvida pelo build do canônico — é o contrato de integração.
 
-    O painel do Tesouro e o calendário estão **fora** de `raw_series` por motivo declarado; a
-    curva, que é justamente a série canônica que nasce do painel, tem de estar **dentro**.
+    O calendário, o painel do Tesouro e as 5 fatias do Focus (D-k) estão **fora** de `raw_series`
+    por motivo declarado; a curva, que é justamente a série canônica que nasce do painel, tem de
+    estar **dentro**. O conjunto é afirmado **exato** de propósito: exclusão nova tem de passar
+    por aqui.
     """
     excluidas = set(TABELAS_FORA_DO_RAW_SERIES)
 
     assert excluidas == {
         "calendario/dias_uteis_anbima.parquet",
         "tesouro-direto/td_painel.parquet",
+        "focus/FOCUS_ANUAIS.parquet",
+        "focus/FOCUS_MENSAIS.parquet",
+        "focus/FOCUS_TRIMESTRAIS.parquet",
+        "focus/FOCUS_SELIC.parquet",
+        "focus/FOCUS_INFLACAO_12M.parquet",
     }
     for series_id in C.SERIES_DE_F016:
         assert C.nome_do_parquet(series_id) not in excluidas

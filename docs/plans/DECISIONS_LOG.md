@@ -12,7 +12,8 @@
 > **Criado por:** F-032 (classe A) em 2026-10-10 · **Cobre:** RF-052, RF-045 (parcial) · **CA:** CA-128
 
 > ⚠️ **TODAS as 12 linhas da §1 estão marcadas `PROVISÓRIA — aguardando aval de Edu/Alexandre`** —
-> e o mesmo vale para as 8 decisões de convenção da **§2.1** (D-a..D-h, consolidação da Onda 1).
+> e o mesmo vale para as 8 decisões de convenção da **§2.1** (D-a..D-h, consolidação da Onda 1) e
+> para as da **§2.3** (D-i e D-j, camada canônica da Onda 2).
 > Nenhuma foi confirmada por humano: são a recomendação da pesquisa (`docs/research/`) adotada como
 > padrão para destravar a construção. Aval = 1 linha de "aceito" aqui e, nas que têm ADR, mudança do
 > status de **Proposta** para **Aceito**. Até lá, **nenhum número derivado destas trocas é publicável**
@@ -222,6 +223,26 @@ S-09, S-10, S-11, S-12**) são operacionais e podem ser aceitas por e-mail, sem 
   **classe C**. Registrado na DoR de F-014 no `TODO.md` e em `docs/wiki/modules/canonical.md` —
   ref: F-008 §6, ADR-006, CA-066
 
+  **RESOLVIDA em 2026-10-11 por F-014: escolhida a (a)** — grade bancária única, com 1 d.u. de ffill
+  nas séries da B3 no 4T; **provisória, aval de Edu pendente** (é a parte (b) de ADR-006, que segue
+  em `Proposta`). **O custo, medido no acervo e não estimado:** **215** células com
+  `ffill_dias_uteis = 1` de **4.038** (**5,325%**), `distribuicao_ffill_dias_uteis = {0: 3.823,
+  1: 215}` — **nenhuma** célula com ffill 2..5 —, em **11** séries, **todas** `source = B3_API`
+  (IBOV, ICON, IDIV, IEEX, IFIX, IFNC, IMAT, IMOB, INDX, SMLL, UTIL) e **20** trimestres,
+  exatamente `2006Q4..2025Q4`; **0** séries da B3 com ffill em 1T/2T/3T e **0** séries não-B3 com
+  ffill em qualquer trimestre. A contagem por série e por trimestre está **no dado**
+  (`relatorio_alinhamento.json → ffill_por_serie`, `→ ffill_por_trimestre`, `→ decisao_d_h`).
+  **Por que (a):** (b) criaria **duas réguas de tempo** no mesmo dataset — toda tabela e toda figura
+  passariam a declarar qual grade a linha usa, e o `join` entre `macro_quarterly` e
+  `asset_returns_quarterly` deixaria de ser por `quarter_end` —, trocando um erro de **1 dia útil,
+  medido e visível por linha**, por uma ambiguidade estrutural **invisível**; o efeito no retorno é
+  **nulo em T, não deslocado** (o 4T usa o mesmo fechamento nas duas pontas do ano); e a direção do
+  achado permite (a), porque **B3 ⊂ ANBIMA, nunca o inverso**, então (a) nunca precisa de ffill
+  "para frente" nem olha o futuro. A escolha está **travada no contrato** pelo check
+  `quarter_end_unico_por_trimestre` de `AlinhadoTrimestralSchema`: virar para (b) exige mudar o
+  schema, não só o código — que é o comportamento desejado. Os 215 ffill vão para a página de
+  limitações (F-028) — ref: F-014 §4, `CONTRACTS.md §8`, ADR-006 §(b).2/§(b).8, CA-066
+
 ### 2.2 Achados medidos na Onda 1 (comportamento de fonte, não decisão)
 
 > Ficam aqui porque vão voltar ao debate: são coisas que a pesquisa (`docs/research/`) registrou
@@ -282,6 +303,261 @@ S-09, S-10, S-11, S-12**) são operacionais e podem ser aceitas por e-mail, sem 
 
 ---
 
+### 2.3 Consolidação da Onda 2 — camada canônica (2026-10-11)
+
+> Decisões tomadas ao fechar a Onda 2, em duas partes: **parte 1** (F-013 `raw_series` + catálogo
+> materializado, F-014 alinhamento trimestral, F-016 curva) → **D-i, D-j** e as 5 de
+> organização/contrato; **parte 2** (F-015, F-017, F-010) → **D-k a D-q**, mais abaixo.
+> **D-i e D-j são provisórias — aval de Edu pendente.**
+> As demais são de organização/contrato e foram **aceitas pelo orquestrador**. Nenhuma toca SPEC,
+> PRD, Anti-SPEC ou o e-mail de escopo; onde o dado real contradiz a SPEC (**D-i**, CA-025), a
+> decisão foi **registrar e medir**, não editar.
+
+- [2026-10-11] [spec/catálogo] **D-i · CA-025 não fecha com o vértice curto de 1 ano; catálogo
+  134 → 138 e a inclinação real **5a−3a** passa a ser a variável principal de regime —
+  PROVISÓRIA, aguarda o aval do Edu; SPEC NÃO EDITADA** — motivo: CA-025 pede valor para **≥ 95%**
+  dos dias úteis de 2006→2026 na inclinação real, e F-016 mediu **60,53%** em
+  `INCLINACAO_REAL_5A_1A` sobre as 5.184 datas base de 2006-01-01 a 2026-10-09. **Nenhuma
+  implementação chega a 95% com o vértice de 1 ano:** a grade de vencimentos da NTN-B é 15/05 e
+  15/08 de anos **alternados**, há períodos longos em que o título mais curto vence em mais de 1 ano,
+  e **2021 e 2022 inteiros** não tiveram nenhum. Chegar a 95% exigiria extrapolar, o que a Anti-SPEC
+  §10.1.1 proíbe. A premissa do CA olha a **ponta longa** (de fato 100%); o que limita é a **curta**
+  — impacto: **4 entradas novas** em `packages/shared/schemas/series_catalog_data.py` (`CURVA_REAL_3A`,
+  `CURVA_NOMINAL_3A`, `INCLINACAO_REAL_5A_3A`, `INCLINACAO_NOMINAL_5A_3A`; catálogo **134 → 138**,
+  `DERIVADO` 9 → **13**, `N_SERIES_ESPERADAS = 138`), F-016 passa de 7 para **11** séries gravadas em
+  `data/processed/curva/`, e **`INCLINACAO_REAL_5A_3A` (95,25% ✔ CA-025)** é a **variável principal
+  de regime, em caráter provisório**. As duas **5a−1a continuam publicadas como secundárias com a
+  cobertura declarada** (60,53% e 97,57%) — são as que ADR-004 §3 nomeia e têm a leitura histórica de
+  20 anos. **O vértice de 3 anos não é escopo novo:** CA-023 já diz "interpola para 1, 3 e 5 anos", e
+  o escopo incluído de F-016 no `TODO.md` também. Os vértices de **10 anos** entraram como
+  medidos-e-**não**-gravados (`VERTICES_FORA_DO_CATALOGO`), para deixar CA-024 quantificado (nominal
+  10a: **36,81%** das datas base de 2006+) sem violar CA-055. **Efeito nas 7 séries que já existiam:
+  nenhum** — os 7 Parquets saíram com `sha256` idêntico ao da rodada anterior a D-i, zero célula
+  alterada. Os dois números estão **travados por teste**
+  (`test_cobertura_da_inclinacao_real_1a_e_a_medida_e_nao_atinge_os_95_de_ca025` e
+  `test_inclinacao_real_5a_3a_e_a_que_fecha_ca025`, medido na série **gravada**). Mesmo caminho de
+  **D-e**: mediu, registrou, travou no teste, não editou a SPEC (`AGENTS.md §8`). **Pendência do
+  Edu:** ratificar D-i **e** a nota editorial em **ADR-004 §3**, que ainda nomeia a 5a−1a como
+  principal. O `obs` de `INCLINACAO_REAL_5A_1A` foi reescrito no fechamento para dizer que a série é
+  secundária desde D-i (era a única linha do catálogo que contradizia a decisão) — ref: F-016 §0/§4.3,
+  CA-023/CA-024/CA-025, ADR-004, `TODO.md §4`
+- [2026-10-11] [método] **D-j · prazo da interpolação da curva em **dias corridos** (ACT), não em
+  dias úteis — PROVISÓRIA, aval de Edu pendente** — motivo: o briefing pedia dias úteis pelo
+  calendário ANBIMA, e **os dois métodos estão implementados** (`MetricaPrazo.DIAS_CORRIDOS`, com
+  alvos de 365,25 / 1.095,75 / 1.826,25 dias, e `MetricaPrazo.DIAS_UTEIS`, com 252 / 756 / 1.260
+  d.u. contados pelo calendário de F-008). O padrão é ACT por **cobertura**, não por preferência: o
+  calendário de F-008 cobre **2001-01-01..2030-12-31** e consulta fora disso **levanta**
+  (`ForaDaCoberturaDoCalendario`), enquanto os vencimentos do painel chegam a **2060** e o vértice de
+  5 anos de qualquer data base de 2026 cai em ~2031. Devolver `NULL` por limite do **nosso**
+  calendário — e não por ausência de título — seria mentir sobre o suporte do dado, o oposto do que
+  CA-024 quer; e construir feriado por regra está recusado por **D-f** ("dado inventado") — impacto:
+  o custo da escolha é **mediana de 0,14 a 0,41 bps** de diferença entre as duas métricas (p95 até
+  1,87 bps, máximo 4,60 bps), contra as **dezenas de bps** de spread de varejo que ADR-004 já
+  declara: a métrica de prazo **não é o que limita a precisão** destas séries. Em dias úteis as duas
+  séries de 1 ano ganhariam 2 a 11 datas base e as de 5 anos **perderiam 298 a 700** — exatamente as
+  datas cujo vértice ou cujo título de borda cai depois de 2030-12-31. Travado em
+  `test_metrica_em_dias_uteis_produz_o_mesmo_vertice_a_menos_de_poucos_bps`. **Armadilha
+  operacional:** `--metrica-prazo dias_uteis` grava **nos mesmos 11 nomes de arquivo**; o que
+  distingue é o campo `metrica_prazo` do `relatorio_curva.json` — conferir antes de qualquer build do
+  canônico — ref: F-016 §3.3, ADR-004, D-f
+- [2026-10-11] [canônico] **O painel do Tesouro Direto fica **fora** de `raw_series`, declarado no
+  dado — ACEITO pelo orquestrador (confirmado pelo QA de F-013)** — motivo:
+  `data/processed/tesouro-direto/td_painel.parquet` tem o mesmo `ProcessedSeriesSchema`, mas seus
+  **750 `series_id` compostos** (`TD_<SIGLA>_<AAAAMMDD>_<METRICA>`) **não são entradas do catálogo**:
+  o catálogo tem `TESOURO_TD_PRECOTAXA` para a **fonte** e `CURVA_*`/`INCLINACAO_*`/`BREAKEVEN_5A`
+  (`fonte=DERIVADO`) para as séries que dela nascem. Admitir os 750 violaria **CA-055/CA-120** (toda
+  linha resolve para uma URL do catálogo) ou exigiria 750 entradas novas — mudança de **contrato**,
+  não de implementação — e levaria `raw_series` de 218.643 para 1.104.943 linhas de insumo que
+  nenhuma tabela canônica consome direto — impacto: a exclusão está **no dado**
+  (`relatorio_build.json → tabelas_excluidas`, com o motivo por arquivo), não só na documentação;
+  `calendario/dias_uteis_anbima.parquet` sai pelo mesmo mecanismo e por motivo óbvio
+  (`CalendarioDiasUteisSchema`, 4 colunas, não é série de valores). **Consequência para F-016:** o
+  insumo dela continua sendo `data/processed/tesouro-direto/`, e é **ela** que acrescenta as 11
+  séries da curva a `raw_series` publicando em `data/processed/curva/` — e **reexecutando o build de
+  F-013 depois**, porque `raw_series.parquet` é **reescrito inteiro** a cada build, sem `append`
+  (vale igual para F-010/F-011/F-012) — ref: F-013 §2.2/§6.1, `ONDA-2-QA-F013.md §4.6`,
+  `CONTRACTS.md §1.1`, CA-055/CA-120
+- [2026-10-11] [canônico] **`data/canonical/ldc.duckdb` mantido; ADR-006 §(a).2 (que escreve
+  `macro.duckdb`) recebe a correção **editorial** quando for aceito — DECIDIDO pelo orquestrador** —
+  motivo: ADR-006 §(a).2 nomeia `data/canonical/macro.duckdb`, o briefing da Onda 2 pediu
+  `ldc.duckdb` e F-013 implementou `ldc.duckdb` (constante `NOME_DUCKDB`, um lugar só). É divergência
+  de **nome**, **zero semântica** — e não se renomeia um artefato vivo para casar com um ADR que
+  ainda está em `Proposta` — impacto: nenhum em dado; o arquivo é **derivado e descartável** (só
+  views `CREATE OR REPLACE VIEW ... SELECT * FROM read_parquet(<caminho absoluto>)`, nunca tabelas,
+  então não há segunda cópia que possa divergir do Parquet e apagá-lo não perde nada). Fica como
+  **pendência editorial do aceite do ADR-006**, registrada em `TODO.md §4` e §6 — ref: F-013 §8.2,
+  `ONDA-2-QA-F013.md` P2-6, ADR-006 §(a).2
+- [2026-10-11] [catálogo] **Campo `calendario` (`dias_uteis` | `corrido` | nulo) acrescentado ao
+  catálogo — ACEITO pelo orquestrador (P1-2 do QA da Onda 1 e P1-2 do QA de F-013)** — motivo: a
+  meta Selic (SGS 432) publica em **dia corrido** e **2.377 dos seus 8.319 pontos (28,6%) caem em fim
+  de semana**, mas a distinção vivia só na constante `SERIES_DIARIAS_DE_CALENDARIO` dentro de
+  `apps/pipeline/extract/bcb_sgs.py`: quem lê catálogo e Parquet — F-014, F-017, qualquer contagem ou
+  média sobre `freq='D'` — não tinha como saber, e sairia enviesado em 28,6% dos pontos — impacto: o
+  campo entrou em `SeriesCatalogEntry` (pydantic, com validator que recusa `calendario` em série não
+  diária) **e** em `SeriesCatalogSchema` (pandera) — sem o segundo, `strict = True` o mantinha fora
+  do tabular e o artefato materializado publicava **25** colunas sem ele, que é exatamente o P1-2 do
+  QA de F-013. Hoje **7** séries `freq=D` o declaram (`BCB_SGS_432 = corrido`; Selic over 11/1178,
+  CDI 12/4389 e PTAX 1/10813 = `dias_uteis`); nas demais é **nulo**, nunca a string `"None"`. É de
+  `calendario` que F-014 **deriva** a régua `corrido` (`series_de_calendario_corrido()`), em vez de
+  manter uma segunda lista — e um teste de contrato afirma que as **três** declarações (catálogo,
+  derivação e a constante do extrator) coincidem. Série nova de dia corrido cai na régua certa **sem**
+  editar F-014 — ref: `ONDA-1-QA-A.md §4.5`, `ONDA-2-QA-F013.md` P1-2, `CONTRACTS.md §2/§2.4`,
+  F-014 §2.2
+- [2026-10-11] [bug] **`ManifestoAusente`: bruto arquivado sem `.meta.json` passa a ser **recusado**,
+  em vez de datar o Parquet pelo relógio da rodada — DECIDIDO (é correção, não escolha)** — motivo:
+  o P1-1 do lote B do QA da Onda 1. O padrão `obtido_em_arquivado(...) or datetime.now(tz=UTC)` era
+  comum aos 8 extratores, mas **só F-005 tinha caminho que chegava nele** —
+  `caminho_bruto_mais_recente()` aceitava de propósito `data/raw/tesouro-direto/td.csv`, a amostra da
+  pesquisa, que existe e **não tem manifesto**. Efeito reproduzido pelo revisor: duas execuções
+  `--offline` do **mesmo** bruto produziam Parquets **diferentes**, com `collected_at` em
+  microssegundos, e `vintage` deixava de ser a safra do dado (quebra D-b, CA-121, Anti-SPEC §10.4.22)
+  — impacto: a guarda subiu para `apps/pipeline/common/` (`ManifestoAusente` em `errors.py`,
+  levantada por `io_layers.py`), com a mensagem dizendo o que fazer ("rode a extração **online** uma
+  vez, o manifesto nasce aí, ou passe `collected_at=` explicitamente"); os 8 extratores a usam e há
+  teste de regressão em cada um. **Recusar é mais barato do que gravar um número plausível e errado**
+  — ref: `ONDA-1-QA-B.md` P1-1, D-b, CA-121
+- [2026-10-11] [repo] **Exceção no `.gitignore`: `.parquet` em `tests/fixtures/` é versionado —
+  DECIDIDO pelo orquestrador** — motivo: a regra "nenhum `.parquet` no git" (`CLAUDE.md §6`,
+  RNF-009) deixava as duas varreduras da consolidação — `tests/unit/test_contract_sgs_sidra.py` e
+  `tests/unit/test_processed_layer_conventions.py`, a **única** trava regressível de D-a, D-b, PK
+  única e da reconciliação SGS × SIDRA — **pulando no CI**, porque `data/` não está no git e o
+  `actions/checkout` entrega a árvore sem ele (9 skipped, medido no P1-4 do lote A do QA) — impacto:
+  `!tests/fixtures/**/*.parquet` no `.gitignore`, e `tests/fixtures/processed/` guarda **recortes
+  reais** de `data/processed/` (≤ 20 KB cada, 6 fontes) com procedência em
+  `tests/fixtures/processed/README.md`. É a **única** exceção à regra, e vale só para fixture: dado
+  de pipeline continua fora do git, e nada em `data/` é versionado. Os recortes também são o segundo
+  acervo da parametrização de F-014 (é o que permite ao teste do limite de ffill usar um buraco
+  **real**, não sintético) — ref: `ONDA-1-QA-A.md §4.6` (P1-4), `.gitignore`,
+  `tests/fixtures/processed/README.md`, F-014 §5.7
+
+> **Parte 2 da Onda 2** (F-015 `macro_quarterly`, F-017 `asset_returns_quarterly`, F-010 Focus),
+> fechada em 2026-10-11. **D-k a D-q são provisórias — aguardam Edu**, exceto onde o item diz
+> "é correção". Nenhuma toca SPEC, PRD, Anti-SPEC ou o e-mail; onde o dado real contradiz a SPEC
+> (**D-m**, CA-007) a decisão foi **registrar e medir**, como em D-e e D-i.
+
+- [2026-10-11] [canônico] **D-k · as 5 tabelas do Focus ficam **fora** de `raw_series`, pelo
+  precedente do painel do Tesouro Direto — ACEITO pelo orquestrador, aguarda Edu só como
+  ratificação de contrato** — motivo: F-010 grava `data/processed/focus/` com **197 `series_id`
+  compostos** (`FOCUS_<ESCOPO>_<INDICADOR>_<CHAVE>`, p.ex. `FOCUS_A_IPCA_H0`,
+  `FOCUS_RCOPOM_SELIC_R1-2027`) que **não são entradas do `series_catalog`**: o catálogo registra o
+  **EntitySet** (`FOCUS_ANUAIS`, `FOCUS_MENSAIS`, `FOCUS_TRIMESTRAIS`, `FOCUS_SELIC`,
+  `FOCUS_INFLACAO_12M`) como fonte. Admitir os 197 violaria **CA-055/CA-120** (toda linha do
+  canônico resolve para uma URL do catálogo) ou exigiria 197 entradas novas — mudança de
+  **contrato**, não de implementação. É literalmente o caso de `td_painel.parquet` (750 compostos),
+  já excluído com motivo registrado — impacto: **5 entradas novas** em
+  `TABELAS_FORA_DO_RAW_SERIES` (`apps/pipeline/canonical/build_raw_series.py`), cada uma com o
+  motivo **no dado** (`relatorio_build.json → tabelas_excluidas`, agora com **7** arquivos), e a
+  fixture `processed_minimo` + o teste de conjunto exato
+  (`test_descoberta_exclui_calendario_painel_do_tesouro_e_focus`, renomeado) passam a gravar as 5
+  fatias como `processed_series` **válidas** — o que as exclui é o `series_id`, não o schema.
+  `tests/contract/test_curva_contract.py` afirma o mesmo conjunto exato, e foi atualizado.
+  **F-015 consome o Focus direto de `data/processed/focus/`** (mesmo `ProcessedSeriesSchema`), como
+  F-014/F-017 já fazem com o calendário, e a **procedência aponta para o EntitySet**, não para o
+  `series_id` por horizonte. Sem D-k, 2 testes de F-013 ficavam vermelhos (`62 == 259` é
+  `62 + 197`) — ref: F-010 §6, F-015 §3.5/§7.4, F-017 §7.5, CA-055/CA-120, `CONTRACTS.md §1.1`
+- [2026-10-11] [canônico] **D-l · `USDBRL` entra no universo de `asset_returns_quarterly`
+  (24 ativos, 1.963 linhas) com `is_total_return = False` — PROVISÓRIA, aguarda Edu** — motivo:
+  **RF-038** (dimensionamento da alocação internacional) e `metodologia §4.2` (câmbio como hedge)
+  pedem o retorno trimestral do dólar, e a PTAX (`BCB_SGS_1`) já tem os **83** trimestres em
+  `alinhado_trimestral` — ficar fora era escolha de briefing ("câmbio não é ativo do bloco B"), não
+  ausência de dado. `is_total_return = False` porque **câmbio não tem carrego**: o cupom cambial
+  ficaria de fora de qualquer construção, e `None` ("a confirmar", o gap G-01) diria que falta medir
+  algo que **não se aplica** — impacto: 1 linha em `UNIVERSO` (`apps/pipeline/canonical/retornos.py`,
+  `Ativo("USDBRL", "BCB_SGS_1", "internacional")`), 1 campo no catálogo (`is_total_return=False` em
+  `BCB_SGS_1`, acréscimo puro) e `USDBRL` sai de `ATIVOS_FORA_DO_UNIVERSO` (9 → **8** motivos
+  declarados). Medido: `asset_returns_quarterly` **1.880 → 1.963** linhas (+83) e **23 → 24**
+  ativos; `ret_tri` do USDBRL vai de **−15,70 %** a **+28,98 %**, 1 nulo (2006Q1, sem `T−1`);
+  `is_total_return` segue com **820** nulos (os 9 setoriais da B3 + CDI — o USDBRL não acrescenta
+  nulo). **Zero mudança de schema e de regra**: `USDBRL` já era um dos 32 `asset_id` de
+  `ASSET_IDS_VALIDOS`. Nenhum teste fixava 23/1.880 (as asserções são contra `len(UNIVERSO)`); o
+  único ajuste de teste foi deduplicar `BCB_SGS_1` no acervo sintético, que agora está no universo
+  **e** no portão `SERIES_EXIGIDAS` de F-014 — ref: F-017 §7.2/§3, RF-038, CA-062, ADR-006 §(b)
+- [2026-10-11] [spec] **D-m · CA-007 não é satisfazível com o IBC-Br real; os 16 nulos de
+  `ibcbr_gap` são aceitos — PROVISÓRIA, aguarda Edu; SPEC NÃO EDITADA** — motivo: CA-007 pede
+  `ibcbr_gap` nos 83 trimestres **ou** `is_estimated=True`, e CA-060 permite `is_estimated=True`
+  **só** em `2026Q3` — as duas não podem valer juntas. A aritmética: SGS 24364 começa em **2003**
+  (o extrator pega de 2004) → `ibcbr_yoy` só existe de **2005Q1** → a média móvel de **20**
+  trimestres com janela cheia só fecha em **2009Q4**. Para hiato em `2006Q1` seria preciso IBC-Br
+  desde **2000Q2**, e a série **não existe** antes de 2003; nenhuma grade de apoio resolve —
+  impacto: `ibcbr_yoy_trend`/`ibcbr_gap` ficam nulos em `2006Q1..2009Q3` (15) e em `2026Q3` (**16**
+  no total), com o motivo publicado em `relatorio_macro.json`. A **V1 de F-019 classifica 67 dos
+  83 trimestres** — 2006-2009, inclusive a crise de 2008, fica fora do eixo de crescimento.
+  A alternativa está **medida** no relatório (`sensibilidade_ibcbr_gap`): `min_periods = 8`
+  recuperaria **12** trimestres com `max |diferença| = 0,0 pp` no trecho comum, e **não** foi
+  adotada porque média de janela parcial é outro estimador, cujo significado muda ao longo do tempo
+  (o hiato de 2006 deixaria de ser comparável ao de 2015). Mesmo tratamento de **D-e** e **D-i**:
+  mediu, registrou, travou em teste, não editou a SPEC (`AGENTS.md §8`) — ref: F-015 §3.3/§7.1,
+  CA-007, CA-060, `TODO.md §4`
+- [2026-10-11] [contrato] **D-n · `INCLINACAO_REAL_5A_3A` **não** ganha coluna em
+  `MacroQuarterlySchema` nesta onda; F-019/F-021 leem a série alinhada direto — DECIDIDO pelo
+  orquestrador, com dívida de schema registrada** — motivo: a principal provisória de **D-i** é a
+  5a−3a (**95,25 %** de cobertura, a que fecha CA-025), mas o schema só prevê
+  `inclinacao_real_5a_1a` / `inclinacao_nominal_5a_1a`. Acrescentar coluna a uma tabela canônica é
+  **alteração de schema classe C**, logo pausa (`AGENTS.md §9/§13`) — e a onda não tem folga para
+  isso antes de 2026-10-14 — impacto: `macro_quarterly` publica a 5a−1a com **33 nulos (39,8 %)**
+  e declarados, e a 5a−3a continua disponível em `raw_series`/`data/processed/curva/`, de onde
+  F-019/F-021 a lêem via `alinhar_series` (é o mesmo caminho que F-017 usa para as derivadas de
+  F-007, que F-014 deixa fora de propósito). **Dívida:** acrescentar `inclinacao_real_5a_3a` (e
+  provavelmente `inclinacao_nominal_5a_3a`) a `MacroQuarterlySchema` como feature C própria, depois
+  do Comitê — ref: F-015 §7.2, D-i, CA-025, `TODO.md §6`
+- [2026-10-11] [contrato] **D-o · unidade: `macro_quarterly` em **por cento/pp**,
+  `asset_returns_quarterly` em **fração** — REGISTRADO (é o estado medido, não uma escolha nova)** —
+  motivo: `macro_quarterly` está em por cento porque é o vocabulário do projeto (`UNIDADES_VALIDAS`
+  tem `%`, `%a.a.`, `pp` e nenhuma fração), é o que `LIMIAR_SELIC_PP = 0,25` pressupõe e é o que os
+  canários exigem (`ipca_12m` de `2006Q1` **tem** de ser `5,32`, o número que o SGS publica);
+  `asset_returns_quarterly` está em fração porque `(1+r)/(1+b) − 1` é a conta de ADR-006 §(b).5 e
+  misturar escala ali **produziria número errado**, não só confuso — impacto: as duas tabelas
+  publicam **`cdi_tri` e `ipca_tri` com o mesmo nome em escalas diferentes**. Hoje **não há bug**:
+  F-017 calcula as duas por conta própria e **nunca** lê `macro_quarterly`, e a reprodução cruzada
+  por dois agentes/dois caminhos de código deu `max |macro − 100 × retornos| = 0,0` nos 83
+  trimestres — o que é exatamente a prova de que a razão de 100 é a única diferença. Mas quem
+  cruzar as duas sem ler a unidade **erra por 100x** — por isso a nota entrou em
+  `CONTRACTS.md §3` e **§4**, e o mapa de unidades já vai no dado
+  (`relatorio_macro.json → unidades`, `relatorio_retornos.json → convencoes`). **Dívida da fase 2:**
+  consumidor único, ou prefixo de escala no nome da coluna — ref: F-015 §2/§5.2, F-017 §2, ADR-006
+- [2026-10-11] [catálogo] **D-p · `FOCUS_PIB_TOTAL` do catálogo passa a `status: descartada` —
+  ACEITO pelo orquestrador** — motivo: a entrada existia com `status=a_confirmar` e
+  `identificador='a_confirmar'` **porque G-04 estava aberto** (o rótulo do indicador na fonte era
+  desconhecido). **G-04 está resolvido** — o rótulo é `PIB Total`, enumerado por F-010 em
+  `INDICADORES_ENUMERADOS` — e o dado **já sai** como `FOCUS_A_PIB_TOTAL_H0`/`_H1` dentro do
+  EntitySet `FOCUS_ANUAIS`. Manter `a_confirmar` publicaria um gap que não existe mais — impacto:
+  **1 entrada alterada** (nenhuma acrescentada, nenhuma removida): `status` → `descartada`, `obs`
+  com o motivo e `identificador` → `ExpectativasMercadoAnuais (Indicador eq 'PIB Total')`, porque o
+  `SeriesCatalogEntry` recusa `identificador='a_confirmar'` com `status != a_confirmar` (é o
+  validator fazendo o trabalho dele). Catálogo segue com **138** entradas; `descartada` vai de 14
+  para **15** e `a_confirmar` de 8 para **7**. `test_schemas_smoke` verde (`N_SERIES_ESPERADAS`
+  **não** mudou) — ref: F-010 §3.5/§6, G-04, `CONTRACTS.md §2.1`
+- [2026-10-11] [achado/método] **D-q · os achados do Focus que valem registro permanente —
+  REGISTRADO (comportamento de fonte e convenção, não escolha reversível)**:
+  **(a) G-04 resolvido** — o rótulo do indicador de PIB na fonte é **`PIB Total`** (não "PIB", não
+  "PIB Total (%)"), presente em `ExpectativasMercadoAnuais` e `ExpectativasMercadoTrimestrais`
+  **desde 2006**; o conjunto de indicadores **muda ao longo da série** (`IPCA Livres`,
+  `IPCA Serviços`, `Taxa de desocupação` e `Dívida bruta` não existiam em 2006) e pedir indicador
+  inexistente devolve **HTTP 200 com `{"value":[]}`** — vazio silencioso, não erro.
+  **(b) G-05 resolvido** — `baseCalculo=0` (todas as instituições dos últimos 30 dias) é a **única**
+  base com os 20 anos do e-mail: medido ano a ano, `baseCalculo=1` (últimos 5 dias úteis) **só
+  existe de 2014 em diante** (vazio em 2006, 2010, 2011, 2012 e 2013). Filtrar é **obrigatório**:
+  sem filtro a série **dobra** de 2014 em diante. Em 2026-10-01, IPCA/2026: `bc=0` → mediana 5,0
+  com 144 respondentes; `bc=1` → 5,1 com 61.
+  **(c) O Focus é exceção explícita a D-a** — `date` é o **dia da pesquisa**, não fim de período
+  civil, e o **horizonte vive no `series_id`** (`H0`/`H1`/`HM1`/`S`/`N`/`R<n>-<ano>`), nunca na
+  data. Converter para fim de período colapsaria `H0` e `H1` na mesma data e **mentiria sobre
+  quando o número era conhecido** — e é essa propriedade (a única fonte do projeto **sem**
+  look-ahead) que `metodologia §1.5/§5.1` pede para preservar. Quem alinha decide a régua; a
+  de F-015 é a **última coleta até o último dia útil de `T−1`** ("a coleta do início de T" de
+  `metodologia §2`), com troca de `H0` para `H1` quando `T` é 1º trimestre — sem a troca,
+  `focus_pib_ano` de **1/4 das linhas** traria a expectativa do ano que acabou.
+  **(d) `%20` e não `+`** — espaço no `$filter`/`$orderby` do OData tem de ser `%20`; `requests`
+  com `params=` (e `urlencode`) manda `+` e o backend responde **HTTP 400**
+  (`"The system query option '$orderby' has the not-allowed value 'Data+asc'."`). Daí `montar_url`
+  + `quote(..., safe="$,'/:()")` e a proibição de `params=` nesta fonte.
+  **(e) `ibcbr_yoy` em fim de período** (decisão 6 de F-015) — `metodologia §2` diz "média do
+  trimestre"; o projeto usa **fim de período**, que é a convenção única do canônico (ADR-006,
+  **D-a**) e o que preserva "nível ≡ célula de F-014" bit a bit. Trocar é 1 linha e **muda os 83
+  `ibcbr_gap`** — ref: F-010 §2/§3.1/§3.4/§3.5, F-015 §3.5/§7.6, D-a, ADR-006, `modules/focus.md`
+
+---
+
 ## 3. Regras deste log
 
 1. **Toda substituição de fonte entra aqui** com os 4 campos. Sem os 4, não é registro — é lembrete.
@@ -304,6 +580,6 @@ S-09, S-10, S-11, S-12**) são operacionais e podem ser aceitas por e-mail, sem 
 ---
 
 *Documento vivo e deliberadamente pequeno — a §2.2 (achados de fonte) é a parte que mais cresce e a
-primeira a enxugar. Quando o Edu avaliar D-a..D-h, o que virar permanente sobe para `CONTRACTS.md` /
+primeira a enxugar. Quando o Edu avaliar D-a..D-q, o que virar permanente sobe para `CONTRACTS.md` /
 ADR e sai daqui; o que virar óbvio se apaga. Nunca apague a linha original de uma decisão avaliada:
 troque o marcador por `ACEITA — <quem> em <data>`.*
