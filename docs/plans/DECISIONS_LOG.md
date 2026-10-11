@@ -13,7 +13,8 @@
 
 > ⚠️ **TODAS as 12 linhas da §1 estão marcadas `PROVISÓRIA — aguardando aval de Edu/Alexandre`** —
 > e o mesmo vale para as 8 decisões de convenção da **§2.1** (D-a..D-h, consolidação da Onda 1) e
-> para as da **§2.3** (D-i e D-j, camada canônica da Onda 2).
+> para as da **§2.3** (D-i e D-j da Onda 2; **D-s, D-t e D-u** da Onda 3, parte 3 — as três mudam
+> número publicado).
 > Nenhuma foi confirmada por humano: são a recomendação da pesquisa (`docs/research/`) adotada como
 > padrão para destravar a construção. Aval = 1 linha de "aceito" aqui e, nas que têm ADR, mudança do
 > status de **Proposta** para **Aceito**. Até lá, **nenhum número derivado destas trocas é publicável**
@@ -551,10 +552,152 @@ S-09, S-10, S-11, S-12**) são operacionais e podem ser aceitas por e-mail, sem 
   com `params=` (e `urlencode`) manda `+` e o backend responde **HTTP 400**
   (`"The system query option '$orderby' has the not-allowed value 'Data+asc'."`). Daí `montar_url`
   + `quote(..., safe="$,'/:()")` e a proibição de `params=` nesta fonte.
-  **(e) `ibcbr_yoy` em fim de período** (decisão 6 de F-015) — `metodologia §2` diz "média do
+  **(e) `ibcbr_yoy` em fim de período** (decisão 6 de F-015) — ~~`metodologia §2` diz "média do
   trimestre"; o projeto usa **fim de período**, que é a convenção única do canônico (ADR-006,
   **D-a**) e o que preserva "nível ≡ célula de F-014" bit a bit. Trocar é 1 linha e **muda os 83
-  `ibcbr_gap`** — ref: F-010 §2/§3.1/§3.4/§3.5, F-015 §3.5/§7.6, D-a, ADR-006, `modules/focus.md`
+  `ibcbr_gap`**~~ → **SUPERADA POR D-s em 2026-10-11** (linha original preservada pela regra 4
+  deste log). O QA da Onda 2 (lote A, **P1-1**) quantificou o que faltava: não eram "os 83
+  `ibcbr_gap`", eram **7 dos 67 trimestres trocando de quadrante na V1**. Ver **D-s** abaixo —
+  ref: F-010 §2/§3.1/§3.4/§3.5, F-015 §3.5/§7.6, D-a, ADR-006, `modules/focus.md`
+
+#### Parte 3 — Onda 3, parte 1: materialização `asof` + lentes de regime (2026-10-11)
+
+> Decisões tomadas ao **fechar** F-018 (`asof`), F-019 (V1) e F-021 (V3) e ao absorver os P1 dos
+> dois QAs da Onda 2. **D-s, D-t e D-u são PROVISÓRIAS — aguardam Edu** (mudam número publicado).
+> **D-r, D-v, D-w e D-x** são de organização/contrato e foram **aceitas pelo orquestrador**.
+> Nenhuma toca SPEC, PRD, Anti-SPEC ou o e-mail de escopo. ADR-001 segue em `Proposta`, logo
+> **nada daqui é publicável** (CA-090, `AGENTS.md §14`).
+
+- [2026-10-11] [regimes] **D-r · F-019 grava `regimes_v1.parquet` validado por `RegimesV1Schema`
+  (acréscimo), não `regimes.parquet`; a junção em `RegimesSchema` é delegada a F-022 — ACEITA pelo
+  orquestrador** — motivo: `RegimesSchema` é o contrato da tabela **completa** (`ciclo_selic`,
+  `regime_v2`, `stress_flag` são `nullable=False` e pertencem a F-020/F-021, e `regime_v1` é
+  `nullable=False` num enum de 4 rótulos). Gravar `regimes.parquet` hoje exigiria **uma** de três
+  coisas, todas recusadas: inventar colunas de outra lente (Anti-SPEC §10.1.2), inventar quadrante
+  para os 16 `INDETERMINADO` (§10.1.1) ou **alterar** schema existente (pausa, `AGENTS.md §9/§13`)
+  — impacto: `RegimesV1Schema` + `COLUNAS_V1_DE_REGIMES` acrescentados ao fim de
+  `packages/shared/schemas/regimes.py`; `regime_v1` **nulo** + `status_regime_v1 = INDETERMINADO` +
+  `motivo_indeterminado = GAP_AUSENTE` nos 16 trimestres sem `ibcbr_gap` (D-m), nunca estimativa.
+  **Achado que sobe ao Comitê, não decisão:** a V1 troca de rótulo entre `revised` e `asof` em
+  **22 de 66 trimestres = 33,33%** (era 29,85% antes de D-s), **acima** dos 25% de **CA-074** ⇒
+  pelo critério escrito a V1 **não é operacional na forma `asof`** (a leitura descritiva, sim) e a
+  hipótese **H-03 do PRD cai**. Vai à página de limitações (F-028) e ao slide, não a nota de pé —
+  ref: F-019 §3.1/§7, CA-073/074/090, `modules/regimes.md`
+
+- [2026-10-11] [metodologia/regimes] **D-s · `ibcbr_yoy` passa a usar a MÉDIA DOS 3 MESES do
+  trimestre, não o nível de fim de período — PROVISÓRIA, aguarda o aval do Edu; SPEC NÃO EDITADA**
+  — motivo: `docs/research/metodologia-regimes-macro.md §2` diz, literalmente, **"IBC-Br: média do
+  trimestre"**, e a implementação de F-015 lia o último mês. **D-q(e)** registrou a escolha, mas
+  mediu o custo errado ("muda os 83 `ibcbr_gap`"); o QA da Onda 2 (lote A, **P1-1**) mediu o custo
+  que importa: `max |dif|` **4,2646 pp** em `ibcbr_yoy`, **4,3064 pp** no hiato e **7 dos 67
+  trimestres trocando o sinal do hiato** — logo **de quadrante na V1**. Um índice de atividade
+  mensal lido num único mês é o nível **daquele mês**, não do trimestre, e carrega o ruído do mês
+  para o eixo de crescimento. Impacto medido no rebuild (as duas materializações):
+  **(i)** nova régua = média aritmética dos 3 meses, janela `(fim de T-1, fim de T]`, com
+  **completude obrigatória** (2 meses → `NULL` com motivo, nunca média parcial);
+  **(ii)** padrão de nulos **idêntico** ao anterior (`ibcbr_yoy` 82/83, `ibcbr_gap` 67/83, `2026Q3`
+  nulo porque o IBC-Br vai até jul/2026 — 1 de 3 meses);
+  **(iii)** os **7** trimestres previstos pelo QA trocam de quadrante, **e só eles**: 2013Q2
+  (EST→EXP), 2013Q3 (REC→DES), 2013Q4 (EXP→EST), 2020Q1 (DES→REC), 2023Q3 (EXP→EST), 2024Q1
+  (DES→REC), 2025Q2 (DES→REC);
+  **(iv)** distribuição V1 `revised` de **EXP 20 · REC 17 · EST 15 · DES 15** para **REC 19 ·
+  EXP 19 · EST 16 · DES 13** (CA-080 continua fechando: 4 quadrantes povoados, todos em [10, 35];
+  desbalanceamento sobe de 1,33× para 1,46×);
+  **(v)** a troca `asof` × `revised` **sobe** de 29,85% (20/67) para **33,33% (22/66)** — não
+  "ajustei" nada para passar: o número foi medido e piorou, e é esse que vai ao Comitê;
+  **(vi)** `pib_yoy` fica como está (`max |dif| = 8,9e-16`, ruído de float): o PIB do SIDRA já é
+  trimestral na fonte, não há o que mediar;
+  **(vii)** a V3 de F-021 **não muda em nada** — os 8 vizinhos de `2026Q3`, as distâncias e o
+  ranking de ativos são byte-idênticos, porque o eixo de crescimento da V3 é `focus_pib_ano`
+  (**D-u**) e nenhuma das 5 features passa pelo IBC-Br.
+  **Procedência (`obs = media_3m`):** 3 observações por trimestre e PK `(quarter, column)` admite
+  **uma** linha por célula → a escolha registrada é a **última das 3** (`date_obs_max`), igual ao
+  que `ACUMULADAS` já fazia, porque é o limite **superior** que torna `date_obs <= quarter_end`
+  (e, na `asof`, `date_obs + lag_dias <= quarter_end`) verificável no Parquet. As outras duas são
+  derivação determinística da grade; a regra vai em `relatorio_macro.json → medias_no_trimestre` —
+  ref: metodologia §2, QA-A P1-1, `macro_quarterly.MEDIAS`/`media_por_trimestre`, D-q(e) (superada)
+
+- [2026-10-11] [regimes] **D-t · ciclo Selic: movimento de `|Δ| >= 0,25 pp` conta como CORTE/ALTA
+  (desigualdade NÃO estrita) — PROVISÓRIA, aguarda o aval do Edu; metodologia NÃO EDITADA** —
+  motivo: a leitura literal de `metodologia §2` (`< -0,25` / `> +0,25`) punha **7** trimestres com
+  `|Δ| = 0,25` **exato** em `NEUTRO`, entre eles **2024Q2 e 2024Q3**, que são cortes reais de 25
+  bps do Copom (QA-A **P1-2**). 25 pb é o **menor passo que o Copom dá**: chamá-lo de "parada"
+  rotula como pausa justamente o início e o fim dos ciclos — e, dos 30 `NEUTRO` da régua antiga,
+  só 23 eram `Δ = 0` de fato. Impacto medido: distribuição de **CORTE 29 · NEUTRO 30 · ALTA 24**
+  para **CORTE 34 · NEUTRO 23 · ALTA 26** (os 7 trimestres de borda: 5 viram CORTE, 2 viram ALTA);
+  `LIMIAR_SELIC_PP = 0,25` **não muda** (continua no schema), muda só a desigualdade.
+  `ciclo_selic` ainda **não é coluna publicada** — mora em `RegimesSchema` e é de F-020, então a
+  mudança atinge hoje só a distribuição de `relatorio_macro.json` e a função pública — ref:
+  metodologia §2 (V2), QA-A P1-2, `macro_quarterly.ciclo_selic`, CONTRACTS §5.3
+
+- [2026-10-11] [regimes/contrato] **D-u · F-021: o eixo de crescimento da V3 é `focus_pib_ano`
+  (substitui `z_ibcbr_gap`), e `regime_v1_neighbor` `nullable=False` fica como está — V3
+  RATIFICADA PROVISORIAMENTE pelo orquestrador; dívida de schema registrada** — motivo: duas
+  coisas, decididas juntas. **(a) O eixo:** `ibcbr_gap` é nulo em `2026Q3` **por construção** (o
+  IBC-Br vai até jul/2026) e `2026Q3` é exatamente o trimestre da pergunta do Comitê — com o hiato
+  como feature a V3 **não tem vetor para a pergunta que foi feita**; e o gap é nulo em
+  `2006Q1..2009Q3` (D-m), o que tiraria a crise de 2008 do conjunto de vizinhos. Nenhuma das duas
+  alternativas resolve `2026Q3` (`min_periods = 8` de D-m recupera 12 trimestres mas não 2026Q3;
+  `ibcbr_yoy` sem tendência tem o mesmo problema). `focus_pib_ano` é dado real, 83/83, **sem**
+  defasagem de divulgação (metodologia §5.1: "o Focus é o dado limpo") e é o eixo de crescimento da
+  V1b na metodologia §2. **(b) O schema:** `RegimeNeighborsSchema.regime_v1_neighbor` é
+  `nullable=False` e, por **D-m**, 16 trimestres não têm quadrante V1 — então a tabela de contrato
+  (`regime_neighbors.parquet`, 5.500 × 11) perde **4 dos 8** vizinhos de `2026Q3` (Jaccard 0,33
+  contra a lente completa). Tornar a coluna anulável é **alteração de schema existente** ⇒ feature
+  classe C própria, e **não foi feita**. Decisão: os **dois** artefatos ficam, e **F-022/F-024 leem
+  `regime_neighbors_v3.parquet`** (9.692 × 21, 77 referências, lente `mahalanobis`, `k = 8`,
+  `somente_passado=False`, `restrito_pos_2016=False`) — regra escrita em `CONTRACTS.md §5` e a
+  perda do pool restrito na página de limitações (F-028). Impacto: nenhuma linha de código muda;
+  a **dívida** `regime_v1_neighbor nullable` entra em `TODO.md §6` — ref: F-021 §2.1/§3.1/§7.1/§7.2,
+  D-m, D-i (mesma classe de decisão), CA-089
+
+- [2026-10-11] [canônico/guardas] **D-v · as três correções dos P1 dos QAs da Onda 2 — ACEITAS pelo
+  orquestrador** — motivo e impacto, um a um.
+  **(a) QA-A P1-3 (bug de guarda, 8 linhas):** `exigir_series` de F-015 rodava **só** contra
+  `raw_series`, então um `alinhado_trimestral` **sem** série exigida fazia o build **concluir em
+  silêncio** — a régua reexpressa em `observacoes_de_fim_de_periodo` cobria a ausência, `ipca_12m`
+  saía com 83 valores não nulos e `max |dif| = 0,0`, e só o contador de células caía de 1.328 para
+  1.245, que nenhum teste afirmava. A feature afirma "todo nível é a célula de F-014": agora
+  `exigir_series` roda **também** contra `alinhado_trimestral` e a ausência é
+  `BLOQUEADO — FONTE INDISPONÍVEL` (CA-076). Teste negativo:
+  `test_build_para_se_o_alinhado_nao_tem_serie_exigida`.
+  **(b) QA-A P1-4 (`versao_build` dependia do checkout):** `versao_build` hasheava `read_bytes()`
+  cru, então o **mesmo commit** dava `fonte_versao` diferente num checkout CRLF (Windows, sem
+  `.gitattributes`) e num LF (CI) — `5cd7bdaf…` contra `54c841bb…` em F-015 —, com **2 dos 7**
+  módulos de `MODULOS_DO_MACRO` já em LF no disco. Quebrava o passo 4 do gate da classe D (dataset
+  congelado por `sha256` + tag git) e CA-121 entre ambientes **sem que uma célula de dado mudasse**.
+  Correção: `normalizar_fim_de_linha` (`\r\n` → `\n`) antes do hash, em
+  `build_raw_series.versao_build` — **todos** os `MODULOS_*` da camada canônica herdam, porque
+  todos passam por ela. Dois testes: a função e a igualdade CRLF ≡ LF ≡ disco. **Resíduo
+  declarado:** `catalogo_sha256` (hash diagnóstico de um arquivo só) **não** foi normalizado — vai
+  para `TODO.md §6`.
+  **(c) QA-B P1-1 (janela do CDI ≠ caminho do ativo):** a janela do CDI é
+  `(quarter_end(T-1), quarter_end(T)]` e o caminho de cada ativo é `(date_obs(T-1), date_obs(T)]`;
+  com `ffill = 1` (D-h) as duas diferem de 1 a 3 d.u. em **599 das 1.857** linhas com excesso.
+  Viés no `ret_excesso_cdi`: média **0,0185 pp**, p95 0,0984, **máx 0,1575 pp** (média 0,0827 pp
+  nas 212 linhas com `ffill = 1`). **O cálculo NÃO foi alterado** — é ~8× menor que o efeito
+  razão-vs-subtração (0,139 pp), a cadeia de preços é contínua (`price_ini(T+1) == price_fim(T)` em
+  100% dos casos com ffill) e corrigir exigiria reconstruir o CDI por ativo. Virou **limitação
+  declarada** em `relatorio_retornos.json → convencoes.janela_do_cdi_vs_caminho_do_ativo` e em
+  `docs/wiki/modules/canonical.md` — ref: QA-A P1-3/P1-4, QA-B P1-1, D-h, CA-076, CA-121, §14.7
+
+- [2026-10-11] [contrato] **D-w · `CONTRACTS.md` atualizada com o estado MEDIDO da camada: duas
+  materializações de procedência (§3.1), `RegimesV1Schema` e `RegimeNeighborsV3Schema` (§5),
+  `FEATURES_V3` 6 declaradas / 5 usadas, e as decisões D-s/D-t — ACEITA pelo orquestrador** —
+  motivo: `CONTRACTS.md` descrevia uma camada que deixou de existir em três pontos (uma só tabela
+  de procedência macro; nenhum schema de regime; 6 features na V3). Contrato que não descreve o
+  que roda é pior que contrato ausente, porque a divergência fica invisível. Impacto: texto, zero
+  linha de código; `termos_troca_yoy` continua a 6ª feature **declarada e não usada**, com o motivo
+  no dado (100% nula em `macro_quarterly`, G-02 / F-037) — ref: F-018 §2/§9.1, F-019 §3.1,
+  F-021 §3.1/§7.5, CONTRACTS §3.1/§5
+
+- [2026-10-11] [organização] **D-x · os paths divergentes do `TODO.md` ficam como estão
+  (`apps/pipeline/canonical/` em vez de `apps/pipeline/transform|analysis/`) — ACEITA pelo
+  orquestrador** — motivo: `apps/pipeline/analysis/` e `apps/pipeline/transform/` **não existem** na
+  árvore; `canonical/` é onde F-013..F-017 moram e de onde `alinhar_series`/`montar_macro` são
+  importados. Mover seria `git mv` + imports, zero linha de lógica, e quebraria o histórico de 7
+  features por estética. Impacto: 1 linha por feature no `TODO.md` (F-014..F-019, F-021) —
+  ref: QA-A §2, F-019 §1/§10.4, F-021 §7.6
 
 ---
 
@@ -580,6 +723,6 @@ S-09, S-10, S-11, S-12**) são operacionais e podem ser aceitas por e-mail, sem 
 ---
 
 *Documento vivo e deliberadamente pequeno — a §2.2 (achados de fonte) é a parte que mais cresce e a
-primeira a enxugar. Quando o Edu avaliar D-a..D-q, o que virar permanente sobe para `CONTRACTS.md` /
+primeira a enxugar. Quando o Edu avaliar D-a..D-x, o que virar permanente sobe para `CONTRACTS.md` /
 ADR e sai daqui; o que virar óbvio se apaga. Nunca apague a linha original de uma decisão avaliada:
 troque o marcador por `ACEITA — <quem> em <data>`.*

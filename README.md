@@ -23,7 +23,7 @@ série conferidos na fonte + linha em `docs/wiki/log.md`).
 
 ## Estado atual (2026-10-11)
 
-**Onda 1 completa e aprovada; Onda 2 (camada canônica) IMPLEMENTADA e aguardando QA — `data/canonical/` está completo. Próximo: Onda 3 — regimes.**
+**Ondas 0, 1 e 2 completas e aprovadas no QA; Onda 3 parte 1 (materialização `asof` + regimes V1 e V3) IMPLEMENTADA e aguardando QA. Próximo: F-022 (métricas regime × ativo) e a Onda 4.**
 
 - Documentação completa: escopo → pesquisa → PRD → SPEC/Anti-SPEC → contratos → TODO (40 features) → PLAN.
 - Contratos de dados em `packages/shared/schemas/` (8 módulos pandera/pydantic + catálogo de **138**
@@ -33,22 +33,35 @@ série conferidos na fonte + linha em `docs/wiki/log.md`).
   calendário de dias úteis). QA independente em `docs/plans/qa/` (`ONDA-0-QA.md`, `ONDA-1-QA-A.md`,
   `ONDA-1-QA-B.md`), **0 × P0**; F-004 fica com **D-e pendente do Edu** (dois CAs da SPEC não fecham
   no dado real) e as pendências P1/P2 estão em `TODO.md §6`.
-- **Onda 2 (classe C) — as 6 features implementadas, aguardando QA/revisão numérica:** **F-013**
+- **Onda 2 (classe C) — as 6 features da camada canônica, com QA aprovado:** **F-013**
   (`raw_series` + catálogo materializado), **F-014** (`alinhado_trimestral`), **F-016** (curva: 11
   séries interpoladas), **F-010** (Focus/Olinda: 5 EntitySets, 197 séries, 150.120 linhas), **F-015**
   (`macro_quarterly` **83 × 42** + `macro_quarterly_provenance` **2.548**) e **F-017**
-  (`asset_returns_quarterly` **1.963** linhas, **24** ativos). `apps/analysis/` segue vazio — é a
-  Onda 3.
+  (`asset_returns_quarterly` **1.963** linhas, **24** ativos). QA independente em
+  `docs/plans/qa/ONDA-2-QA-{A,B}.md`, **0 × P0**, com a revisão numérica da classe C reconstruindo
+  as camadas **por fora** e achando **igualdade exata em float64** (4.038 células em F-014; 22
+  colunas em F-015; 11 séries × 5.436 datas do CSV bruto em F-016; e validação **externa** do
+  breakeven contra a Curva Zero da ANBIMA, a 0,010 bp). Os **6 × P1** levantados foram absorvidos no
+  fechamento da Onda 3 (**D-s, D-t, D-v** em `DECISIONS_LOG §2.3`).
+- **Onda 3 parte 1 (classe C) — 3 features implementadas, aguardando QA/revisão numérica:**
+  **F-018** (regra anti-look-ahead + materialização **`asof`**: `macro_quarterly_asof` **83 × 42** +
+  procedência **2.552** com `date_obs`/`lag_dias` em todas e **0** células com look-ahead),
+  **F-019** (regimes **V1**, quadrantes crescimento × inflação: `regimes_v1{,_asof}` **83 × 18**,
+  67 classificados) e **F-021** (regimes **V3**, vizinhos mais próximos com Mahalanobis +
+  Ledoit-Wolf: `regime_neighbors_v3` **9.692 × 21** — **a resposta literal ao e-mail**).
+  `apps/analysis/` segue vazio — é F-022 em diante.
 - `data/processed/` tem **69 Parquets** reconstruíveis com um comando por fonte: ~219 mil linhas de
   `processed_series` em 51 arquivos, as **11** séries da curva (F-016), as **5** fatias do Focus
   (F-010), o painel do Tesouro Direto (886.300 linhas, 750 `series_id`) e o calendário de dias úteis
   (10.957 dias, 2001→2030). `data/canonical/` tem `raw_series.parquet` (**278.439** linhas, **62**
   séries, 1979-12-31 → 2026-10-10), `series_catalog.parquet` (**138 × 26**),
   `alinhado_trimestral.parquet` (4.038 linhas), `macro_quarterly.parquet` + a companheira de
-  procedência, `asset_returns_quarterly.parquet`, os **4** relatórios de build e o `ldc.duckdb`
-  derivado. O rebuild tem **ordem obrigatória**: `build_raw_series` → `alinhamento` →
-  `macro_quarterly` → `retornos` (a `curva` roda antes de tudo, porque escreve em
-  `data/processed/`); 2 rodadas dão hashes idênticos. `data/raw/` tem o bruto de cada fonte com
+  procedência, **`macro_quarterly_asof.parquet` + a dela**, `asset_returns_quarterly.parquet`,
+  **`regimes_v1{,_asof}.parquet`**, **`regime_neighbors_v3.parquet`** e `regime_neighbors.parquet`,
+  mais os **8** relatórios de build e o `ldc.duckdb` derivado — **20** artefatos. O rebuild tem
+  **ordem obrigatória**: `build_raw_series` → `alinhamento` → `macro_quarterly` → `asof` →
+  `retornos` → `regimes_v1` (nas duas materializações) → `regimes_v3` (a `curva` roda antes de
+  tudo, porque escreve em `data/processed/`); 2 rodadas dão hashes idênticos. `data/raw/` tem o bruto de cada fonte com
   manifesto (`sha256`, URL, hora da coleta) e a janela rolante arquivada pelo job F-009. **Nada de
   `data/` vai para o git** — a fonte de verdade é o script.
 - Reprodutível sem rede: `python -m apps.pipeline.extract.<fonte> --offline` reconstrói o Parquet a
@@ -58,10 +71,19 @@ série conferidos na fonte + linha em `docs/wiki/log.md`).
   [`docs/plans/DECISIONS_LOG.md`](docs/plans/DECISIONS_LOG.md).
 - CI: N1 (lint + unit) configurado em `.github/workflows/ci.yml`; N2/N3 comentados até existirem testes.
 - **8 decisões de Edu/Alexandre bloqueiam a publicação** (não o desenvolvimento) — ver abaixo; e as
-  decisões provisórias das Ondas 1-2 (**D-a..D-q**, com **D-h..D-m** à espera de aval) estão
-  tabuladas em [`TODO.md §4`](TODO.md). Duas delas mudam o que se pode afirmar: **D-m** (a V1 vai
-  classificar **67** dos 83 trimestres, não 83, porque o IBC-Br começa em 2003) e **D-o** (unidade:
-  `macro_quarterly` em por cento, `asset_returns_quarterly` em fração).
+  decisões provisórias das Ondas 1-3 (**D-a..D-x**, com **D-h..D-m** e **D-s/D-t/D-u** à espera de
+  aval) estão tabuladas em [`TODO.md §4`](TODO.md). Quatro delas mudam o que se pode afirmar:
+  **D-m** (a V1 classifica **67** dos 83 trimestres, não 83, porque o IBC-Br começa em 2003 — a
+  crise de 2008 fica fora do eixo de crescimento), **D-o** (unidade: `macro_quarterly` em por cento,
+  `asset_returns_quarterly` em fração), **D-s** (o IBC-Br trimestral é a **média dos 3 meses**, como
+  a metodologia escreve — **7** trimestres mudam de quadrante) e **D-t** (um movimento de 25 bps na
+  Selic é **ciclo**, não parada).
+- ⚠️ **Achado que vai ao Comitê, e que não é bug de ninguém:** rodando a V1 nas duas
+  materializações, **22 de 66 trimestres (33,33%) trocam de rótulo** entre `revised` e `asof` —
+  acima dos **25%** que a metodologia e **CA-074** fixam como limite. Pelo critério escrito, a
+  leitura **operacional** da V1 ("em que quadrante estamos agora, com o que se sabia na época")
+  **não é operacional nesta forma**, e com ela cai a hipótese **H-03** do PRD; a leitura
+  **descritiva** continua válida e é o entregável. Vai à página de limitações (F-028) e ao slide.
 
 ## Como configurar o ambiente
 
@@ -144,8 +166,8 @@ Detalhe em [`docs/plans/PLAN.md`](docs/plans/PLAN.md); uma onda só começa com 
 |---|---|---|
 | **0** | sáb 10/10 | job diário de arquivamento ANBIMA (janela rolante de ~20 d.u.) · infra de extração · `DECISIONS_LOG` |
 | **1** | dom 11/10 | todos os extratores de esforço baixo em paralelo (ANBIMA S3, SGS, SIDRA, Tesouro, B3, Yahoo/MSCI, calendário) + Focus, FRED-fallback, Teva |
-| **2** | dom/seg 11-12/10 | camada canônica — `raw_series`, alinhamento trimestral, curva, retornos, `macro_quarterly`, anti-look-ahead (**classe C**) |
-| **3** | ter 13/10 | regimes V1 (quadrantes) + V3 (vizinhos) + V2 (ciclo Selic) e métricas por regime × ativo (**classe C**) |
+| **2** | dom/seg 11-12/10 | camada canônica — `raw_series`, alinhamento trimestral, curva, retornos, `macro_quarterly` (**classe C**) · **fechada e aprovada no QA** |
+| **3** | ter 13/10 | anti-look-ahead/`asof` + regimes V1 (quadrantes) + V3 (vizinhos) + V2 (ciclo Selic) e métricas por regime × ativo (**classe C**) · **parte 1 fechada: F-018, F-019, F-021; falta F-020 e F-022** |
 | **4** | ter 13/10 | heatmap, timeline, ranking, internacional, orquestrador — **marco de revisão humana do Edu** |
 | **5** | qua 14/10 | limitações, notebook de entrega e **pacote do Comitê (classe D)** |
 

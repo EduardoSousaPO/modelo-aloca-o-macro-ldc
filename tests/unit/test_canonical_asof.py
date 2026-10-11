@@ -74,6 +74,7 @@ from apps.pipeline.canonical.macro_quarterly import (
     Acumulado,
     acumular_por_trimestre,
     grade_estendida,
+    medias_no_trimestre,
     metadado_de_procedencia,
     montar_macro,
     observacoes_de_fim_de_periodo,
@@ -549,10 +550,12 @@ def montagem() -> MontagemSintetica:
         }
         for sid in sorted(set(ACUMULADAS.values()))
     }
+    medias = medias_no_trimestre(raw, trimestres=trimestres)
     metadado = metadado_de_procedencia(raw)
     revised, _, _ = montar_macro(
         observacoes=niveis_revised,
         acumulados=acumulados,
+        medias=medias,
         metadado=metadado,
         trimestres=trimestres,
         quarters=janela,
@@ -561,6 +564,7 @@ def montagem() -> MontagemSintetica:
     bruto, prov, diagnostico = montar_macro(
         observacoes=niveis_asof,
         acumulados=deslocar_acumulados(acumulados, lags=lags, trimestres=trimestres),
+        medias=deslocar_acumulados(medias, lags=lags, trimestres=trimestres),
         metadado=metadado,
         trimestres=trimestres,
         quarters=janela,
@@ -619,16 +623,46 @@ def test_derivada_do_asof_nao_e_a_coluna_do_revised_deslocada_de_uma_linha(
 ) -> None:
     """A trava contra "copiar em vez de recalcular" onde a cópia **não** é equivalente.
 
-    `ibcbr_*` tem `lag = 45`: a `asof` de `T` usa o IBC-Br do **primeiro** mês de `T` (dois meses
-    para trás), que não é o nível de fim de nenhum trimestre. Nenhum deslocamento de linha da
-    tabela revisada produz essa coluna — então, se o a/a de `asof` coincidir com o de `revised`
-    deslocado, é porque alguém copiou.
+    `ipca_12m` tem `lag = 10` e grade **mensal**: a `asof` de `T` usa o IPCA do **penúltimo** mês
+    de `T`, que não é o nível de fim de nenhum trimestre. Então `ipca_12m_delta` da `asof` é a
+    diferença entre dois penúltimos meses, e **nenhum** deslocamento de linha da tabela revisada
+    produz essa coluna — se coincidir, é porque alguém copiou.
+
+    A coluna usada aqui era `ibcbr_yoy` até **D-s**. Desde D-s o nível trimestral do IBC-Br é a
+    **média dos 3 meses** e média de trimestre desloca em trimestres cheios, então `ibcbr_yoy` da
+    `asof` **é** o da `revised` em `T-1` — por construção, não por cópia. Essa igualdade virou
+    afirmação própria, no teste seguinte.
+    """
+    for coluna in ("ipca_12m", "ipca_12m_delta"):
+        asof = montagem.asof.set_index("quarter")[coluna]
+        copia = montagem.revised.set_index("quarter")[coluna].shift(1)
+        comparaveis = asof.notna() & copia.notna()
+        assert int(comparaveis.sum()) > 60, coluna
+        assert not np.allclose(asof[comparaveis], copia[comparaveis], atol=1e-6), coluna
+
+
+def test_ibcbr_yoy_do_asof_e_o_do_revised_de_t_menos_1_por_construcao_de_d_s(
+    montagem: MontagemSintetica,
+) -> None:
+    """**D-s**, consequência medida: a `asof` de `T` carrega a média do trimestre `T-1`.
+
+    O nível trimestral do IBC-Br é a média dos 3 meses, e a média de `T` só se conhece ~45 dias
+    depois do fim de `T` — depois do `quarter_end`. Logo o trimestre mais recente cuja média cabe
+    no corte é `T-1`, e `deslocar_acumulados` (a régua dos fluxos, reusada) devolve exatamente
+    isso. A igualdade é **afirmada**, não tolerada: se a régua da média passar a mirar o 1º mês de
+    `T` ou a aceitar média parcial, este teste quebra.
     """
     asof = montagem.asof.set_index("quarter")["ibcbr_yoy"]
-    copia = montagem.revised.set_index("quarter")["ibcbr_yoy"].shift(1)
-    comparaveis = asof.notna() & copia.notna()
-    assert int(comparaveis.sum()) > 60
-    assert not np.allclose(asof[comparaveis], copia[comparaveis], atol=1e-6)
+    revised = montagem.revised.set_index("quarter")["ibcbr_yoy"]
+    comparaveis = [
+        rotulo
+        for rotulo in montagem.janela[1:]
+        if pd.notna(asof[rotulo]) and pd.notna(revised[str(pd.Period(rotulo, freq="Q") - 1)])
+    ]
+    assert len(comparaveis) > 60
+    for rotulo in comparaveis:
+        anterior = str(pd.Period(rotulo, freq="Q") - 1)
+        assert asof[rotulo] == pytest.approx(revised[anterior], abs=1e-12), rotulo
 
 
 def test_tendencia_e_hiato_do_asof_saem_da_media_movel_dos_niveis_deslocados(

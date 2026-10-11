@@ -913,6 +913,20 @@ def montar_relatorio(
             "n_dias_uteis": "tamanho do caminho diario em (date_obs(T-1), date_obs(T)]",
             "ffill_dias_uteis": "forward-fill da ponta de FECHAMENTO (P_fim); o de P_ini, em T-1",
             "is_total_return": "propagado do series_catalog declarado; None = G-01 a confirmar",
+            "janela_do_cdi_vs_caminho_do_ativo": (
+                "LIMITACAO DECLARADA (P1-1 do QA da Onda 2, lote B; D-v). A janela do CDI e "
+                "(quarter_end(T-1), quarter_end(T)]; o caminho de cada ativo e "
+                "(date_obs(T-1), date_obs(T)]. Com ffill = 1 d.u. (D-h: a B3 nao publica no "
+                "ultimo d.u. ANBIMA de 20 dos 4os trimestres), date_obs != quarter_end e as duas "
+                "janelas diferem de 1 a 3 d.u. em 599 das 1.857 linhas com excesso "
+                "(-3: 98, -2: 120, -1: 348, 0: 1.258, +1: 22, +2: 11). Vies implicito no "
+                "ret_excesso_cdi: media 0,0185 pp, p95 0,0984 pp, MAXIMO 0,1575 pp; nas 212 "
+                "linhas com ffill = 1, media 0,0827 pp. E ~8x menor que o efeito razao-vs-"
+                "subtracao (0,139 pp) e a cadeia de precos e continua "
+                "(price_ini(T+1) == price_fim(T) em 100% dos casos com ffill), por isso o "
+                "calculo NAO foi alterado: a correcao exigiria reconstruir o CDI por ativo. "
+                "Declarada aqui e em docs/wiki/modules/canonical.md."
+            ),
         },
         "universo": {
             "n_ativos": len(universo),

@@ -114,6 +114,7 @@ from apps.pipeline.canonical.build_raw_series import (
 from apps.pipeline.canonical.macro_quarterly import (
     ACUMULADAS,
     CATALOGO_DO_FOCUS,
+    MEDIAS,
     MODULOS_DO_MACRO,
     NOME_MACRO,
     ORIGENS,
@@ -125,6 +126,7 @@ from apps.pipeline.canonical.macro_quarterly import (
     fatiar_curva,
     grade_estendida,
     insumos_da_coluna,
+    medias_no_trimestre,
     metadado_de_procedencia,
     montar_macro,
     observacoes_de_fim_de_periodo,
@@ -273,9 +275,15 @@ def tolerancia_de_frescor(freq: str) -> int:
 
     `LIMITE_FFILL_DIAS_UTEIS` (5, a regra de F-014) **mais** um período da série. O termo do
     período não é folga: com defasagem, a publicação mais recente que existe no fim de `T` é, por
-    construção, de até um período atrás (o IBC-Br de julho é o mais novo que se conhece no fim de
-    setembro). Sem ele, `ibcbr_*` sairia 100% nula — e nula por regra de frescor, não por ausência
-    de dado, que é a pior forma de errar: silenciosa e com cara de ausência legítima.
+    construção, de até um período atrás (o IPCA de agosto é o mais novo que se conhece no fim de
+    setembro). Sem ele, as colunas de lag > 0 sairiam 100% nulas — e nulas por regra de frescor,
+    não por ausência de dado, que é a pior forma de errar: silenciosa e com cara de ausência
+    legítima.
+
+    **Não governa `ibcbr_*` desde D-s.** O nível trimestral do IBC-Br passou a ser a **média dos 3
+    meses** (`MEDIAS` de F-015), e média de trimestre é deslocada por `deslocar_acumulados` — a
+    mesma régua dos fluxos —, não por `observacoes_asof`. Esta tolerância continua valendo para as
+    séries lidas em **nível** de fim de período (PIB, IPCA 12m, Selic meta, câmbio, externo).
     """
     if freq not in PASSO_EM_DIAS_UTEIS:
         msg = f"freq={freq!r} sem passo declarado em PASSO_EM_DIAS_UTEIS"
@@ -492,9 +500,9 @@ def lag_da_coluna(coluna: str, lags: Mapping[str, int]) -> int:
     logo não há defasagem a declarar.
     """
     valores = [int(lags[i.series_id]) for i in insumos_da_coluna(coluna) if i.series_id in lags]
-    if coluna in ACUMULADAS:
-        series_id = ACUMULADAS[coluna]
-        if series_id in lags:
+    for mapa in (ACUMULADAS, MEDIAS):
+        series_id = mapa.get(coluna)
+        if series_id is not None and series_id in lags:
             valores.append(int(lags[series_id]))
     return max(valores) if valores else 0
 
@@ -766,6 +774,8 @@ class InsumosDoAsof:
     observacoes_asof: pd.DataFrame
     acumulados_revised: dict[str, dict[str, Acumulado]]
     acumulados_asof: dict[str, dict[str, Acumulado]]
+    medias_revised: dict[str, dict[str, Acumulado]]
+    medias_asof: dict[str, dict[str, Acumulado]]
     metadado: dict[str, dict[str, Any]]
     lags: dict[str, int]
     versao_asof: str
@@ -846,6 +856,13 @@ def preparar_insumos(
             )
         }
 
+    # D-s: o nivel trimestral do IBC-Br e a media dos 3 meses. Na `asof` a media de `T'` so e
+    # conhecida quando o **ultimo** mes de `T'` e divulgado -- a mesma conta dos fluxos, logo o
+    # mesmo `deslocar_acumulados`, sem uma segunda regua. Efeito com o catalogo de hoje (lag 45):
+    # a media de `T` nunca cabe ate `quarter_end(T)` (o 3o mes sai ~45 d depois do fim do
+    # trimestre), entao a celula `asof` de `T` e a media de `T-1`.
+    medias = medias_no_trimestre(raw, trimestres=trimestres)
+
     metadado = metadado_de_procedencia(raw)
     if focus is not None:
         por_subserie = metadado_de_procedencia(focus)
@@ -861,6 +878,8 @@ def preparar_insumos(
         observacoes_asof=observacoes_defasadas,
         acumulados_revised=acumulados,
         acumulados_asof=deslocar_acumulados(acumulados, lags=lags, trimestres=trimestres),
+        medias_revised=medias,
+        medias_asof=deslocar_acumulados(medias, lags=lags, trimestres=trimestres),
         metadado=metadado,
         lags=lags,
         versao_asof=versao_build(),
@@ -1181,6 +1200,7 @@ def construir(
     macro_revised, _, _ = montar_macro(
         observacoes=insumos.observacoes_revised,
         acumulados=insumos.acumulados_revised,
+        medias=insumos.medias_revised,
         metadado=insumos.metadado,
         trimestres=insumos.trimestres,
         quarters=insumos.janela,
@@ -1192,6 +1212,7 @@ def construir(
     bruto, provenance_bruta, diagnostico = montar_macro(
         observacoes=insumos.observacoes_asof,
         acumulados=insumos.acumulados_asof,
+        medias=insumos.medias_asof,
         metadado=insumos.metadado,
         trimestres=insumos.trimestres,
         quarters=insumos.janela,

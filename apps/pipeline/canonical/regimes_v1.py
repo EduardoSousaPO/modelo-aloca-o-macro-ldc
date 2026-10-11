@@ -225,35 +225,53 @@ CANARIOS: tuple[Canario, ...] = (
     ),
     Canario(
         quarter="2015Q4",
-        g_esperado=-7.043308,
+        g_esperado=-6.40468,
         pi_esperado=1.18,
         regime_esperado=RegimeV1.ESTAGFLACAO.value,
         nota=(
-            "recessao de 2015 com IPCA em aceleracao para 10,67% em 12m: g = -7,0433 pp (abaixo "
-            "da tendencia) e pi = +1,18 pp (acelerando) -> ESTAGFLACAO. E o quadrante que a "
-            "leitura economica do periodo exige, e o canario que pegaria sinal invertido no eixo."
+            "recessao de 2015 com IPCA em aceleracao para 10,67% em 12m: g = -6,4047 pp (IBC-Br "
+            "a/a de -5,9531% contra tendencia de +0,4515%, abaixo da tendencia) e pi = +1,18 pp "
+            "(acelerando) -> ESTAGFLACAO. E o quadrante que a leitura economica do periodo exige, "
+            "e o canario que pegaria sinal invertido no eixo. g era -7,0433 pp antes de D-s (nivel "
+            "de fim de periodo); o rotulo NAO mudou."
         ),
     ),
     Canario(
         quarter="2021Q2",
-        g_esperado=7.914372,
+        g_esperado=12.220736,
         pi_esperado=2.25,
         regime_esperado=RegimeV1.EXPANSAO_INFL.value,
         nota=(
-            "reabertura pos-covid contra a base deprimida de 2020Q2: g = +7,9144 pp (o 2o maior "
-            "da amostra) e pi = +2,25 pp (IPCA 12m de 6,10 para 8,35) -> EXPANSAO_INFL. "
-            "Canario do quadrante oposto ao de 2015Q4."
+            "reabertura pos-covid contra a base deprimida de 2020Q2: g = +12,2207 pp (o MAIOR da "
+            "amostra, contra o menor, -9,609 pp de 2020Q2) e pi = +2,25 pp (IPCA 12m de 6,10 para "
+            "8,35) -> EXPANSAO_INFL. Canario do quadrante oposto ao de 2015Q4. g era +7,9144 pp "
+            "antes de D-s: a media do trimestre amplia o pico porque abril e maio de 2021 ficaram "
+            "acima de junho. O rotulo NAO mudou."
+        ),
+    ),
+    Canario(
+        quarter="2023Q3",
+        g_esperado=-0.029941,
+        pi_esperado=2.03,
+        regime_esperado=RegimeV1.ESTAGFLACAO.value,
+        nota=(
+            "quase-empate deliberado (o menor |g| da amostra desde D-s): g = -0,029941 pp, a 3 "
+            "centesimos de pp do limiar. NAO e empate exato, logo NAO aciona CA-079 - classifica "
+            "por g < 0. Esta aqui para provar que o desempate e `== 0` exato e nao uma tolerancia "
+            "inventada. O papel era de 2024Q1 (g = -0,003228) antes de D-s."
         ),
     ),
     Canario(
         quarter="2024Q1",
-        g_esperado=-0.003228,
+        g_esperado=0.893048,
         pi_esperado=-0.69,
-        regime_esperado=RegimeV1.DESACELERACAO.value,
+        regime_esperado=RegimeV1.RECUPERACAO.value,
         nota=(
-            "quase-empate deliberado: g = -0,003228 pp, a 3,2 milesimos de pp do limiar. NAO e "
-            "empate exato, logo NAO aciona CA-079 - classifica por g < 0. Esta aqui para provar "
-            "que o desempate e `== 0` exato e nao uma tolerancia inventada."
+            "canario de D-s: era o quase-empate (g = -0,003228 pp -> DESACELERACAO) com o IBC-Br "
+            "lido no fim do trimestre; com a media dos 3 meses g = +0,893048 pp e o quadrante vira "
+            "RECUPERACAO. E 1 dos 7 trimestres que trocam de quadrante entre as duas reguas "
+            "(2013Q2, 2013Q3, 2013Q4, 2020Q1, 2023Q3, 2024Q1, 2025Q2) - exatamente os 7 que o "
+            "P1-1 do QA da Onda 2 previu. Existe para que a regua de nivel nao volte em silencio."
         ),
     ),
 )
@@ -800,7 +818,8 @@ def bloco_indeterminados(regimes: pd.DataFrame) -> dict[str, Any]:
         "motivo_de_fundo": (
             "D-m (DECISIONS_LOG 2.3, TODO.md 4): ibcbr_gap e nulo em 2006Q1..2009Q3 e 2026Q3 "
             "porque a media movel de 20 trimestres com janela cheia so fecha em 2009Q4 e o "
-            "IBC-Br dessaz. (SGS 24364) comeca em 2003. Nenhuma estimativa foi colocada no lugar "
+            "IBC-Br dessaz. (SGS 24364) comeca em 2003; 2026Q3 e nulo porque a media do trimestre "
+            "(D-s) exige 3 meses e o IBC-Br vai ate jul/2026. Nenhuma estimativa no lugar "
             "(Anti-SPEC 10.1.1). Consequencia: a crise de 2008 fica fora do eixo de crescimento "
             "da V1 — vai a pagina de limitacoes (F-028)."
         ),
@@ -866,7 +885,8 @@ def montar_relatorio(
             "regras": {
                 "eixo_crescimento": (
                     f"g_T = macro_quarterly.{COLUNA_CRESCIMENTO} (IBC-Br a/a dessaz. menos media "
-                    "movel de 20 trimestres), em pp; crescimento_acima = g_T > "
+                    "movel de 20 trimestres, com o nivel trimestral = MEDIA DOS 3 MESES do "
+                    "trimestre desde D-s, nao o fim de periodo), em pp; crescimento_acima = g_T > "
                     f"{LIMIAR_CRESCIMENTO_PP}"
                 ),
                 "eixo_inflacao": (

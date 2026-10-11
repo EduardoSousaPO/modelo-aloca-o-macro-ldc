@@ -51,6 +51,7 @@ from apps.pipeline.canonical.build_raw_series import (
 from apps.pipeline.canonical.macro_quarterly import (
     ACUMULADAS,
     CATALOGO_DO_FOCUS,
+    MEDIAS,
     MOTIVO_SERIE_SEM_VALOR,
     MOTIVO_TRIMESTRE_INCOMPLETO,
     N_TRIMESTRES_TENDENCIA,
@@ -74,6 +75,8 @@ from apps.pipeline.canonical.macro_quarterly import (
     hiato_vs_tendencia,
     insumos_da_coluna,
     media_movel,
+    media_por_trimestre,
+    medias_no_trimestre,
     observacoes_de_fim_de_periodo,
     quarters_de_apoio,
     sensibilidade_da_tendencia,
@@ -81,7 +84,7 @@ from apps.pipeline.canonical.macro_quarterly import (
     variacao_por_razao,
     versao_build,
 )
-from apps.pipeline.common.errors import SerieInconsistente
+from apps.pipeline.common.errors import FonteIndisponivel, SerieInconsistente
 from apps.pipeline.common.io_layers import (
     Camada,
     caminho_camada,
@@ -231,22 +234,37 @@ def test_acumulacao_geometrica_vazia_levanta() -> None:
     [
         (-1.50, "CORTE"),
         (-0.26, "CORTE"),
-        (-0.25, "NEUTRO"),
+        (-0.25, "CORTE"),
+        (-0.24, "NEUTRO"),
         (0.0, "NEUTRO"),
-        (0.25, "NEUTRO"),
+        (0.24, "NEUTRO"),
+        (0.25, "ALTA"),
         (0.26, "ALTA"),
         (2.75, "ALTA"),
     ],
 )
 def test_ciclo_selic_nos_tres_estados(delta: float, esperado: str) -> None:
-    """Os 3 estados e as duas bordas do limiar de 0,25 pp (`CONTRACTS.md §5.3`).
+    """Os 3 estados e as duas bordas do limiar de 0,25 pp (**D-t**).
 
-    `|Δ| == 0,25` é `NEUTRO` por construção: a regra da metodologia §2 é `< -0,25` e `> +0,25`, e
-    uma reunião que corta exatamente 25 bps é a menor mudança possível — tratá-la como ciclo
-    rotularia metade da amostra.
+    `|Δ| == 0,25` é **movimento**, não parada, desde D-t (2026-10-11). A leitura literal da
+    metodologia §2 (`< -0,25` / `> +0,25`) punha 7 trimestres com `|Δ| = 0,25` exato em `NEUTRO`,
+    entre eles **2024Q2 e 2024Q3** — cortes reais de 25 bps do Copom (P1-2 do QA da Onda 2). 25 pb
+    é o menor passo que o Copom dá: chamá-lo de pausa rotula como parada justamente o início e o
+    fim dos ciclos. Só `|Δ| < 0,25` é `NEUTRO`.
     """
     assert ciclo_selic(delta) == esperado
     assert pytest.approx(0.25) == LIMIAR_SELIC_PP
+
+
+@pytest.mark.parametrize("delta", [-0.25, 0.25])
+def test_ciclo_selic_na_borda_exata_nao_e_neutro(delta: float) -> None:
+    """Negativo de D-t: a desigualdade **não** pode voltar a ser estrita.
+
+    Travado sozinho porque a regressão é de 1 caractere (`<=` → `<`) e nenhum número publicado
+    gritaria: a distribuição mudaria de 36/16/31 para 29/30/24 em silêncio.
+    """
+    assert ciclo_selic(delta) != "NEUTRO"
+    assert ciclo_selic(delta) == ("CORTE" if delta < 0 else "ALTA")
 
 
 def test_ciclo_selic_sem_delta_e_none_e_nao_neutro() -> None:
@@ -483,6 +501,80 @@ def test_acumular_por_trimestre_mensal_exige_os_3_meses() -> None:
     assert parcial[0].value is None
     assert parcial[0].motivo_nulo == MOTIVO_TRIMESTRE_INCOMPLETO
     assert (parcial[0].n_obs, parcial[0].n_esperado) == (2, 3)
+
+
+def test_media_por_trimestre_e_a_media_dos_3_meses_e_exige_os_3() -> None:
+    """**D-s:** o nivel trimestral do IBC-Br e a media aritmetica dos 3 meses do trimestre.
+
+    Numeros cravados a mao: 100 / 110 / 120 -> media **110**, que e o mes do meio e **nao** o
+    ultimo (120). E a diferenca que o P1-1 do QA da Onda 2 mediu em 4,2646 pp no `ibcbr_yoy`
+    real. Com 2 meses, `NULL` + `MOTIVO_TRIMESTRE_INCOMPLETO` — nunca a media de 2 disfarcada.
+    """
+    cal = calendario_sintetico(2005, 2007)
+    trimestres = grade_de_trimestres(cal, quarters=["2005Q4", "2006Q1"])
+    completo = quadro_raw(
+        [
+            linha_raw("BCB_SGS_24364", quando, valor)
+            for quando, valor in (
+                (date(2006, 1, 31), 100.0),
+                (date(2006, 2, 28), 110.0),
+                (date(2006, 3, 31), 120.0),
+            )
+        ]
+    )
+    saida = media_por_trimestre(completo, series_id="BCB_SGS_24364", trimestres=trimestres)
+    assert saida[0].quarter == "2006Q1"
+    assert saida[0].value == pytest.approx(110.0)
+    assert saida[0].value != pytest.approx(120.0), "fim de periodo nao e media do trimestre"
+    assert (saida[0].n_obs, saida[0].n_esperado) == (3, 3)
+    # `obs = media_3m`: a procedencia registra a ULTIMA das 3 observacoes.
+    assert saida[0].date_obs_max == date(2006, 3, 31)
+
+    incompleto = quadro_raw(
+        [
+            linha_raw("BCB_SGS_24364", quando, 100.0)
+            for quando in (date(2006, 1, 31), date(2006, 2, 28))
+        ]
+    )
+    parcial = media_por_trimestre(incompleto, series_id="BCB_SGS_24364", trimestres=trimestres)
+    assert parcial[0].value is None
+    assert parcial[0].motivo_nulo == MOTIVO_TRIMESTRE_INCOMPLETO
+    assert (parcial[0].n_obs, parcial[0].n_esperado) == (2, 3)
+
+
+def test_media_por_trimestre_e_aritmetica_nao_geometrica() -> None:
+    """Negativo de D-s: indice de **nivel** media aritmeticamente; so fluxo encadeia.
+
+    Com 100 / 110 / 120 a media aritmetica e 110,0 e a geometrica (media dos logs) e ~109,696.
+    Trocar uma pela outra nao falharia nenhum check de schema — por isso o teste existe.
+    """
+    cal = calendario_sintegro = calendario_sintetico(2005, 2007)
+    trimestres = grade_de_trimestres(cal, quarters=["2005Q4", "2006Q1"])
+    quadro = quadro_raw(
+        [
+            linha_raw("BCB_SGS_24364", quando, valor)
+            for quando, valor in (
+                (date(2006, 1, 31), 100.0),
+                (date(2006, 2, 28), 110.0),
+                (date(2006, 3, 31), 120.0),
+            )
+        ]
+    )
+    obtido = media_por_trimestre(quadro, series_id="BCB_SGS_24364", trimestres=trimestres)[0].value
+    geometrica = float(np.exp(np.mean(np.log([100.0, 110.0, 120.0]))))
+    assert obtido == pytest.approx(110.0)
+    assert geometrica == pytest.approx(109.69613, abs=1e-5)
+    assert obtido != pytest.approx(geometrica, abs=1e-6)
+    assert calendario_sintegro is cal
+
+
+def test_media_por_trimestre_recusa_serie_de_grade_bancaria() -> None:
+    """A media do trimestre esta definida para grade civil; serie diaria e erro de programacao."""
+    cal = calendario_sintetico(2005, 2007)
+    trimestres = grade_de_trimestres(cal, quarters=["2005Q4", "2006Q1"])
+    diaria = quadro_raw([linha_raw("BCB_SGS_12", date(2006, 3, 31), 0.04)])
+    with pytest.raises(SerieInconsistente, match="grade civil"):
+        media_por_trimestre(diaria, series_id="BCB_SGS_12", trimestres=trimestres)
 
 
 def test_acumular_por_trimestre_diario_exige_todos_os_dias_uteis() -> None:
@@ -737,6 +829,58 @@ def test_build_sintetico_ciclo_selic_tem_os_tres_estados(build_sintetico: object
     assert sum(distribuicao.values()) == 83
 
 
+def test_medias_no_trimestre_cobre_exatamente_as_series_de_medias(
+    arvore_com_focus: ArvoreSintetica,
+) -> None:
+    """**D-s:** `MEDIAS` é o contrato legível, e `medias_no_trimestre` não inventa série nenhuma."""
+    cal = arvore_com_focus.calendario
+    trimestres = grade_estendida(cal, quarters=quarters_da_janela())
+    medias = medias_no_trimestre(arvore_com_focus.raw, trimestres=trimestres)
+    assert set(medias) == set(MEDIAS.values()) == {"BCB_SGS_24364"}
+    assert set(MEDIAS) == {"ibcbr_yoy", "ibcbr_yoy_trend", "ibcbr_gap"}
+    for por_quarter in medias.values():
+        assert all(a.n_esperado == 3 for a in por_quarter.values())
+
+
+def test_build_sintetico_procedencia_de_ibcbr_aponta_o_ultimo_mes_da_media(
+    build_sintetico: object,
+) -> None:
+    """`obs = media_3m`: 1 linha por célula, `date_obs` = a **última** das 3 observações (D-s).
+
+    A escolha é a mesma de `ACUMULADAS` e é o que mantém `date_obs <= quarter_end` um limite
+    **superior** verificável no Parquet — e, na `asof` de F-018, `date_obs + lag_dias`.
+    """
+    diag = build_sintetico.diagnostico  # type: ignore[attr-defined]
+    fatia = diag.loc[diag["column"].isin(sorted(MEDIAS))]
+    assert not fatia.empty
+    assert (fatia["series_id"] == "BCB_SGS_24364").all()
+    com_data = fatia.loc[fatia["date_obs_max"].notna()]
+    assert len(com_data) > 150
+    # O último mês do trimestre: mês 3, 6, 9 ou 12 — nunca o 1º mês de T nem um mês de T+1.
+    meses = pd.to_datetime(com_data["date_obs_max"]).dt.month
+    assert set(meses.unique()) <= {3, 6, 9, 12}
+    assert (pd.to_datetime(com_data["date_obs_max"]) <= com_data["fim_civil"]).all()
+
+
+def test_build_para_se_o_alinhado_nao_tem_serie_exigida(tmp_path: Path) -> None:
+    """**D-v (P1-3 do QA da Onda 2):** `alinhado_trimestral` sem série exigida **para** o build.
+
+    Era o achado: `exigir_series` só rodava contra `raw_series`, então um `alinhado_trimestral`
+    sem `BCB_SGS_13522` fazia o build **concluir em silêncio** — a régua reexpressa em
+    `observacoes_de_fim_de_periodo` cobria a ausência, `ipca_12m` saía com 83 valores não nulos e
+    só o contador de células conferidas caía (1.328 → 1.245), que nenhum teste afirmava. A feature
+    afirma que "todo nível é a célula de F-014": a série exigida tem de estar **nos dois**.
+    """
+    arvore = montar_arvore(tmp_path, com_focus=True)
+    alvo = caminho_canonical("alinhado_trimestral.parquet", raiz=arvore.raiz)
+    alinhado = pd.read_parquet(alvo)
+    assert "BCB_SGS_13522" in set(alinhado["series_id"])
+    alinhado.loc[alinhado["series_id"] != "BCB_SGS_13522"].to_parquet(alvo, index=False)
+
+    with pytest.raises(FonteIndisponivel, match="BLOQUEADO — FONTE INDISPONÍVEL"):
+        construir(raiz=arvore.raiz, calendario=arvore.calendario)
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # D — acervo real: diff numérico, reconstrução independente, anti-look-ahead
 # ═════════════════════════════════════════════════════════════════════════════
@@ -797,6 +941,21 @@ def _nivel_do_alinhado(alinhado: pd.DataFrame, series_id: str) -> pd.Series:
     return fatia.set_index("quarter")["value"].astype("float64")
 
 
+def _media_do_trimestre(raw: pd.DataFrame, series_id: str) -> pd.Series:
+    """A média dos meses do trimestre, recalculada **aqui** de `raw_series` (**D-s**).
+
+    Conta independente e deliberadamente ingênua (`groupby` do período trimestral da própria
+    `date`, sem a grade de F-014 e sem importar `media_por_trimestre`): é o que faz o diff de
+    classe C do nível de `ibcbr_*` ser conferência e não tautologia. Trimestre com menos de 3
+    meses sai `NaN`, igual à régua publicada.
+    """
+    fatia = raw.loc[(raw["series_id"] == series_id) & raw["value"].notna()].copy()
+    fatia["quarter"] = pd.PeriodIndex(pd.to_datetime(fatia["date"]), freq="Q").astype(str)
+    por_quarter = fatia.groupby("quarter")["value"]
+    media = por_quarter.mean().astype("float64")
+    return media.where(por_quarter.size() == 3)
+
+
 #: Coluna de nível → série de origem. Repetido **de propósito** (não importado de `ORIGENS`): é o
 #: que faz o diff numérico ser uma conferência independente e não uma tautologia.
 NIVEIS_ESPERADOS: Mapping[str, str] = {
@@ -841,7 +1000,13 @@ def test_acervo_derivadas_reproduzidas_por_conta_independente(
         nivel = _nivel_do_alinhado(alinhado_real, series_id).reindex(quarters)
         return (nivel / nivel.shift(passos) - 1.0) * 100.0
 
-    ibcbr_yoy = razao("BCB_SGS_24364", 4)
+    # **D-s:** o nível trimestral do IBC-Br é a média dos 3 meses, não a célula de fim de período
+    # de F-014. A média é recalculada aqui de `raw_series`, sem importar o módulo. Com a leitura
+    # antiga (fim de período) esta mesma conta divergia do publicado em 4,2646 pp — é o número que
+    # o P1-1 do QA da Onda 2 mediu, e este teste é o que trava o lado certo da decisão.
+    raw_para_media = pd.read_parquet(caminho_canonical(NOME_RAW_SERIES))
+    ibcbr_nivel = _media_do_trimestre(raw_para_media, "BCB_SGS_24364").reindex(quarters)
+    ibcbr_yoy = (ibcbr_nivel / ibcbr_nivel.shift(4) - 1.0) * 100.0
     verificacoes = {
         "pib_yoy": razao("SIDRA_1620_V583_90707", 4),
         "ibcbr_yoy": ibcbr_yoy,

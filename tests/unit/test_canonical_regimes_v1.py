@@ -133,7 +133,7 @@ def test_rotulo_cobre_a_tabela_de_verdade_inteira() -> None:
 def test_eixo_de_crescimento_invertido_erraria_2015Q4() -> None:
     """Negativo: trocar o sinal do eixo de crescimento muda o quadrante de 2015Q4.
 
-    Prova que o canário 2015Q4 **discrimina**: com `g` invertido (+7,04 em vez de −7,04) e o mesmo
+    Prova que o canário 2015Q4 **discrimina**: com `g` invertido (+6,40 em vez de −6,40) e o mesmo
     `pi`, o rótulo vira `EXPANSAO_INFL`. Um canário que não muda quando a regra muda não testa nada.
     """
     canario = next(c for c in R.CANARIOS if c.quarter == "2015Q4")

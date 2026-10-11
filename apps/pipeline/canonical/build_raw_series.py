@@ -568,6 +568,24 @@ def caminhos_dos_componentes(modulos: Sequence[str] | None = None) -> tuple[Path
     return tuple(caminhos)
 
 
+def normalizar_fim_de_linha(corpo: bytes) -> bytes:
+    r"""`\r\n` → `\n` (e `\r` solto → `\n`): o conteúdo do arquivo **sem** o checkout.
+
+    **P1-4 do QA da Onda 2 (D-v).** `versao_build` hasheava `read_bytes()` cru, então o mesmo
+    commit dava `fonte_versao` diferente num checkout CRLF (Windows, sem `.gitattributes`) e num
+    LF (CI, Linux) — e 2 dos 7 módulos de `MODULOS_DO_MACRO` já estavam em LF no disco desta
+    máquina, logo a divergência era real e não hipotética. Isso quebrava o passo 4 do gate da
+    classe D (`AGENTS.md §14`: dataset congelado por `sha256` + tag git) e CA-121 entre
+    ambientes **sem que uma única célula de dado mudasse**.
+
+    Normalizar aqui é a correção de menor superfície: `versao_build` é o único lugar da camada
+    canônica que hasheia código, e todos os `MODULOS_*` (`MODULOS_DO_BUILD`,
+    `MODULOS_DO_ALINHAMENTO`, `MODULOS_DO_MACRO`, `MODULOS_DO_ASOF`, `MODULOS_DO_RETORNO`,
+    `MODULOS_DO_REGIME_V1`, `MODULOS_DO_REGIME_V3`) passam por ela.
+    """
+    return corpo.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
 def versao_build(componentes: Sequence[Path] | None = None) -> str:
     """`sha256` do **conjunto** `MODULOS_DO_BUILD` — o `fonte_versao` da camada (RF-048/CA-121).
 
@@ -579,9 +597,14 @@ def versao_build(componentes: Sequence[Path] | None = None) -> str:
     muda o `series_catalog.parquet` sem tocar o builder. Agora o nome de cada componente entra no
     corpo hasheado antes do conteúdo, então o hash não depende do caminho absoluto (o teste pode
     hashear cópias em `tmp_path`), mas qualquer renomeação conta como mudança.
+
+    O conteúdo entra **com o fim de linha normalizado** (`normalizar_fim_de_linha`, P1-4 do mesmo
+    QA / D-v): o hash é do código, não do modo como o git materializou o arquivo em disco.
     """
     caminhos = tuple(componentes) if componentes is not None else caminhos_dos_componentes()
-    corpo = b"".join(c.name.encode("utf-8") + b"\n" + c.read_bytes() for c in caminhos)
+    corpo = b"".join(
+        c.name.encode("utf-8") + b"\n" + normalizar_fim_de_linha(c.read_bytes()) for c in caminhos
+    )
     return sha256_de(corpo)
 
 

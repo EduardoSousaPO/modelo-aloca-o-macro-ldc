@@ -25,11 +25,12 @@ packages/shared/schemas/
 │                                  load_catalog()                                   (pydantic+pandera)
 ├── series_catalog_data.py      ← O CATÁLOGO COMO DADO — 138 séries
 ├── alinhado_trimestral.py      ← AlinhadoTrimestralSchema (grade trimestral long)  (pandera)
-├── macro_quarterly.py          ← MacroQuarterlySchema,
-│                                  MacroQuarterlyProvenanceSchema                   (pandera)
+├── macro_quarterly.py          ← MacroQuarterlySchema, MacroQuarterlyProvenanceSchema,
+│                                  MacroQuarterlyAsofProvenanceSchema (subclasse)   (pandera)
 ├── asset_returns_quarterly.py  ← AssetReturnsQuarterlySchema,
 │                                  RegimeAssetMetricsSchema                         (pandera)
-├── regimes.py                  ← RegimesSchema, RegimeNeighborsSchema, enums       (pandera)
+├── regimes.py                  ← RegimesSchema, RegimeNeighborsSchema,
+│                                  RegimesV1Schema, RegimeNeighborsV3Schema, enums  (pandera)
 └── calendario.py               ← CalendarioDiasUteisSchema (grade de dias úteis)   (pandera)
 ```
 
@@ -41,7 +42,7 @@ Fronteiras onde a validação é **obrigatória** (`wiki/architecture.md §4`):
 | `data/processed/` → `data/canonical/` | `RawSeriesSchema` + schema da tabela destino |
 | `data/canonical/series_catalog.parquet` (catálogo **materializado**, 26 colunas) | `SeriesCatalogMaterializedSchema` (§2.4) |
 | `raw_series` → grade trimestral (`data/canonical/alinhado_trimestral.parquet`) | `AlinhadoTrimestralSchema` (§8) |
-| entrada e saída de `data/canonical/` | `MacroQuarterlySchema`, `MacroQuarterlyProvenanceSchema`, `AssetReturnsQuarterlySchema`, `RegimesSchema`, `RegimeNeighborsSchema`, `SeriesCatalogSchema` |
+| entrada e saída de `data/canonical/` | `MacroQuarterlySchema`, `MacroQuarterlyProvenanceSchema`, `MacroQuarterlyAsofProvenanceSchema`, `AssetReturnsQuarterlySchema`, `RegimesSchema`, `RegimesV1Schema`, `RegimeNeighborsSchema`, `RegimeNeighborsV3Schema`, `SeriesCatalogSchema` |
 | config de extrator / parâmetros de janela | `ExtractorConfig` (pydantic) |
 | catálogo de séries | `SeriesCatalogEntry` (pydantic) |
 
@@ -125,7 +126,7 @@ desta camada. **O que o contrato precisa dizer sobre a materialização:**
 > **Estado medido em 2026-10-11** (rebuild sincronizado da Onda 2 completa, com o Focus em disco):
 > **62** Parquets lidos → `raw_series` com **278.439** linhas e **62** séries,
 > 1979-12-31 → 2026-10-10, `linhas_dedup = 0`, `sha256 0d23df7a…`,
-> `versao_build = e48262bb…`; `series_catalog.parquet` com **138 × 26** (`sha256 f56f207e…`), 62
+> `versao_build = 6989371e…`; `series_catalog.parquet` com **138 × 26** (`sha256 f56f207e…`), 62
 > presentes no processado, 59 cobrindo 1T2006, **7** tabelas excluídas, 33 séries `ok` do pacote
 > mínimo ainda ausentes (F-011/F-012 e as demais). O número vivo é o próprio relatório, não esta
 > linha.
@@ -331,9 +332,23 @@ nunca se confunda com "não veio".
 - `janela_de_83_trimestres` — exatamente 83 linhas, de `2006Q1` a `2026Q3` (CA-059).
 - `lag_adjusted_homogeneo` — uma materialização nunca mistura `asof` e `revised`.
 
-**Duas materializações:** `macro_quarterly_asof` (`lag_adjusted=True`, para decisão) e
-`macro_quarterly_revised` (`lag_adjusted=False`, para descrição histórica). Na v1 a divergência de
-classificação entre as duas é **reportada** (RF-025); a dupla materialização completa é fase 2.
+**Duas materializações, as duas em disco desde F-018:** `data/canonical/macro_quarterly.parquet`
+(`lag_adjusted=False`, **`revised`**, F-015) e `data/canonical/macro_quarterly_asof.parquet`
+(`lag_adjusted=True`, **`asof`**, F-018 — a materialização **de decisão**, SPEC §2). As duas têm o
+**mesmo** `MacroQuarterlySchema` e a mesma grade: trocar de materialização é trocar o caminho do
+Parquet, e `lag_adjusted` da linha diz qual foi lida. A `asof` sai do **mesmo** `montar_macro`, com
+os níveis deslocados pela divulgação (`date_obs + lag_divulgacao_dias <= quarter_end`, lag inteiro
+do `series_catalog`) e **toda derivada recalculada**, nunca copiada da revisada. A divergência de
+classificação entre as duas é **reportada** (RF-025, CA-073/074) e hoje está **acima** do limiar —
+ver §5.1a.
+
+> **Nível trimestral do IBC-Br = média dos 3 meses do trimestre (`obs = media_3m`, D-s).**
+> `metodologia §2` diz "IBC-Br: média do trimestre"; até 2026-10-11 a implementação lia o **fim de
+> período** (D-q(e)). O QA da Onda 2 mediu a diferença: `max |dif|` **4,2646 pp** em `ibcbr_yoy`,
+> **4,3064 pp** no hiato e **7 dos 67 trimestres trocando de quadrante na V1**. A média exige os **3**
+> meses (2 → `NULL` com motivo, nunca média parcial), e a procedência registra a **última** das 3
+> observações — o limite superior que mantém `date_obs <= quarter_end` verificável no Parquet.
+> `pib_yoy` **não** muda (o PIB do SIDRA já é trimestral na fonte).
 
 Colunas nulas são **legítimas e informativas**: `ipca_meta` (série de metas é gap G-02),
 `embi_br_fim` após 30/07/2024, `curva_nominal_*` onde o vértice não existe. Nulo **nunca** é
@@ -348,9 +363,14 @@ preenchido para "fechar" a linha.
 > diferentes. Quem cruzar as duas sem ler a unidade erra por **100x**; a conversão é exatamente
 > `macro = 100 × retornos` (medido: `max |dif| = 0,0` nos 83 trimestres).
 
-> **Estado medido em 2026-10-11** (F-015, `python -m apps.pipeline.canonical.macro_quarterly
-> --offline`): **83 × 42**, `2006Q1..2026Q3`, materialização **`revised`** (`lag_adjusted=False`
-> nas 83), `sha256 dcded731…`. **5** colunas 100% nulas, **todas** por gap declarado: `ipca_meta` e
+> **Estado medido em 2026-10-11, depois do rebuild de fechamento da Onda 3 parte 1** (F-015 +
+> D-s/D-v, `python -m apps.pipeline.canonical.macro_quarterly --offline`): **83 × 42**,
+> `2006Q1..2026Q3`, materialização **`revised`** (`lag_adjusted=False` nas 83),
+> `sha256 bcb31e92…`. A companheira `asof` (F-018): **83 × 42**, `lag_adjusted=True` nas 83,
+> `sha256 85e8ec67…`; **27** das 37 colunas rastreáveis são **idênticas** às da `revised` e **10**
+> mudam (lag > 0), e a reprodução da `revised` na mesma rodada confere **3.071 células, 0
+> divergências, `max |dif| = 0,0`** contra o Parquet em disco. **5** colunas 100% nulas, **todas**
+> por gap declarado: `ipca_meta` e
 > `ipca_desvio_meta` (G-02), `embi_br_fim` e `embi_delta_tri` (L8) e `termos_troca_yoy` (nenhum
 > índice de termos de troca foi extraído — proxy IC-Br em `TODO.md §6`). `ibcbr_yoy_trend` e
 > `ibcbr_gap` têm **16** nulos (`2006Q1..2009Q3` + `2026Q3`): **CA-007 não é satisfazível** com o
@@ -358,13 +378,30 @@ preenchido para "fechar" a linha.
 > nulos (39,8%), e a inclinação **principal** de D-i (`INCLINACAO_REAL_5A_3A`, 95,25%) **não é
 > coluna** deste schema (**D-n**): F-019/F-021 leem a série. `is_estimated = True` só em `2026Q3`
 > (CA-060). Os 4 canários publicados: `ipca_12m` 2006Q1 = **5,32**, `selic_meta_fim` 2008Q4 =
-> **13,75**, `pib_yoy` 2010Q1 = **9,207417**, `focus_ipca_12m` 2026Q3 = **4,19**.
+> **13,75**, `pib_yoy` 2010Q1 = **9,207417**, `focus_ipca_12m` 2026Q3 = **4,19**. **Ciclo Selic
+> (D-t):** `|Δ| >= 0,25 pp` conta como movimento (desigualdade **não** estrita), distribuição
+> medida **CORTE 34 · NEUTRO 23 · ALTA 26** nos 83 — era 29/30/24 com a desigualdade estrita, que
+> punha os cortes reais de 25 bps de **2024Q2 e 2024Q3** em `NEUTRO`.
 
 ### 3.1 `macro_quarterly_provenance` — procedência por célula (RF-047 / CA-120)
 
 `packages/shared/schemas/macro_quarterly.py` → `MacroQuarterlyProvenanceSchema`.
 PK `(quarter, column)`. Materializada em `data/canonical/macro_quarterly_provenance.parquet`,
 **junto** com a tabela wide, pela mesma feature (F-015).
+
+> **São DUAS materializações de procedência, uma por materialização da tabela wide** (F-018 §2/§9.1):
+>
+> | Artefato | Schema | Colunas | Quem escreve |
+> |---|---|---|---|
+> | `macro_quarterly_provenance.parquet` | `MacroQuarterlyProvenanceSchema` | **8** | F-015 (`revised`) |
+> | `macro_quarterly_asof_provenance.parquet` | `MacroQuarterlyAsofProvenanceSchema` | **10** (+ `date_obs`, + `lag_dias`) | F-018 (`asof`) |
+>
+> `MacroQuarterlyAsofProvenanceSchema` é **subclasse** (acréscimo, nunca alteração: o schema de
+> F-015 é `strict=True` e alterá-lo é pausa). As duas colunas novas são o que torna **CA-072
+> verificável no Parquet publicado** e não só no código: `date_obs + lag_dias <= quarter_end` é
+> consultável, e `lag_dias` é o **maior** lag entre os insumos da coluna — limite superior
+> conservador (`surpresa_pib` = max(PIB 60, Focus 0) = 60). Sem elas, "qual observação foi usada"
+> só existiria no relatório. Guardar `date_obs` apenas no relatório foi a alternativa descartada.
 
 | Coluna | Tipo | Nulo? | Regra |
 |---|---|---|---|
@@ -391,9 +428,14 @@ tabela por 5 e ainda assim só valeria para o wide. O long resolve as duas coisa
 `series_id` na linha. `vintage`/`collected_at` de um retorno ficam em `raw_series`, pela PK
 `(series_id, date, vintage)`.
 
-> **Estado medido em 2026-10-11:** **2.548** linhas (1 por célula rastreável **preenchida**),
-> cobrindo **32** das 37 `COLUNAS_RASTREAVEIS` e **20** séries de origem distintas,
-> `sha256 4a582c1d…`. CA-120 verificado por **anti-join nas duas direções**: nenhuma célula
+> **Estado medido em 2026-10-11 (pós-rebuild):** `revised` com **2.548** linhas (1 por célula
+> rastreável **preenchida**), cobrindo **32** das 37 `COLUNAS_RASTREAVEIS` e **20** séries de origem
+> distintas, `sha256 aa8d427a…`; `asof` com **2.552** linhas, **32** colunas, **`date_obs` e
+> `lag_dias` em todas**, `sha256 a5b2eaef…`, e **0** células com divulgação posterior ao fim do
+> trimestre (CA-072 — o build **para** se houver uma). A `asof` tem 4 linhas **a mais** porque usa
+> o último dado **divulgado**: em `2026Q3` a `revised` não tem PIB nem IBC-Br e a `asof` carrega o
+> PIB de `2026Q2` e a média do IBC-Br de `2026Q2`, que é o que estava na mesa em 30/09.
+> CA-120 verificado por **anti-join nas duas direções**: nenhuma célula
 > preenchida sem procedência e **nenhuma procedência para célula nula** (procedência de nulo seria
 > afirmação sobre dado que não existe). Todo `series_id` resolve em `series_catalog` — e para o
 > Focus a linha aponta para o **EntitySet** (`FOCUS_ANUAIS`, `FOCUS_INFLACAO_12M`), **não** para o
@@ -443,7 +485,7 @@ IFIX) é aceito pelo schema: é parcial, não anterior — quem o anula é a reg
 
 > **Estado medido em 2026-10-11** (F-017, `python -m apps.pipeline.canonical.retornos --offline`):
 > **1.963** linhas · **24** `asset_id` dos 32 do enum · 83 trimestres (`2006Q1..2026Q3`) ·
-> `sha256 ab61eeca…`. `USDBRL` entrou por **D-l** (+83 linhas; `is_total_return = False`, porque
+> `sha256 c055ac81…` (era `ab61eeca…` antes de **D-v b**: só `fonte_versao` mudou, nenhum valor). `USDBRL` entrou por **D-l** (+83 linhas; `is_total_return = False`, porque
 > câmbio não tem carrego) e os **8** que seguem fora têm motivo nomeado em
 > `ATIVOS_FORA_DO_UNIVERSO`, publicado no relatório: os 5 `FII_*` (Teva/F-012 não rodou),
 > `SP500_HEDGE` (exige Fed Funds, FRED bloqueado), `UST10_BRL` (`YAHOO_TNX` é **taxa**, não
@@ -486,6 +528,49 @@ Colunas: `n_obs`, `ret_medio`, `ret_mediana`, `ret_desvio`, `erro_padrao_media`,
 
 **Check:** `todos_os_quadrantes_povoados` — os 4 rótulos existem na amostra.
 
+> **`regimes.parquet` NÃO EXISTE AINDA.** `RegimesSchema` é o contrato da tabela **completa**, e
+> `ciclo_selic`/`regime_v2`/`stress_flag` são `nullable=False` e pertencem a F-020/F-021. A junção
+> é **F-022** (**D-r**) e vai ter de decidir o que fazer com os `regime_v1` nulos: excluir as
+> linhas, tornar `regime_v1` anulável, ou acrescentar `INDETERMINADO` ao enum (o que quebraria
+> `todos_os_quadrantes_povoados`, que exige `nunique() == len(RegimeV1)`). As três são **alteração
+> de schema existente ⇒ pausa**.
+
+### 5.1a `RegimesV1Schema` — a V1 isolada, PK `(quarter, lag_adjusted)` (F-019, **D-r**)
+
+Acrescentado ao fim de `packages/shared/schemas/regimes.py` (nada acima foi alterado). Valida o
+**subconjunto V1** de `RegimesSchema` — toda coluna de `COLUNAS_V1_DE_REGIMES` existe em
+`RegimesSchema` com o **mesmo nome**, e há teste de contrato para isso — mais 4 colunas de
+auditoria próprias:
+
+`regime_v1` (**anulável**, ao contrário de `RegimesSchema`) · `status_regime_v1` ∈
+{`CLASSIFICADO`, `INDETERMINADO`} · `motivo_indeterminado` ∈ {`GAP_AUSENTE`, `ACELERACAO_AUSENTE`,
+`AMBOS_AUSENTES`, `EMPATE_SEM_SINAL_ANTERIOR`} · `desempate_aplicado` ·
+`g_score`/`pi_score` · `n_obs_regime_v1` · as 3 flags de `n` · `lag_adjusted` ·
+`trocou_vs_revised` (**nulo** na própria `revised`: não existe "trocou em relação a si mesma") ·
+`especificacao_congelada` · `versao_especificacao` · `fonte_versao`.
+
+**Checks:** `status_coerente_com_o_rotulo` e `eixos_presentes_se_classificado` — não dá para ter
+`regime_v1` nulo sem `status = INDETERMINADO` com motivo, nem o contrário. `lag_adjusted_homogeneo`.
+
+> **Estado medido em 2026-10-11 (pós-D-s), materialização `revised`:** `regimes_v1.parquet`
+> **83 × 18**, `sha256 b74f8d67…`; **67** classificados e **16** `INDETERMINADO`
+> (`2006Q1..2009Q3` + `2026Q3`, todos `GAP_AUSENTE` por **D-m** — a crise de 2008 inteira fica fora
+> do eixo de crescimento). Distribuição **RECUPERACAO 19 · EXPANSAO_INFL 19 · ESTAGFLACAO 16 ·
+> DESACELERACAO 13**: CA-080 fecha (4 quadrantes povoados, todos em [10, 35]), desbalanceamento
+> **1,46×**, nenhuma flag de `n` acesa, **0 desempates** (nenhum eixo é exatamente 0 no dado real,
+> então CA-079 só é exercitado em sintético). Companheira `regimes_v1_asof.parquet`
+> (`sha256 6e922165…`): **67** classificados, **EXP 21 · REC 17 · EST 16 · DES 13**.
+>
+> ⚠️ **CA-074 ACIONADO:** a V1 troca de rótulo entre `revised` e `asof` em **22 de 66 trimestres =
+> 33,33%**, acima do limiar de **25%**. Pelo critério escrito em `metodologia §5.1` a V1 **não é
+> operacional na forma `asof`** e a hipótese **H-03 do PRD cai**; a leitura **descritiva** segue
+> válida e é o entregável de RF-027. Mecanicamente: `ibcbr_gap` é um hiato pequeno (mediana
+> `|g| ≈ 2 pp`) sobre média móvel de 20 trimestres, e deslocar o IBC-Br de um trimestre troca o
+> sinal com facilidade. Vai à página de limitações (F-028) e ao slide do Comitê.
+>
+> **`especificacao_congelada = False` nas 83 linhas**, lido do **status do ADR-001 em disco**
+> (`Proposta`), com falha fechada: **nenhum número daqui é publicável** (CA-090, `AGENTS.md §14`).
+
 ### 5.2 `RegimeNeighborsSchema` — PK `(quarter_ref, rank, metrica, k_usado, restrito_pos_2016)`
 
 `distancia` ≥ 0 · `metrica` ∈ {`mahalanobis`, `euclidiana`} · `k_usado` ∈ {5, 8, 12} ·
@@ -499,13 +584,66 @@ aceitável — P1-10 da auditoria) ·
 **Check:** `exclui_vizinhos_adjacentes` — o trimestre de referência não é vizinho de si mesmo; a
 exclusão dos 2 trimestres anteriores é verificada no teste da feature (CA-085).
 
+### 5.2a `RegimeNeighborsV3Schema` — a lente completa (F-021, **D-u**)
+
+Acrescentado ao fim de `packages/shared/schemas/regimes.py`. PK
+`(quarter_ref, rank, metrica, k_usado, restrito_pos_2016, somente_passado)`, **21** colunas: as de
+`RegimeNeighborsSchema` mais `quarter_t_mais_1`, `somente_passado`, `status_regime_v1_neighbor`,
+`rho_shrinkage`, as 5 features em unidade original e `regime_v1_neighbor` **anulável**.
+
+> **Por que existem DOIS artefatos de vizinhos — e qual F-022/F-024 devem ler.**
+> `RegimeNeighborsSchema.regime_v1_neighbor` é `nullable=False`, e por **D-m** 16 trimestres não
+> têm quadrante V1. A tabela de contrato só pode conter vizinho **com rótulo**, e isso custa **4
+> dos 8** vizinhos de `2026Q3` (Jaccard **0,33** contra a lente completa) — perde 2006-2009
+> inteiro, inclusive a crise, **sem que a tabela diga que perdeu**.
+>
+> **→ F-022 e F-024 leem `data/canonical/regime_neighbors_v3.parquet`**, lente
+> `metrica=mahalanobis`, `k_usado=8`, `somente_passado=False`, `restrito_pos_2016=False`. As outras
+> 23 combinações são **sensibilidade**. `data/canonical/regime_neighbors.parquet` existe para
+> satisfazer CA-089 e **não** é a resposta. Tornar a coluna anulável é alteração de schema
+> existente ⇒ **feature classe C própria**, registrada como dívida em `TODO.md §6` (**D-u**).
+>
+> O retorno de `T+1` **não** está em nenhum dos dois schemas: junte `quarter_t_mais_1` com
+> `asset_returns_quarterly.quarter` — ou, melhor, **importe** `retornos_em_t_mais_1` e
+> `ranking_de_ativos` de `regimes_v3.py`, que já fazem isso com `n`, mediana, erro-padrão e as duas
+> flags. `asset_returns_quarterly` está em **fração** e `macro_quarterly` em **por cento** (D-o).
+
+> **Estado medido em 2026-10-11:** `regime_neighbors_v3.parquet` **9.692 × 21**, **77**
+> referências com vetor completo, `sha256 5241f275…`; `regime_neighbors.parquet` **5.500 × 11**,
+> `sha256 eb101c5a…`. Mahalanobis com shrinkage de **Ledoit-Wolf** medido (`rho = 0,259874`,
+> condicionamento 8,26 → 3,97), implementado em numpy puro. Exclusão de vizinhança **simétrica**
+> (`T±1`, `T±2`) — CA-085 fala só dos anteriores, mas sem a simetria o vizinho rank 1 de quase
+> todo trimestre seria `T+1`, autocorrelação trivial. Os **8 vizinhos de `2026Q3`** são
+> `2006Q3 · 2006Q4 · 2006Q1 · 2024Q3 · 2014Q4 · 2007Q1 · 2024Q2 · 2014Q3`, e a variante **sem
+> nenhum look-ahead** dá a **mesma lista** (Jaccard 1,0). **D-s não mudou nada aqui** (lista,
+> distâncias e ranking byte-idênticos): nenhuma das 5 features passa pelo IBC-Br.
+
 ### 5.3 Constantes do contrato (não números soltos no código)
 
 `K_VIZINHOS_PADRAO = 8` · `K_VIZINHOS_SENSIBILIDADE = (5, 8, 12)` ·
-`N_TRIMESTRES_EXCLUIDOS_VIZINHANCA = 2` · `LIMIAR_SELIC_PP = 0.25` · `N_ALERTA = 8` ·
+`N_TRIMESTRES_EXCLUIDOS_VIZINHANCA = 2` · `LIMIAR_SELIC_PP = 0.25` (**D-t:** a desigualdade do
+ciclo é **não estrita**, `|Δ| >= 0,25` é movimento) · `N_ALERTA = 8` ·
 `N_SUPRESSAO = 5` · `LIMIAR_TROCA_REGIME_INOPERANTE = 0.25` ·
+`LIMIAR_CRESCIMENTO_PP = 0.0` · `LIMIAR_ACELERACAO_PP = 0.0` ·
+`MIN_OBS_PADRONIZACAO_EXPANDING = 20` (constante **do módulo** `regimes_v3.py`, não deste contrato
+— dívida em `TODO.md §6`) ·
 `FEATURES_V3 = (z_ibcbr_gap, z_ipca_desvio_meta, z_juro_real_exante, z_inclinacao,
 z_usdbrl_var_12m, z_termos_troca_yoy)`.
+
+> **`FEATURES_V3`: 6 declaradas, 5 usadas** — o de/para medido, publicado em
+> `relatorio_regimes_v3.json → features` para que a comparação seja automática:
+>
+> | declarada | o que roda | por quê |
+> |---|---|---|
+> | `z_ibcbr_gap` | **`focus_pib_ano`** (`z_crescimento_esperado`) | `ibcbr_gap` é nulo em `2026Q3` **por construção** e em `2006Q1..2009Q3` (D-m) — sem vetor para a pergunta do Comitê e sem a crise de 2008. **D-u** |
+> | `z_ipca_desvio_meta` | **`ipca_12m_delta`** | `ipca_desvio_meta` é 100% nula (G-02, a série de metas do CMN não existe no projeto); a aceleração é o eixo que ADR-001 §4 adota |
+> | `z_juro_real_exante` | `juro_real_exante` | — |
+> | `z_inclinacao` | **`inclinacao_real_5a_3a`** | **D-i/D-n**: a 5a−1a tem 39,8% de nulos; a 5a−3a (95,25%) é a principal e é lida de `raw_series` |
+> | `z_usdbrl_var_12m` | `usdbrl_var_12m` | — |
+> | `z_termos_troca_yoy` | **CORTADA** | `termos_troca_yoy` é **100% nula** em `macro_quarterly`: nenhum índice de termos de troca foi extraído. O proxy IC-Br do BCB (SGS 27574/27575) é escopo de **F-037**. Preencher seria dado inventado (Anti-SPEC §10.1.1) |
+>
+> `n_features = 5` é publicado na linha (`RegimeNeighborsSchema.n_features ∈ {3,4,5,6}`): o corte é
+> **declarado no dado**, nunca silencioso.
 
 ---
 

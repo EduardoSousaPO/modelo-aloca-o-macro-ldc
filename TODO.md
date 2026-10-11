@@ -6,13 +6,18 @@
 > **v3.2 — Feedback Hardened + Project Wiki:** cada feature B/C/D traz o **Feature Contract inline**
 > (DoR + escopo + arquivos + CAs + testes + matriz). Features A podem ter apenas a descrição mínima.
 
-**Última revisão:** 2026-10-11 (fechamento documental da Onda 2, parte 1)
-**Fase:** **Onda 2 — camada canônica (classe C)**. Ondas 0 e 1 concluídas e **aprovadas** no QA
-(9 features em §3) · **40 features mapeadas** · publicação segue travada por ADR-001
+**Última revisão:** 2026-10-11 (fechamento da **Onda 3, parte 1**: F-018, F-019, F-021 + os P1 dos
+dois QAs da Onda 2)
+**Fase:** **Onda 3 — regimes (classe C)**, parte 1 fechada. Ondas 0, 1 e 2 **aprovadas** no QA
+(F-013..F-017 e F-010 com QA independente, 0 × P0) · **40 features mapeadas** · publicação segue
+travada por ADR-001
 **Tipo:** ferramenta interna (dados / quant — não SaaS, não web, roda local)
-**Foco atual:** §1 Em andamento = **F-013, F-014, F-016** implementadas e aguardando
-QA/revisão numérica, com **F-015, F-017 e F-010** em implementação em paralelo. `data/canonical/`
-existe: 62 séries, 278.439 linhas, catálogo de 138 séries
+**Foco atual:** §1 Em andamento = **F-018, F-019, F-021** implementadas e aguardando QA/revisão
+numérica independente. `data/canonical/` tem **20** artefatos: 62 séries, 278.439 linhas, catálogo
+de 138 séries, as **duas** materializações de `macro_quarterly` e as **duas** lentes de regime
+(V1 e V3)
+**Próximo:** **F-022** (métricas regime × ativo — a junção em `RegimesSchema`, D-r) e a **Onda 4**
+(F-020 V2, F-023 heatmap, F-024 ranking, F-028 limitações)
 
 ---
 
@@ -57,40 +62,62 @@ qualquer mudança na camada canônica — ver `AGENTS.md §2`.
 
 > Máximo 2 itens simultâneos. Se tiver mais, você está dispersando.
 
-**Onda 2 IMPLEMENTADA, QA pendente (2026-10-11).** A **Onda 1 está completa e aprovada**: QA
-independente em dois lotes (`docs/plans/qa/ONDA-1-QA-A.md`, `ONDA-1-QA-B.md`), **0 × P0**, e as 7
-features de extração desceram para **§3 Concluído**. As **6** features da Onda 2 estão
-**implementadas e aguardando QA/revisão numérica independente**:
+**Onda 3 parte 1 IMPLEMENTADA, QA pendente (2026-10-11).** A **Onda 2 está completa e aprovada**:
+QA independente em dois lotes (`docs/plans/qa/ONDA-2-QA-A.md` = F-014/F-015,
+`ONDA-2-QA-B.md` = F-016/F-017), **0 × P0**, com a revisão numérica reconstruindo as camadas por
+fora e achando **igualdade exata em float64**. As 6 features da Onda 2 estão registradas em
+**§3 Concluído**; o Feature Contract de cada uma fica em §2 como referência de CAs e testes. As **3** features da Onda 3 parte 1 estão **implementadas e aguardando QA**:
 
 | Feature | O que entregou | Estado |
 |---|---|---|
-| **F-013** | `raw_series` + catálogo materializado | `MUDANÇAS_SOLICITADAS` do QA atendidas em `3265499` — **re-QA pendente** |
-| **F-014** | `alinhado_trimestral` (régua temporal única) | QA pendente |
-| **F-016** | curva: 11 séries, **D-i** | QA pendente |
-| **F-010** | Focus/Olinda: 5 EntitySets, 197 séries, 150.120 linhas | QA pendente · **D-k, D-p, D-q** |
-| **F-015** | `macro_quarterly` **83 × 42** + `macro_quarterly_provenance` (2.548) | QA + **revisão numérica** pendentes · **D-m, D-n, D-o** |
-| **F-017** | `asset_returns_quarterly` **1.963 × 16**, 24 ativos | QA + **revisão numérica** pendentes · **D-l, D-o** |
+| **F-018** | `macro_quarterly_asof` **83 × 42** + `macro_quarterly_asof_provenance` (**2.552**, com `date_obs`/`lag_dias`) + `relatorio_asof.json` | QA + **revisão numérica** pendentes · acréscimo de schema (**D-w**) |
+| **F-019** | `regimes_v1{,_asof}.parquet` **83 × 18**, 67 classificados, 16 `INDETERMINADO` | QA + **revisão numérica** pendentes · **D-r**, **D-s** |
+| **F-021** | `regime_neighbors_v3.parquet` **9.692 × 21** + `regime_neighbors.parquet` **5.500 × 11** | QA + **revisão numérica** pendentes · **D-u** |
 
-**Próximo passo: Onda 3 — regimes** (F-019 V1 → F-020 V2 → F-021 V3 → F-022 métricas). Os insumos
-estão prontos e são os dois artefatos de F-015/F-017; ver `docs/wiki/modules/regimes.md`.
+**Os 5 P1 dos QAs da Onda 2 foram absorvidos neste fechamento** (todos em **D-s/D-t/D-v**):
+QA-A P1-1 (IBC-Br média do trimestre → **D-s**, 7 quadrantes trocam) · QA-A P1-2 (borda do limiar
+da Selic → **D-t**, 7 trimestres) · QA-A P1-3 (`exigir_series` cego a `alinhado_trimestral` →
+corrigido + teste) · QA-A P1-4 (`versao_build` dependia do fim de linha → normalizado + 2 testes) ·
+QA-B P1-1 (janela do CDI ≠ caminho do ativo → **limitação declarada**, cálculo intacto). QA-A P1-5
+(`macro_quarterly` reescrito durante o QA) está resolvido: o rebuild abaixo é de **árvore limpa**.
 
-**`data/canonical/` depois do rebuild sincronizado de 2026-10-11** (ordem obrigatória:
-`build_raw_series` → `alinhamento` → `macro_quarterly` → `retornos`, todos `--offline`; `curva`
-roda **antes**, porque escreve em `data/processed/`), **2 rodadas com hashes idênticos**:
+**Próximo passo: F-022** (métricas regime × ativo + a junção em `RegimesSchema`, que **D-r**
+delegou) e a **Onda 4** (F-020 V2, F-023 heatmap, F-024 ranking, F-028 limitações). Os insumos de
+F-022 são `regime_neighbors_v3.parquet` (lente principal, **D-u**), `regimes_v1.parquet` e
+`asset_returns_quarterly.parquet`; ver `docs/wiki/modules/regimes.md`.
+
+**`data/canonical/` depois do rebuild encadeado de árvore limpa de 2026-10-11** (ordem obrigatória,
+todos `--offline`: `build_raw_series` → `alinhamento` → `macro_quarterly` → `asof` → `retornos` →
+`regimes_v1` (revised **e** asof) → `regimes_v3`; `curva` roda **antes de tudo**, porque escreve em
+`data/processed/`), **2 rodadas com hashes idênticos nos 20 artefatos**:
 
 | Artefato | Estado medido | `sha256` |
 |---|---|---|
-| `raw_series.parquet` | **278.439** linhas · **62** séries · 1979-12-31 → 2026-10-10 · **7** tabelas excluídas (D-k) | `0d23df7a…` |
-| `series_catalog.parquet` | **138 × 26** · 62 presentes · 59 cobrem 1T2006 | `f56f207e…` |
-| `alinhado_trimestral.parquet` | **4.038** linhas · 49 séries · 83 trimestres · 215 ffill · 7 nulos | `ac0d9842…` |
-| `macro_quarterly.parquet` | **83 × 42** · `revised` · 5 colunas 100% nulas · 16 nulos em `ibcbr_gap` | `dcded731…` |
-| `macro_quarterly_provenance.parquet` | **2.548** linhas · 32 colunas · 20 séries | `4a582c1d…` |
-| `asset_returns_quarterly.parquet` | **1.963** linhas · **24** ativos · 83 trimestres | `ab61eeca…` |
+| `raw_series.parquet` | **278.439** linhas · **62** séries · 1979-12-31 → 2026-10-10 · **7** tabelas excluídas (D-k) | `0d23df7a…` *(inalterado)* |
+| `series_catalog.parquet` | **138 × 26** · 62 presentes · 59 cobrem 1T2006 | `f56f207e…` *(inalterado)* |
+| `alinhado_trimestral.parquet` | **4.038** linhas · 49 séries · 83 trimestres · 215 ffill · 7 nulos | `c66f09a5…` |
+| `macro_quarterly.parquet` | **83 × 42** · `revised` · 5 colunas 100% nulas · 16 nulos em `ibcbr_gap` · **D-s** | `bcb31e92…` |
+| `macro_quarterly_provenance.parquet` | **2.548** linhas · 32 colunas · 20 séries | `aa8d427a…` |
+| `macro_quarterly_asof.parquet` | **83 × 42** · `asof` · 27 colunas idênticas / 10 mudam | `85e8ec67…` |
+| `macro_quarterly_asof_provenance.parquet` | **2.552** linhas · 32 colunas · `date_obs`+`lag_dias` em todas · **0** com look-ahead | `a5b2eaef…` |
+| `asset_returns_quarterly.parquet` | **1.963** linhas · **24** ativos · 83 trimestres | `c055ac81…` |
+| `regimes_v1.parquet` | **83 × 18** · `revised` · 67 classificados · REC 19 · EXP 19 · EST 16 · DES 13 | `b74f8d67…` |
+| `regimes_v1_asof.parquet` | **83 × 18** · `asof` · 67 classificados · EXP 21 · REC 17 · EST 16 · DES 13 | `6e922165…` |
+| `regime_neighbors_v3.parquet` | **9.692 × 21** · 77 referências · lente principal (**D-u**) | `5241f275…` |
+| `regime_neighbors.parquet` | **5.500 × 11** · pool restrito de CA-089 · **não** é a resposta | `eb101c5a…` |
 
-Os 4 `relatorio_*.json` têm `versao_build` **conferido contra o código em disco** (`e48262bb…`,
-`ae18c930…`, `5cd7bdaf…`, `20b812f2…`). Decisões da onda: **D-h (opção a)**, **D-i**, **D-j** (parte
-1) e **D-k..D-q** (parte 2) — todas em `DECISIONS_LOG §2.3`, **provisórias**, com o que precisa de
-ratificação do Edu tabulado em **§4**.
+> **Os hashes de `alinhado_trimestral`, `macro_quarterly*` e `asset_returns_quarterly` mudaram sem
+> que uma célula de dado mudasse por outro motivo que D-s.** `versao_build` passou a normalizar o
+> fim de linha (**D-v b**, P1-4 do QA), então `fonte_versao` mudou em **toda** a camada canônica.
+> `raw_series` e `series_catalog` **não** têm coluna de versão e saíram byte-idênticos — é a
+> contraprova de que o dado bruto não se moveu. `asset_returns_quarterly`: só `fonte_versao`
+> (valores conferidos). `alinhado_trimestral`: só `fonte_versao`. `macro_quarterly`: `fonte_versao`
+> **+ as 3 colunas de `ibcbr_*`** (D-s).
+
+Os 8 `relatorio_*.json` carregam `versao_build` conferido contra o código em disco. Decisões da
+onda anterior: **D-h (a)**, **D-i**, **D-j**, **D-k..D-q**; desta: **D-r..D-x** — todas em
+`DECISIONS_LOG §2.3`, **provisórias onde mudam número**, com o que precisa de ratificação do Edu
+tabulado em **§4**.
 
 **Consolidação da Onda 1 — o que mudou depois dos 7 relatórios** (decisões D-a..D-h, todas
 registradas em `docs/plans/DECISIONS_LOG.md §2.1` como **provisórias, aval de Edu pendente**):
@@ -176,7 +203,7 @@ divergência explicada + reconstrução completa de `data/canonical/`.
 > de cada uma — inclusive as notas de ajuste de caminho/nome de arquivo — fica no histórico do git
 > (até o commit `3265499`); o conhecimento permanente está em `docs/wiki/modules/`.
 
-### [~] F-010 — Extrator Focus (BCB Olinda / OData v4) — **implementada — QA pendente**
+### [x] F-010 — Extrator Focus (BCB Olinda / OData v4) — **QA APROVADO (ver §3)**
 
 > **Estado (2026-10-11):** implementada, **QA pendente**. `data/processed/focus/` com **5
 > EntitySets**, **197 `series_id`**, **150.120 linhas**, **0,00%** de nulos, 2004-01-02 →
@@ -303,7 +330,7 @@ filtro de `baseCalculo` único; normalização de nomes de campo; enumeração d
 
 ---
 
-### [~] F-013 — Camada `raw_series` + `series_catalog` materializado — **classe C** — **implementada — QA/revisão numérica**
+### [x] F-013 — Camada `raw_series` + `series_catalog` materializado — **classe C** — **QA APROVADO (ver §3)**
 
 > **Estado (2026-10-11):** implementada; o QA independente deu **`MUDANÇAS_SOLICITADAS`**
 > (`docs/plans/qa/ONDA-2-QA-F013.md`: 3 × P1, 7 × P2, **0 × P0**, com o número central confirmado) e
@@ -369,7 +396,7 @@ independente** (quem escreveu não confere).
 
 ---
 
-### [~] F-014 — Alinhamento trimestral (fim de período, ffill <= 5 d.u.) — **classe C** — **implementada — QA/revisão numérica**
+### [x] F-014 — Alinhamento trimestral (fim de período, ffill <= 5 d.u.) — **classe C** — **QA APROVADO (ver §3)**
 
 > **Estado (2026-10-11):** implementada, **QA pendente**. Materializa a tabela intermediária
 > **`alinhado_trimestral`** (`data/canonical/alinhado_trimestral.parquet`, **4.038** linhas · 49
@@ -472,11 +499,11 @@ colunas, 11 checks de DataFrame), `packages/shared/schemas/__init__.py` (+1 impo
 
 ---
 
-### [~] F-015 — `macro_quarterly` com 83 trimestres — **classe C** — **implementada — QA/revisão numérica**
+### [x] F-015 — `macro_quarterly` com 83 trimestres — **classe C** — **QA APROVADO (ver §3)**
 
 > **Estado (2026-10-11):** implementada, **QA e revisão numérica independente pendentes**.
 > `macro_quarterly.parquet` com **83 × 42** (`2006Q1..2026Q3`, materialização **`revised`**,
-> `sha256 dcded731…`), a companheira `macro_quarterly_provenance.parquet` com **2.548** linhas
+> `sha256 bcb31e92…` depois do rebuild de fechamento da Onda 3; era `dcded731…`), a companheira `macro_quarterly_provenance.parquet` com **2.548** linhas
 > (**32** colunas rastreáveis, **20** séries de origem, CA-120 por anti-join nas **duas** direções)
 > e `relatorio_macro.json` com nulos **por coluna com motivo**, unidades, 4 canários, bloco
 > anti-look-ahead e a sensibilidade do hiato. 2 rodadas byte-idênticas.
@@ -547,12 +574,12 @@ exportados e nenhuma constante nova foi necessária).
 
 **Anti-SPEC específica:** §10.1.1, §10.4.24.
 **Extra de classe C:** diff numérico + reconstrução + revisão independente — **o material da revisão
-está em `docs/wiki/context/F-015.md §5`** (4 canários conferidos na fonte, diff numérico por conta
+está no `ONDA-2-QA-A.md` e no relatório** (4 canários conferidos na fonte, diff numérico por conta
 independente, reprodução cruzada por F-017, hashes de 2 rodadas).
 
 ---
 
-### [~] F-016 — Curva: vértices fixos interpolados + inclinação — **classe C** — **implementada — QA/revisão numérica**
+### [x] F-016 — Curva: vértices fixos interpolados + inclinação — **classe C** — **QA APROVADO (ver §3)**
 
 > **Estado (2026-10-11):** implementada, **QA pendente**. Grava **11** séries em
 > `data/processed/curva/` (5.436 linhas cada, `fonte=DERIVADO`) + `relatorio_curva.json`, e já entrou
@@ -630,11 +657,11 @@ substituição de fonte), §10.3.14 (nada pago).
 
 ---
 
-### [~] F-017 — `asset_returns_quarterly`: retornos, excesso sobre CDI e real — **classe C** — **implementada — QA/revisão numérica**
+### [x] F-017 — `asset_returns_quarterly`: retornos, excesso sobre CDI e real — **classe C** — **QA APROVADO (ver §3)**
 
 > **Estado (2026-10-11):** implementada, **QA e revisão numérica independente pendentes**.
 > `asset_returns_quarterly.parquet` com **1.963 linhas** · **24** ativos · 83 trimestres
-> (`sha256 ab61eeca…`) + `relatorio_retornos.json` (cobertura por ativo, nulos **por coluna com
+> (`sha256 c055ac81…` depois do rebuild de fechamento da Onda 3; era `ab61eeca…`, e só `fonte_versao` mudou) + `relatorio_retornos.json` (cobertura por ativo, nulos **por coluna com
 > motivo**, CDI e IPCA por trimestre em `bases_por_trimestre`, as 11 convenções em texto).
 > **`USDBRL` entrou por D-l** (+83 linhas, `is_total_return = False` declarado no catálogo — câmbio
 > não tem carrego): é o que RF-038 precisa, e a PTAX já tinha os 83 trimestres alinhados. Os **8**
@@ -715,17 +742,18 @@ níveis, CDI por acumulação, excesso/real por razão, métricas intra, relató
 **Anti-SPEC específica:** §10.2.13 (razão), §10.2.12 (TR vs. PR), §10.1.1, §10.2.11 (Sharpe não é
 implementável).
 **Extra de classe C:** diff numérico + reconstrução + revisão independente — **o material da revisão
-está em `docs/wiki/context/F-017.md §5`**, e §6 lista onde o cálculo pode estar errado **sem o teste
+está no `ONDA-2-QA-B.md` e no relatório**, que listam onde o cálculo pode estar errado **sem o teste
 pegar** (9 itens, para o Validation Mode).
 
 ---
 
-### [ ] F-018 — Regra anti-look-ahead + materializações `asof` / `revised` — **classe C**
+### [~] F-018 — Regra anti-look-ahead + materializações `asof` / `revised` — **classe C** — **implementada — QA pendente**
 
 - **Risco:** **C** · **CI alvo:** N2 · **Branch:** `feat/anti-look-ahead`
 - **Cobre:** RF-025 · e-mail: base metodológica
-- **CAs da SPEC:** CA-072, CA-073, CA-074
+- **CAs da SPEC:** CA-072, CA-073, CA-074 (+ CA-010)
 - **Depende de:** F-015
+- **Context pack (vivo até o QA aprovar):** `docs/wiki/context/F-018.md`
 
 **DoR específica** — [x] `lag_divulgacao_dias` no catálogo para todas as séries; [x] regra definida
 (PIB/IBC-Br de T−1; IPCA do penúltimo mês de T; Focus/Selic/curva/câmbio livres);
@@ -736,8 +764,33 @@ pegar** (9 itens, para o Validation Mode).
 explícito se > 25%.
 **Excluído:** relatório completo de divergência de classificação (→ F-034, fase 2).
 
-**Arquivos:** `apps/pipeline/transform/asof.py`, `tests/unit/test_asof.py`,
-`tests/integration/test_divergencia_lookahead.py`.
+**Arquivos REAIS** (os do contrato eram `apps/pipeline/transform/asof.py`,
+`tests/unit/test_asof.py`, `tests/integration/test_divergencia_lookahead.py` — divergência
+sancionada em **D-x**, `apps/pipeline/transform/` não existe na árvore):
+`apps/pipeline/canonical/asof.py` (1.353 L) · `tests/unit/test_canonical_asof.py` (**35** testes) ·
+`tests/contract/test_asof_contract.py` (**22** testes) ·
+`packages/shared/schemas/macro_quarterly.py` (**acréscimo** de
+`MacroQuarterlyAsofProvenanceSchema`, subclasse) · `packages/shared/schemas/__init__.py` (1 export).
+
+**Notas do fechamento:**
+- **a regra:** o valor de `(T, coluna)` é o da última observação cuja **divulgação**
+  (`date_obs + lag_divulgacao_dias`, lag **inteiro do `series_catalog`**: PIB 60, IBC-Br 45, IPCA 10,
+  resto 0) é `<= quarter_end(T)`. Série sem lag resolvível **para** o build (`LagDesconhecido`) —
+  assumir 0 reintroduziria o look-ahead que a materialização existe para eliminar.
+- **duas peças novas de código e só duas** (`observacoes_asof` e `deslocar_acumulados`); todo o
+  resto é **importado de F-015 sem adaptação**, e é isso que faz a reprodução da `revised` na mesma
+  rodada conferir **3.071 células, 0 divergências, `max |dif| = 0,0`** contra o Parquet em disco.
+- **CA-072 é verificável no Parquet publicado**, não só no código: a procedência `asof` publica
+  `date_obs` e `lag_dias`, e o teste de acervo junta as duas tabelas e exige
+  `date_obs + lag_dias <= quarter_end` nas **2.552** linhas. O build **para** se uma violar.
+- **CA-074 acionado:** o proxy de quadrante troca em **22 de 66** trimestres = **33,33%** (era
+  29,85%/20-67 antes de **D-s**), acima dos 25%. O número **oficial** é o de F-019 e é o mesmo.
+- **D-s chegou depois:** o nível trimestral do IBC-Br é a média dos 3 meses, e média de trimestre é
+  deslocada por `deslocar_acumulados` (a régua dos fluxos, reusada) — não por `observacoes_asof`.
+  Consequência medida e **afirmada em teste**: `ibcbr_yoy` da `asof` em `T` **é** o da `revised` em
+  `T-1`, por construção.
+- **acréscimo de schema** (`MacroQuarterlyAsofProvenanceSchema`): subclasse, nunca alteração — o
+  schema de F-015 é `strict=True`. Registrado em `CONTRACTS.md §3.1` (**D-w**).
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -745,17 +798,27 @@ explícito se > 25%.
 | % de troca de regime é calculado e exposto | integration | CA-073 |
 | % > 25% → texto afirma que o modelo não é operacional | unit | CA-074 |
 | tabela nunca mistura `asof` e `revised` | contract negativo | CA-072 |
+| `lag = 0` reproduz a régua de F-015 célula a célula | unit | CA-072 |
+| série sem `lag_divulgacao_dias` **para** o build | unit negativo | CA-072 |
+| derivada é **recalculada**, não a coluna do `revised` deslocada | unit negativo | CA-072 |
+| `ibcbr_yoy` da `asof` = o do `revised` de `T-1` (consequência de **D-s**) | unit | CA-072 |
+| 2 rodadas → `sha256` idêntico nos 3 artefatos | unit | CA-121 |
+| o módulo de produção **não lê o relógio** | unit | CA-121 |
 
 **Anti-SPEC específica:** §10.2.7 (look-ahead sem flag é proibido).
-**Extra de classe C:** diff numérico + reconstrução + revisão independente.
+**Extra de classe C:** diff numérico + reconstrução + revisão independente — **feito**: a
+reconstrução da `revised` na mesma rodada é conferida **célula a célula e sem tolerância** contra o
+artefato de F-015 em disco (`conferir_contra_revised_em_disco`), e divergência **para** o build.
 
 ---
 
-### [ ] F-019 — Regimes V1 (quadrantes crescimento × inflação) — **classe C**
+### [~] F-019 — Regimes V1 (quadrantes crescimento × inflação) — **classe C** — **implementada — QA pendente**
 
 - **Risco:** **C** · **CI alvo:** N2 · **Branch:** `feat/regimes-v1`
 - **Cobre:** RF-027, RF-030, RF-031 · e-mail: **A1, A2** + objetivo
-- **CAs da SPEC:** CA-078..081, CA-088, CA-090, CA-091
+- **CAs da SPEC:** CA-078..081, CA-088, CA-090, CA-091 (+ CA-072/073/074 na parte que vem de F-018,
+  + CA-108/109)
+- **Context pack (vivo até o QA aprovar):** `docs/wiki/context/F-019.md`
 - **Decisão provisória que carrega:** `[PROVISÓRIO D1, D3]` — ADR-001.
   **Item de DoR bloqueante da publicação:** enquanto ADR-001 estiver em **Proposta**,
   `especificacao_congelada = False` e o número **não vai ao Comitê** (gate da classe D).
@@ -769,8 +832,36 @@ herança do trimestre anterior, `n_obs_regime_v1`, `alerta_n_baixo`, `fonte_vers
 `versao_especificacao`.
 **Excluído:** V1b vs. Focus (→ F-033); V2 (→ F-020); V3 (→ F-021).
 
-**Arquivos:** `apps/pipeline/analysis/regimes_v1.py`, `tests/unit/test_regimes_v1.py`,
-`tests/contract/test_regimes_schema.py`, `docs/wiki/modules/regimes.md`.
+**Arquivos REAIS** (o contrato dizia `apps/pipeline/analysis/regimes_v1.py`,
+`tests/unit/test_regimes_v1.py`, `tests/contract/test_regimes_schema.py` — divergência sancionada
+em **D-x**): `apps/pipeline/canonical/regimes_v1.py` (1.142 L) ·
+`tests/unit/test_canonical_regimes_v1.py` (**84** testes) ·
+`tests/contract/test_regimes_v1_contract.py` (**39** testes) ·
+`packages/shared/schemas/regimes.py` (**acréscimo** ao fim: `RegimesV1Schema`, `StatusRegimeV1`,
+`MotivoIndeterminado`, 7 constantes, `COLUNAS_V1_DE_REGIMES`) ·
+`packages/shared/schemas/__init__.py` (10 nomes) · `docs/wiki/modules/regimes.md`.
+
+**Notas do fechamento:**
+- **grava `regimes_v1.parquet`, não `regimes.parquet`** (**D-r**): `RegimesSchema` é o contrato da
+  tabela completa e exigiria inventar coluna de outra lente, inventar quadrante, ou **alterar**
+  schema (pausa). A junção é **F-022**, e há teste que existe só para avisar
+  (`test_regimes_schema_continua_recusando_regime_v1_nulo`).
+- **67 classificados / 16 `INDETERMINADO`** (`2006Q1..2009Q3` + `2026Q3`, todos `GAP_AUSENTE` por
+  **D-m** — a crise de 2008 inteira fica fora do eixo de crescimento, e isso vai à F-028).
+  `regime_v1` **nulo** + `status_regime_v1` + `motivo_indeterminado`, nunca estimativa.
+- **distribuição pós-D-s: REC 19 · EXP 19 · EST 16 · DES 13** (era EXP 20 · REC 17 · EST 15 · DES
+  15 com o IBC-Br em fim de período). CA-080 fecha: 4 quadrantes povoados, todos em [10, 35],
+  desbalanceamento **1,46×**, nenhuma flag de `n` acesa. **7** trimestres mudaram de quadrante com
+  D-s, e exatamente os 7 que o QA previu: 2013Q2, 2013Q3, 2013Q4, 2020Q1, 2023Q3, 2024Q1, 2025Q2.
+- **0 desempates na rodada real** — nenhum eixo é exatamente 0 nos 83, então CA-079 é hoje só uma
+  regra de borda coberta por teste sintético. Sensibilidade ±0,1 pp no limiar: **1** trimestre
+  (1,20%) na `revised`, 4 (4,82%) na `asof`.
+- ⚠️ **CA-074 acionado — é o achado que sobe ao Comitê:** **22 de 66 trimestres = 33,33%** trocam
+  de rótulo entre `revised` e `asof` (era 29,85%), acima do limiar de **25%**. Pelo critério
+  escrito a V1 **não é operacional na forma `asof`** e **H-03 do PRD cai**; a leitura descritiva
+  (RF-027) segue válida. Vai à **página de limitações (F-028)** e ao slide, não a nota de pé.
+- **`especificacao_congelada = False` nas 83 linhas**, lido do **status do ADR-001 em disco** com
+  falha fechada: nada daqui é publicável (CA-090).
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -780,10 +871,18 @@ herança do trimestre anterior, `n_obs_regime_v1`, `alerta_n_baixo`, `fonte_vers
 | `n` por quadrante entre 10 e 35, senão alerta | unit | CA-080 |
 | ADR-001 em Proposta ⇒ `especificacao_congelada=False` | unit | CA-090 |
 | ajuste posterior nasce como `V1.1`, sem sobrescrever | unit | CA-091 |
+| classificação de `T` não muda quando **todo** o futuro muda | unit | CA-078 |
+| entrada fora de ordem é **recusada** (a herança de CA-079 lê `T-1`) | unit negativo | CA-079 |
+| tabela nunca mistura `asof` e `revised` | contract negativo | CA-072 |
+| os 4 canários do acervo, conferidos à mão contra `macro_quarterly` | unit (acervo) | CA-078 |
+| eixo de crescimento invertido **erraria** 2015Q4 | unit negativo | CA-078 |
 
 **Anti-SPEC específica:** §10.2.9 (não ajustar a especificação depois de ver os retornos), §10.2.10
 (descritivo, não preditivo).
-**Extra de classe C:** diff numérico + reconstrução + revisão independente.
+**Extra de classe C:** diff numérico + reconstrução + revisão independente — **parcial**: não há
+versão anterior de `regimes_v1` para diferenciar (é a 1ª materialização), e `g_score`/`pi_score`
+são a célula de `macro_quarterly` **bit a bit**. O diff que existe é `revised` × `asof` (22/66) e o
+diff **vs. a régua anterior do IBC-Br** (7 quadrantes, D-s). A reconstrução independente é do QA.
 
 ---
 
@@ -816,26 +915,56 @@ corte conta como `CORTE`; `regime_v2` = `v1 + "_" + ciclo`; `n` visível em toda
 
 ---
 
-### [ ] F-021 — Regimes V3 (vizinhos mais próximos) + retorno em T+1 — **classe C**
+### [~] F-021 — Regimes V3 (vizinhos mais próximos) + retorno em T+1 — **classe C** — **implementada — QA pendente**
 
 - **Risco:** **C** · **CI alvo:** N2 · **Branch:** `feat/regimes-v3`
-- **Cobre:** RF-029, RF-030, RF-036 · e-mail: objetivo literal ("momentos semelhantes")
-- **CAs da SPEC:** CA-084..087, CA-089, CA-101, CA-102
-- **Decisão provisória que carrega:** `[PROVISÓRIO D1]` — ADR-001 (V3 é o diferencial)
+- **Cobre:** RF-029, RF-030, RF-031, RF-036 · e-mail: objetivo literal ("momentos semelhantes")
+- **CAs da SPEC:** CA-084..087, CA-088/089, CA-090/091, CA-101, CA-102
+- **Decisão provisória que carrega:** `[PROVISÓRIO D1]` — ADR-001 (V3 é o diferencial) · **D-u**
 - **Depende de:** F-015, F-016 (curva), F-017
+- **Context pack (vivo até o QA aprovar):** `docs/wiki/context/F-021.md`
 
 **DoR específica** — [x] 6 features definidas (`FEATURES_V3` no schema); [x] k=8 + sensibilidade
 (5, 12); [x] plano B se a curva não ficar pronta (5 features, declarado);
-[ ] `scipy`/`scikit-learn` para Ledoit-Wolf: **confirmar se já há dependência** — se precisar
-adicionar, exige **ADR** (`AGENTS.md §12`).
+[x] `scipy`/`scikit-learn` para Ledoit-Wolf: **não há** no ambiente e **nenhuma dependência foi
+adicionada** — o estimador foi implementado **à mão em numpy** no próprio módulo, o que dispensa o
+ADR de §10.4.25 e mantém o shrinkage **medido** (`rho = 0,259874`) em vez de parametrizado.
 
 **Escopo incluído:** z-score na amostra completa; Mahalanobis com shrinkage Ledoit-Wolf; Euclidiana em
 paralelo; exclusão dos 2 trimestres anteriores; desempate pelo mais recente; variante `V3-pos2016`;
 saída `regime_neighbors` + retorno de cada ativo nos trimestres **seguintes** aos vizinhos.
 **Excluído:** clustering/HMM (→ F-039); otimização de carteira (fora de escopo, D11).
 
-**Arquivos:** `apps/pipeline/analysis/regimes_v3.py`, `tests/unit/test_regimes_v3.py`,
-`tests/contract/test_regime_neighbors.py`.
+**Arquivos REAIS** (o contrato dizia `apps/pipeline/analysis/regimes_v3.py`,
+`tests/unit/test_regimes_v3.py`, `tests/contract/test_regime_neighbors.py` — divergência sancionada
+em **D-x**): `apps/pipeline/canonical/regimes_v3.py` (1.565 L) ·
+`tests/unit/test_canonical_regimes_v3.py` (**45** testes) ·
+`tests/contract/test_regimes_v3_contract.py` (**39** testes) ·
+`packages/shared/schemas/regimes.py` (**acréscimo** ao fim: `RegimeNeighborsV3Schema`, 6
+constantes, `indice_do_quarter`) · `packages/shared/schemas/__init__.py` (3 nomes).
+
+**Notas do fechamento:**
+- **5 features em z-score, não 6** (`FEATURES_V3` tem 6 declaradas): `focus_pib_ano` (substitui
+  `z_ibcbr_gap`, **D-u**), `ipca_12m_delta`, `juro_real_exante`, `inclinacao_real_5a_3a` (D-i/D-n),
+  `usdbrl_var_12m`; **`termos_troca_yoy` cortada** porque é 100% nula (G-02 / F-037) — preencher
+  seria dado inventado. O de/para está em `CONTRACTS.md §5.3` e em
+  `relatorio_regimes_v3.json → features`, para a comparação ser automática.
+- **o eixo de crescimento é `focus_pib_ano`** (**D-u**, ratificado provisoriamente): `ibcbr_gap` é
+  nulo em `2026Q3` **por construção**, e `2026Q3` é a pergunta do Comitê. Nenhuma alternativa
+  (D-m `min_periods=8`, `ibcbr_yoy` sem tendência) resolve `2026Q3`.
+- **dois artefatos de vizinhos, e F-022/F-024 leem o `_v3`** (**D-u**):
+  `regime_neighbors.parquet` (5.500 × 11) satisfaz CA-089 mas perde **4 dos 8** vizinhos de
+  `2026Q3` porque `regime_v1_neighbor` é `nullable=False` e 16 trimestres não têm quadrante (D-m).
+  Dívida de schema em **§6**.
+- **os 8 vizinhos de `2026Q3`:** `2006Q3 · 2006Q4 · 2006Q1 · 2024Q3 · 2014Q4 · 2007Q1 · 2024Q2 ·
+  2014Q3`. A variante **sem nenhum look-ahead** dá a **mesma lista** (Jaccard 1,0) — o achado mais
+  forte da feature. **D-s não mudou nada aqui**: lista, distâncias e ranking byte-idênticos.
+- **exclusão de vizinhança simétrica** (`T±1`, `T±2`): CA-085 fala só dos anteriores, mas sem a
+  simetria o vizinho rank 1 de quase todo trimestre seria `T+1` — autocorrelação trivial.
+  Declarado em `relatorio_regimes_v3.json → exclusao_de_vizinhanca.simetrica`.
+- **`n = 8` não distingue quase nada**: erro-padrão de 2,5 a 5 pp, e só `INDX` (+5,04%) chega perto
+  de 2 ep. `IFIX` e `IMOB` têm `n = 4` ⇒ `conclusao_suprimida` (CA-109). A linguagem é
+  **descritiva** por contrato (§10.2.10) e o gate de publicação é `False` (ADR-001 em Proposta).
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -845,10 +974,15 @@ saída `regime_neighbors` + retorno de cada ativo nos trimestres **seguintes** a
 | k=5, 8 e 12 produzidos; divergência reportada | integration | CA-087 |
 | PK de `regime_neighbors` e `metrica` no enum | contract | CA-089 |
 | retorno medido em **T+1** dos vizinhos, não nos vizinhos | unit | CA-102 |
+| distância recalculada em **numpy puro dentro do teste**, no acervo real | unit (acervo) | CA-084 |
+| variante `somente_passado` não usa nenhuma informação futura | unit | CA-101 |
+| ADR-001 em Proposta ⇒ gate de publicação `False` | contract | CA-090 |
 
 **Anti-SPEC específica:** §10.2.9 (não escolher k pelo resultado), §10.2.10, §10.4.25 (dependência nova
-exige ADR).
-**Extra de classe C:** diff numérico + revisão independente.
+exige ADR — **nenhuma foi adicionada**).
+**Extra de classe C:** diff numérico + revisão independente — **feito em parte**: o rótulo V1 de
+anotação é conferido contra `regimes_v1.parquet` de F-019 (**83 trimestres, 0 divergências**) e as
+24 combinações de lente são o diff interno. A reconstrução independente é do QA.
 
 ---
 
@@ -1259,6 +1393,50 @@ Convenções da onda (D-a..D-h) em `DECISIONS_LOG §2.1`; permanente em `docs/wi
 > P2-3 do lote B), `vintage` em data **UTC** não comparável entre features (P2-5) e os markers de
 > `tests/` (P2-6) também em §6.
 
+**Onda 2 — a camada canônica (2026-10-11, classe C).** QA independente em dois lotes por **dois
+subagentes distintos**, nenhum deles implementador: `docs/plans/qa/ONDA-2-QA-A.md` (F-014, F-015) e
+`docs/plans/qa/ONDA-2-QA-B.md` (F-016, F-017). **0 × P0 nos dois lotes.** O método foi o que a
+classe C exige: o revisor **reimplementou a régua do zero**, sem importar o módulo sob teste, e
+comparou **célula a célula e sem tolerância**. Decisões da onda (D-i..D-q) em `DECISIONS_LOG §2.3`;
+permanente em `docs/wiki/modules/canonical.md` e `modules/focus.md`.
+
+- [x] **F-013 — `raw_series` + `series_catalog` materializado** —
+      `apps/pipeline/canonical/build_raw_series.py`: 278.439 linhas, 62 séries, catálogo 138 × 26.
+      **QA: MUDANÇAS_SOLICITADAS → APROVADO após `3265499`** — P1-1 (`versao_build` era cego ao
+      catálogo: editar `series_catalog_data.py` mudava o Parquet sem mudar a versão) e P1-2
+      (`calendario` não chegava ao materializado) resolvidos. O **resto do P1-1** — o hash dependia
+      do fim de linha do checkout — só foi fechado agora, em **D-v (b)**
+- [x] **F-014 — Alinhamento trimestral (fim de período, ffill ≤ 5 d.u.)** —
+      `apps/pipeline/canonical/alinhamento.py` + `alinhado_trimestral.parquet` (artefato **novo**,
+      `CONTRACTS.md §8`). **QA: APROVADO** — o revisor reconstruiu a régua inteira (grade, 3
+      calendários, ffill em dias úteis, limite de 5, painel desbalanceado) e conferiu **4.038
+      células com 0 divergências**; build em scratch saiu **byte-idêntico** ao publicado. Os 215
+      ffill são **todos** B3, **todos** 4º trimestre, **exatamente 1 d.u.** (D-h); os 7 nulos têm
+      lacuna de 65/42 d.u. e `date_obs` nulo
+- [x] **F-015 — `macro_quarterly` 83 × 42 + procedência por célula** —
+      `apps/pipeline/canonical/macro_quarterly.py`. **QA: APROVADO** — **22 colunas** recalculadas
+      por conta independente com **`max |dif| = 0,0`** (igualdade exata em float64, não
+      tolerância), padrão de nulos idêntico, procedência bidirecional **0/0**, anti-look-ahead
+      **0 violações** em 2.515 `date_obs` reconstruídas, 4 canários conferidos na fonte. **5 P1
+      abertos pelo lote A foram absorvidos no fechamento da Onda 3** (D-s, D-t, D-v)
+- [x] **F-016 — Curva: vértices fixos interpolados + inclinação (11 séries, D-i)** —
+      `apps/pipeline/canonical/curva.py`. **QA: APROVADO** — o revisor recalculou **as 11 séries ×
+      5.436 datas a partir do CSV bruto** com igualdade **exata** e 0 divergências de nulidade, as
+      duas coberturas de D-i ao centésimo (60,53% e 95,25%), e fez validação **externa**: o
+      breakeven **por razão** reproduz a coluna "Inflação Implícita" da **própria ANBIMA** com erro
+      máx **0,010 bp**, enquanto a subtração erra até **37,2 bps**
+- [x] **F-017 — `asset_returns_quarterly`: retornos, excesso sobre CDI e real** —
+      `apps/pipeline/canonical/retornos.py`: 1.963 × 16, 24 ativos. **QA: APROVADO** — `ret_tri`,
+      CDI, IPCA, excesso, real, `vol` e `dd` reproduzidos por fora com **igualdade exata**; canário
+      CDI 2006 = **15,027140%** em 249 d.u.; **2ª fonte independente** (SGS 4389, outra unidade,
+      base 252) a **2,8e-05 pp**; razão ≠ subtração comprovada (média 0,139 pp, máx 1,495 pp).
+      1 × P1 (**janela do CDI ≠ caminho do ativo**) virou **limitação declarada** em **D-v (c)**
+- [x] **F-010 — Extrator Focus (BCB Olinda / OData v4)** —
+      `apps/pipeline/extract/bcb_focus.py`: 5 EntitySets, 197 séries, 150.120 linhas.
+      **QA: APROVADO** (lote A da Onda 2, em conjunto com F-015, que é a única consumidora).
+      Decisões **D-k** (o Focus fica fora de `raw_series`: os `series_id` são compostos por
+      horizonte e não são entradas do catálogo), **D-p** e **D-q**
+
 ---
 
 ## 4. Bloqueios
@@ -1315,7 +1493,7 @@ O que isso muda e o que **não** muda:
       `test_inclinacao_real_5a_3a_e_a_que_fecha_ca025`) e **a SPEC não foi editada** (`AGENTS.md §8`).
       **Quem decide:** Edu — e **ADR-004 §3 nomeia a 5a−1a como principal**, então o ADR precisa de
       uma **nota editorial** quando for aceito. As duas alternativas recusadas ficam registradas em
-      `docs/wiki/context/F-016.md §4.3`: usar a inclinação **nominal** 5a−1a como principal (97,57%,
+      `DECISIONS_LOG §2.3` (D-i): usar a inclinação **nominal** 5a−1a como principal (97,57%,
       mas inverte ADR-004 §3) ou manter como está e declarar que ~40% dos trimestres podem cair num
       dia sem valor.
 
@@ -1354,6 +1532,35 @@ O que isso muda e o que **não** muda:
 | **D-p** | `FOCUS_PIB_TOTAL` → `status: descartada` (G-04 resolvido) | orquestrador | nenhuma consequência numérica: a série nunca foi extraída por essa entrada |
 | **D-q** | Achados do Focus registrados: G-04, G-05, exceção a **D-a**, `%20` × `+`, `ibcbr_yoy` em fim de período | registro de **achado**, não escolha | só (e) é reversível: trocar `ibcbr_yoy` para média do trimestre muda os 83 `ibcbr_gap` |
 
+### Aceites das decisões da Onda 3, parte 1 (D-r..D-x, 2026-10-11)
+
+> Registradas em `DECISIONS_LOG §2.3` (parte 3) com data e **"aguarda Edu"** onde couber. Nenhuma
+> toca SPEC, PRD, Anti-SPEC ou o e-mail de escopo. **D-s, D-t e D-u mudam número publicado** e são
+> as que precisam de ratificação:
+
+| # | Decisão | Quem decide | O que acontece se o Edu discordar |
+|---|---|---|---|
+| **D-s** | **`ibcbr_yoy` = média dos 3 meses do trimestre**, não fim de período (metodologia §2, QA-A P1-1) | **Edu** — muda o eixo de crescimento da V1 | voltar ao fim de período é 1 linha + rebuild da cadeia; devolve a distribuição EXP 20 · REC 17 · EST 15 · DES 15 e **7 trimestres** mudam de quadrante de volta (2013Q2-Q4, 2020Q1, 2023Q3, 2024Q1, 2025Q2). Travado por teste e canário |
+| **D-t** | **ciclo Selic: `\|Δ\| >= 0,25 pp` é movimento** (desigualdade não estrita), QA-A P1-2 | **Edu** | voltar à desigualdade estrita é 2 caracteres + rebuild; devolve CORTE 29 · NEUTRO 30 · ALTA 24 e põe os cortes reais de 25 bps de **2024Q2/Q3** em `NEUTRO`. Travado por 2 testes |
+| **D-u** | **eixo de crescimento da V3 = `focus_pib_ano`** (substitui `z_ibcbr_gap`); `regime_v1_neighbor` segue `nullable=False` e **F-022/F-024 leem `regime_neighbors_v3.parquet`** | **Edu** (o eixo) + orquestrador (o schema) | sem o Focus a V3 **não tem vetor para `2026Q3`**, que é a pergunta do Comitê, e perde 2006-2009. Tornar a coluna anulável é feature **classe C** própria (§6) |
+| **D-r** | F-019 grava `regimes_v1.parquet` (`RegimesV1Schema`, acréscimo), junção em `RegimesSchema` delegada a **F-022** | orquestrador (**aceita**) | as 3 alternativas são inventar dado ou **alterar** schema ⇒ pausa |
+| **D-v** | as 3 correções dos P1 dos QAs: `exigir_series` também contra `alinhado_trimestral`; `versao_build` normaliza o fim de linha; janela do CDI vira **limitação declarada** | orquestrador (**aceita**) | nada a desfazer — são guardas e uma declaração; `fonte_versao` de **toda** a camada mudou uma vez, de propósito |
+| **D-w** | `CONTRACTS.md` atualizada com o estado medido (2 materializações de procedência, `RegimesV1Schema`, `RegimeNeighborsV3Schema`, `FEATURES_V3` 6/5) | orquestrador (**aceita**) | só texto |
+| **D-x** | paths em `apps/pipeline/canonical/` em vez de `transform/`/`analysis/` | orquestrador (**aceita**) | `git mv` + imports, zero linha de lógica |
+
+> ⚠️ **ITEM PARA O COMITÊ, não para o Edu decidir: a V1 NÃO É OPERACIONAL na forma `asof`.**
+> A troca de rótulo entre `revised` e `asof` é **33,33% (22/66)** — era **29,85% (20/67)** antes de
+> D-s —, acima do limiar de **25%** de **CA-074** e de `metodologia §5.1`. Pelo critério escrito, a
+> leitura **operacional** ("em que quadrante estamos agora, com o que se sabia na época") cai, e com
+> ela a hipótese **H-03 do PRD**; a leitura **descritiva** (RF-027, "em que quadrante cada trimestre
+> do histórico caiu") continua válida e é o entregável. Isso **tem** de ir à página de limitações
+> (**F-028**) e ao slide do Comitê — não a nota de pé. As saídas possíveis, nenhuma escolhida aqui:
+> (a) assumir a V1 como **descritiva** e dizer isso; (b) trocar o eixo de crescimento por um menos
+> sensível à defasagem (PIB t/t dessaz., ou surpresa vs. Focus = **V1b/F-033**); (c) regime
+> **mensal** na fase 2. Mecanicamente o motivo é conhecido: `ibcbr_gap` é um hiato pequeno (mediana
+> `|g| ≈ 2 pp`) sobre média móvel de 20 trimestres, e deslocar o IBC-Br de um trimestre troca o
+> sinal com facilidade.
+
 ### Aceites formais pendentes dos ADRs da camada canônica (2026-10-11)
 
 > **Desenvolvimento liberado, aceite formal pendente** — a autorização do Edu de 2026-10-10
@@ -1377,6 +1584,18 @@ O que isso muda e o que **não** muda:
       no 4T), **provisória**. Custo medido: **215** células de 4.038 (5,325%), 11 séries `B3_API`, 20
       trimestres, **zero** ffill de 2..5. Travada no contrato pelo check
       `quarter_end_unico_por_trimestre`: virar para (b) é mudança de schema, não de código.
+      **Consequência medida depois (QA-B P1-1, D-v c):** é D-h que faz a janela do CDI divergir do
+      caminho do ativo em 1 a 3 d.u. em **599 das 1.857** linhas com excesso — viés médio de
+      **0,0185 pp** e **máx 0,1575 pp** no `ret_excesso_cdi`. Limitação **declarada**, cálculo
+      intacto.
+- [ ] **ADR-001 (lente de regime oficial: V1 quadrantes + aceleração) — `Proposta`.** É o **único**
+      gate duro de publicação: `especificacao_congelada` é lido do **status do ADR em disco**, com
+      falha fechada, então hoje F-019 e F-021 publicam `BLOQUEADO — ESPECIFICAÇÃO NÃO CONGELADA` nas
+      83 linhas e **nenhum número de regime é publicável** (CA-090, `AGENTS.md §14`). O dia em que o
+      Edu virar **D1/D3** e aceitar o ADR, **um rebuild** muda as 83 linhas — zero linha de código.
+      O aceite precisa absorver **três** notas: **D-s** (eixo de crescimento sobre a média do
+      trimestre), **D-t** (desigualdade do ciclo Selic) e o achado de **CA-074** acima, que é
+      material para o §Consequências do próprio ADR.
 
 > **8 decisões de Edu/Alexandre seguem abertas** (bloqueavam o início da implementação — ver o estado de
 > 2026-10-10 acima). Origem: `docs/product/PRD.md §13.2`
@@ -1596,10 +1815,11 @@ orquestrador ou de Edu, não bug):
   lá (ou um passo novo no orquestrador de F-029), **zero** efeito em dado, porque as views são
   `SELECT * FROM read_parquet(...)` sobre Parquet já escrito. Mesma dívida de
   `alinhado_trimestral`, acima.
-- **`ciclo_selic` é função publicada, não coluna.** O rótulo mora em `RegimesSchema` (F-019) e o
+- **`ciclo_selic` é função publicada, não coluna.** O rótulo mora em `RegimesSchema` (F-020) e o
   insumo (`selic_meta_delta`) em `macro_quarterly`; a função `ciclo_selic(delta_pp)` vive no módulo
-  de F-015 e o relatório publica a distribuição medida (`CORTE 29 · NEUTRO 30 · ALTA 24`,
-  `sem_delta 0`). Quem implementar F-020 **importa a função**, não reimplementa o limiar.
+  de F-015 e o relatório publica a distribuição medida — **`CORTE 34 · NEUTRO 23 · ALTA 26`,
+  `sem_delta 0`** desde **D-t** (era 29/30/24 com a desigualdade estrita). Quem implementar F-020
+  **importa a função**, não reimplementa o limiar.
 - **Limitação medida do schema wide:** `coerce=True` roda **antes** do check de nulidade, então um
   `None` em `vertice_extrapolado` entra como `False` em vez de ser rejeitado — e `False` significa
   "nenhum vértice faltou", o **oposto** da ausência. Está travado em teste
@@ -1610,7 +1830,67 @@ orquestrador ou de Edu, não bug):
   `asset_returns_quarterly` (fração) publicam `cdi_tri`/`ipca_tri` com o **mesmo nome**. Não há bug
   hoje (F-017 nunca lê `macro_quarterly`; `max |macro − 100 × retornos| = 0,0`), mas o próximo
   consumidor que cruzar as duas erra por 100x. Caminho da fase 2: consumidor único, ou sufixo de
-  escala no nome.
+  escala no nome. **F-021 já é esse consumidor** e resolve na mão: o ranking sai em **fração** e o
+  relatório declara.
+
+**Dívidas da Onda 3, parte 1 — F-018, F-019 e F-021** (nenhuma bloqueia o QA; todas são escolha do
+orquestrador, não bug):
+
+- **`regime_v1_neighbor` é `nullable=False` e por isso existem DOIS artefatos de vizinhos (D-u).**
+  `RegimeNeighborsSchema` só admite vizinho **com rótulo** V1, e por **D-m** 16 trimestres não têm
+  quadrante — então `regime_neighbors.parquet` (5.500 × 11, o de contrato) perde **4 dos 8**
+  vizinhos de `2026Q3` (Jaccard **0,33**), inclusive 2006-2009 e a crise, **sem que a tabela diga
+  que perdeu**. A saída recomendada é tornar a coluna **anulável** com uma coluna de status, como
+  F-019 fez em `RegimesV1Schema`: aí os dois artefatos colapsam num só e
+  `regime_neighbors_v3.parquet` deixa de existir. É **alteração de schema existente ⇒ feature
+  classe C própria**, e não foi feita. Até lá, **F-022/F-024 leem o `_v3`** (regra escrita em
+  `CONTRACTS.md §5.2a`) e a perda vai à página de limitações (**F-028**).
+- **`MIN_OBS_PADRONIZACAO_EXPANDING = 20` é constante nova do módulo `regimes_v3.py`, não do
+  contrato.** Não vem de `CONTRACTS.md §5.3`: é a janela que ADR-001 §4 já usa para tendência,
+  reaproveitada como "história suficiente" para a variante `somente_passado` do z-score. Afeta
+  **só** essa variante (19 referências a menos); a lente principal não depende dela. Se o
+  orquestrador preferir 12 ou 24, é 1 constante — mas o lugar certo é o contrato.
+- **`lag_divulgacao_dias` é defasagem típica em DIAS CIVIS e não foi auditado release a release.**
+  Os valores do catálogo (PIB 60, IBC-Br 45, IPCA 10) vêm do texto da metodologia, não do
+  calendário real de divulgação do IBGE/BCB. Se o IBGE atrasar um release específico, a `asof`
+  **daquele** trimestre é otimista. Arredondar para cima é conservador (descarta informação, nunca
+  cria look-ahead), mas a auditoria não foi feita. Um extrator do calendário de divulgação
+  resolveria — fora do escopo do e-mail.
+- **A perna de `vintage` da `asof` é degenerada.** `raw_series` tem **1 safra por série** (medido:
+  0 de 62 com mais de um `vintage`), então a `asof` respeita a **divulgação** mas usa a série
+  **revisada de hoje**: o efeito de look-ahead publicado é um **piso**, não o total — a revisão
+  anual do PIB não está nele. Declarado em `relatorio_asof.json → limitacoes.vintage_unico`.
+  Agrava: `selecionar_vintage` é hoje **inalcançável**, porque a guarda `validar_frequencia_nativa`
+  de F-013 roda antes e um `raw_series` com 2 safras da mesma série levanta `FrequenciaNaoNativa`
+  (P2-2 do QA-A). Capturar safras exige recoleta periódica — fase 2.
+- **`catalogo_sha256` NÃO normaliza o fim de linha** (resíduo de **D-v b**). `versao_build` passou a
+  normalizar; `catalogo_sha256` continua hasheando `read_bytes()` cru de `series_catalog_data.py`,
+  porque é um hash **diagnóstico** de um arquivo só ("o catálogo mudou?") e há teste que o compara
+  com o sha do arquivo em disco. Consequência: esse campo do `relatorio_build.json` ainda difere
+  entre um checkout CRLF e um LF. Não afeta `fonte_versao` de nenhum Parquet. 2 linhas quando
+  alguém for mexer.
+- **`n_obs_regime_v1` é estatística da AMOSTRA INTEIRA, de propósito.** A leitura descritiva é
+  "onde estamos no histórico" (metodologia §2, princípio 4), e o relatório publica
+  `anti_look_ahead.n_e_estatistica_da_amostra_inteira = true`. Quem usar `regimes_v1.parquet` para
+  **backtest** precisa recalcular `n` em janela **expanding** — e backtest está fora de escopo
+  (Anti-SPEC §10.3.16). Travado por `test_remover_linhas_futuras_muda_n_mas_nao_rotulo`.
+- **CA-079 (desempate por herança) só é exercitado em sintético:** **0 desempates** na rodada real,
+  porque nenhum eixo é exatamente `0.0` nos 83 trimestres — o que se espera de um float derivado de
+  razão. Se alguém mudar a regra de herança, **nenhum número publicado muda** e só o teste
+  sintético pega.
+- **A exclusão de vizinhança da V3 é simétrica (`T±1`, `T±2`) e CA-085 fala só dos anteriores.**
+  Sem a simetria o vizinho rank 1 de quase todo trimestre seria `T+1` — autocorrelação trivial,
+  exatamente o que CA-085 quer evitar. Registrado em
+  `relatorio_regimes_v3.json → exclusao_de_vizinhanca.simetrica = true`; voltar à leitura literal é
+  1 linha, e aí a lente descritiva muda muito.
+- **`ldc.duckdb` continua sem view das 7 tabelas novas** (`alinhado_trimestral`, `macro_quarterly*`,
+  `asset_returns_quarterly`, `regimes_v1*`, `regime_neighbors*`) — mesma dívida já listada acima,
+  agora maior. `construir_duckdb` vive em `build_raw_series.py`; o lugar certo é o orquestrador de
+  **F-029**.
+- **`FEATURES_V3` tem 6 nomes e a rodada usa 5.** `termos_troca_yoy` é 100% nula (G-02 / F-037) e
+  foi **cortada**, com `n_features = 5` declarado **na linha**. O de/para está em
+  `CONTRACTS.md §5.3` e em `relatorio_regimes_v3.json → features`, para a comparação ser
+  automática. Não há guarda que impeça alguém de reintroduzir a feature nula.
 
 ---
 

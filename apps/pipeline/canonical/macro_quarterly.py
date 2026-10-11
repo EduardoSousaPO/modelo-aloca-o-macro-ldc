@@ -25,6 +25,9 @@ O que este módulo faz, e **só** isto:
    em vez de uma segunda verdade.
 4. **Deriva** as variações (a/a por razão, t/t por razão), a **aceleração** do IPCA 12m, a
    **tendência** (média móvel de 20 trimestres) e o **hiato** do IBC-Br, e o `vertice_extrapolado`.
+   O nível trimestral do IBC-Br é a **média dos 3 meses** do trimestre (`MEDIAS`,
+   `media_por_trimestre`, **D-s**), não o último mês — é o que a metodologia §2 escreve e o que o
+   P1-1 do QA da Onda 2 mediu como diferença de **quadrante** em 7 dos 67 trimestres.
 5. **Acumula no trimestre** o que é fluxo e não ponto — `ipca_tri` (3 meses de `BCB_SGS_433`),
    `cdi_tri` (`BCB_SGS_12`) e `selic_over_tri` (`BCB_SGS_11`) — por **produto geométrico**, nunca
    soma, e só quando o trimestre está **completo** (contagem de observações igual à contagem de dias
@@ -351,7 +354,9 @@ ORIGENS: dict[str, Origem] = {
     ),
     "ibcbr_yoy": Origem(
         "BCB_SGS_24364",
-        "(v[T] / v[T-4] - 1) * 100 sobre o IBC-Br **com** ajuste sazonal, fim de período",
+        "(v[T] / v[T-4] - 1) * 100 sobre o IBC-Br **com** ajuste sazonal, com v[T] = **média "
+        "aritmética dos 3 meses do trimestre** (`obs = media_3m`; metodologia §2 'IBC-Br: média "
+        "do trimestre', **D-s**). Trimestre com menos de 3 meses → nulo, nunca média parcial",
         "%",
     ),
     "ibcbr_yoy_trend": Origem(
@@ -527,6 +532,23 @@ ACUMULADAS: dict[str, str] = {
     "cdi_tri": "BCB_SGS_12",
 }
 
+SERIE_DO_IBCBR = "BCB_SGS_24364"
+"""IBC-Br **com** ajuste sazonal (SGS 24364), índice mensal — o insumo do eixo de crescimento."""
+
+#: Colunas cujo nível trimestral é a **média dos meses do trimestre**, não o último mês (**D-s**).
+#:
+#: `docs/research/metodologia-regimes-macro.md §2` diz, literalmente, que o IBC-Br trimestral é a
+#: "média do trimestre". A implementação original lia o **fim de período** (o mês de março/junho/
+#: setembro/dezembro), e o QA da Onda 2 (lote A, **P1-1**) mediu o custo: `max |dif|` de
+#: **4,26 pp** em `ibcbr_yoy`, **4,31 pp** no hiato e **7 dos 67 trimestres trocando o sinal do
+#: hiato** — logo trocando de quadrante na V1. D-s adota a média; `pib_yoy` fica como está (o PIB
+#: do SIDRA já é trimestral na fonte, não há o que mediar).
+MEDIAS: dict[str, str] = {
+    "ibcbr_yoy": SERIE_DO_IBCBR,
+    "ibcbr_yoy_trend": SERIE_DO_IBCBR,
+    "ibcbr_gap": SERIE_DO_IBCBR,
+}
+
 MOTIVO_TRIMESTRE_INCOMPLETO = "trimestre_incompleto_para_acumulacao"
 MOTIVO_SEM_LAG = "sem_trimestre_de_referencia_na_grade"
 MOTIVO_JANELA_CURTA = "janela_da_media_movel_incompleta"
@@ -631,20 +653,28 @@ def acumulacao_geometrica(valores_percentuais: Sequence[float] | pd.Series) -> f
 def ciclo_selic(delta_pp: float | None, *, limiar: float = LIMIAR_SELIC_PP) -> str | None:
     """Ciclo de política monetária do trimestre, a partir de `selic_meta_delta`.
 
-    Regra do contrato (`CONTRACTS.md §5.3`, `LIMIAR_SELIC_PP = 0,25`; metodologia §2 V2):
-    `delta < -limiar` → `CORTE` (cortando) · `delta > +limiar` → `ALTA` (subindo) ·
-    caso contrário → `NEUTRO` (parada). `None` entra e sai `None` — trimestre sem delta não tem
-    ciclo, e chamar isso de `NEUTRO` inventaria uma pausa que ninguém mediu.
+    Regra (`LIMIAR_SELIC_PP = 0,25`; metodologia §2 V2, **com a correção de D-t**):
+    `delta <= -limiar` → `CORTE` (cortando) · `delta >= +limiar` → `ALTA` (subindo) ·
+    `|delta| < limiar` → `NEUTRO` (parada). `None` entra e sai `None` — trimestre sem delta não
+    tem ciclo, e chamar isso de `NEUTRO` inventaria uma pausa que ninguém mediu.
+
+    **A desigualdade é não estrita desde D-t (2026-10-11).** A leitura literal da metodologia
+    (`< -0,25` / `> +0,25`) punha **7** trimestres com `|Δ| = 0,25` exato em `NEUTRO`, entre eles
+    **2024Q2 e 2024Q3**, que são cortes reais de 25 bps do Copom (P1-2 do QA da Onda 2, lote A).
+    Um movimento de 25 pb é o **menor passo que o Copom dá**: chamá-lo de "parada" rotula como
+    pausa justamente o início e o fim dos ciclos. `|Δ| >= 0,25` conta como movimento; só `Δ`
+    estritamente dentro da banda é parada — e dos `NEUTRO` que sobram, a quase totalidade é
+    `Δ = 0` de fato.
 
     **Não é coluna desta tabela.** `MacroQuarterlySchema` não tem `ciclo_selic`: o rótulo mora em
-    `RegimesSchema` (F-019). A função vive aqui porque o insumo (`selic_meta_delta`) é desta
+    `RegimesSchema` (F-019/F-020). A função vive aqui porque o insumo (`selic_meta_delta`) é desta
     feature, e `relatorio_macro.json` publica a distribuição medida dos 3 estados.
     """
     if delta_pp is None or (isinstance(delta_pp, float) and pd.isna(delta_pp)):
         return None
-    if delta_pp < -limiar:
+    if delta_pp <= -limiar:
         return str(CicloSelic.CORTE)
-    if delta_pp > limiar:
+    if delta_pp >= limiar:
         return str(CicloSelic.ALTA)
     return str(CicloSelic.NEUTRO)
 
@@ -899,6 +929,103 @@ def acumular_por_trimestre(
     return saida
 
 
+def media_por_trimestre(
+    pontos: pd.DataFrame,
+    *,
+    series_id: str,
+    trimestres: Sequence[Trimestre],
+) -> list[Acumulado]:
+    """A **média aritmética** dos meses do trimestre — a régua de nível de `ibcbr_*` (**D-s**).
+
+    `docs/research/metodologia-regimes-macro.md §2`: "IBC-Br: média do trimestre". Um índice de
+    atividade mensal lido no **último mês** do trimestre é o nível de um mês, não do trimestre, e
+    carrega o ruído desse mês inteiro para o eixo de crescimento da V1. O QA da Onda 2 (lote A,
+    P1-1) mediu o custo da leitura de fim de período: `max |dif|` de **4,26 pp** em `ibcbr_yoy`,
+    **4,31 pp** no hiato e **7 dos 67 trimestres trocando o sinal do hiato** — ou seja, trocando
+    de quadrante.
+
+    Mesma janela de `acumular_por_trimestre` — `(alvo(T-1), alvo(T)]` na grade da própria série,
+    semiaberta à esquerda para que nenhum mês conte duas vezes — e **mesma exigência de
+    completude**: 3 observações num trimestre de série mensal. Trimestre com 1 ou 2 meses sai
+    `None` com `MOTIVO_TRIMESTRE_INCOMPLETO` e as duas contagens registradas, em vez de uma média
+    de 1 mês disfarçada de média trimestral (Anti-SPEC §10.1.1). É o que mantém `2026Q3` nulo:
+    o IBC-Br vai até jul/2026, logo o 3º trimestre tem **1 de 3** meses.
+
+    `date_obs_max` é a data do **último** mês que entrou na média — é o que a procedência publica
+    (`obs = media_3m`: uma linha por célula, apontando a observação mais recente consumida), e o
+    que o diagnóstico anti-look-ahead inspeciona. Para esta série, essa data é exatamente a mesma
+    que a leitura de fim de período daria, então nenhuma garantia de CA-072/anti-look-ahead muda.
+
+    Média **aritmética** e não geométrica porque o IBC-Br é um **índice de nível**, não uma taxa:
+    o encadeamento geométrico de `acumular_por_trimestre` vale para fluxo (`ipca_tri`, `cdi_tri`).
+    """
+    fatia = pontos.loc[pontos["series_id"] == series_id]
+    if fatia.empty:
+        return [
+            Acumulado(t.quarter, None, 0, 0, MOTIVO_SERIE_SEM_VALOR, None) for t in trimestres[1:]
+        ]
+    grade = grade_da_serie(series_id, str(fatia["freq"].iloc[0]))
+    if grade != "civil":
+        msg = (
+            f"{series_id}: média do trimestre está definida para série de grade civil (mensal/"
+            f"trimestral); grade recebida = {grade}"
+        )
+        raise SerieInconsistente(msg)
+    serie = (
+        fatia.loc[fatia["value"].notna()].set_index("date")["value"].sort_index().astype("float64")
+    )
+
+    saida: list[Acumulado] = []
+    for anterior, atual in zip(trimestres[:-1], trimestres[1:], strict=True):
+        inicio = pd.Timestamp(anterior.alvo(grade))
+        fim = pd.Timestamp(atual.alvo(grade))
+        janela = serie.loc[(serie.index > inicio) & (serie.index <= fim)]
+        esperado = len(pd.period_range(inicio + pd.Timedelta(days=1), fim, freq="M"))
+        if len(janela) == 0 or len(janela) != esperado:
+            saida.append(
+                Acumulado(
+                    atual.quarter,
+                    None,
+                    int(len(janela)),
+                    int(esperado),
+                    MOTIVO_TRIMESTRE_INCOMPLETO if len(janela) else MOTIVO_SERIE_SEM_VALOR,
+                    None,
+                )
+            )
+            continue
+        saida.append(
+            Acumulado(
+                atual.quarter,
+                float(janela.mean()),
+                int(len(janela)),
+                int(esperado),
+                None,
+                pd.Timestamp(janela.index.max()).date(),
+            )
+        )
+    return saida
+
+
+def medias_no_trimestre(
+    raw: pd.DataFrame, *, trimestres: Sequence[Trimestre]
+) -> dict[str, dict[str, Acumulado]]:
+    """`{series_id: {quarter: Acumulado}}` para as séries de `MEDIAS` — o insumo de `montar_macro`.
+
+    Mesma forma de `acumulados`, de propósito: é o que permite a `asof` (F-018) reusar
+    `deslocar_acumulados` sem uma segunda régua — a média de `T'` passa a ser conhecida quando o
+    **último** mês de `T'` é divulgado, que é a mesma conta dos fluxos.
+    """
+    saida: dict[str, dict[str, Acumulado]] = {}
+    for series_id in sorted(set(MEDIAS.values())):
+        bruto = raw.loc[raw["series_id"] == series_id]
+        pontos = validar_indice_temporal(selecionar_vintage(bruto))
+        saida[series_id] = {
+            a.quarter: a
+            for a in media_por_trimestre(pontos, series_id=series_id, trimestres=trimestres)
+        }
+    return saida
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Montagem da tabela wide + procedência
 # ─────────────────────────────────────────────────────────────────────────────
@@ -943,10 +1070,31 @@ def _coluna(wide: pd.DataFrame, series_id: str, quarters: Sequence[str]) -> pd.S
     return pd.Series(np.nan, index=list(quarters), dtype="float64")
 
 
+def serie_de_medias(
+    medias: Mapping[str, Mapping[str, Acumulado]],
+    series_id: str,
+    quarters: Sequence[str],
+) -> pd.Series:
+    """O nível médio do trimestre da série, na grade pedida — `NaN` onde a média não fechou."""
+    por_quarter = medias.get(series_id, {})
+    return pd.Series(
+        {
+            q: (
+                por_quarter[q].value
+                if q in por_quarter and por_quarter[q].value is not None
+                else np.nan
+            )
+            for q in quarters
+        },
+        dtype="float64",
+    )
+
+
 def montar_macro(
     *,
     observacoes: pd.DataFrame,
     acumulados: Mapping[str, Mapping[str, Acumulado]],
+    medias: Mapping[str, Mapping[str, Acumulado]],
     metadado: Mapping[str, Mapping[str, Any]],
     trimestres: Sequence[Trimestre],
     quarters: Sequence[str],
@@ -958,6 +1106,11 @@ def montar_macro(
     Toda derivada é calculada na grade estendida e **depois** recortada, que é como `T-4` de
     `2006Q1` existe. O recorte é a última operação: nada da janela depende da ordem em que as
     colunas foram montadas.
+
+    `acumulados` traz os **fluxos** (`ipca_tri`, `cdi_tri`, `selic_over_tri`) e `medias` traz os
+    níveis que são **média do trimestre** (`MEDIAS`: hoje só o IBC-Br, **D-s**). Os dois são
+    argumentos e não cálculos internos porque a `asof` (F-018) precisa deslocá-los pela divulgação
+    antes de montar — a montagem é a mesma nas duas materializações.
     """
     todos = [t.quarter for t in trimestres]
     niveis = _niveis_wide(observacoes, todos)
@@ -973,7 +1126,8 @@ def montar_macro(
     # --- crescimento -----------------------------------------------------------------------
     valores["pib_yoy"] = variacao_por_razao(nivel("SIDRA_1620_V583_90707"), 4)
     valores["pib_qoq_sa"] = nivel("SIDRA_5932_V6564_90707")
-    valores["ibcbr_yoy"] = variacao_por_razao(nivel("BCB_SGS_24364"), 4)
+    # D-s: o nível trimestral do IBC-Br é a **média dos 3 meses**, não o último mês.
+    valores["ibcbr_yoy"] = variacao_por_razao(serie_de_medias(medias, SERIE_DO_IBCBR, todos), 4)
     tendencia, gap = hiato_vs_tendencia(valores["ibcbr_yoy"])
     valores["ibcbr_yoy_trend"] = tendencia
     valores["ibcbr_gap"] = gap
@@ -1053,6 +1207,7 @@ def montar_macro(
         macro=macro,
         datas=datas,
         acumulados=acumulados,
+        medias=medias,
         metadado=metadado,
         faltou_vertice=faltou_vertice,
         quarters=janela,
@@ -1108,12 +1263,22 @@ def _montar_procedencia(
     macro: pd.DataFrame,
     datas: pd.DataFrame,
     acumulados: Mapping[str, Mapping[str, Acumulado]],
+    medias: Mapping[str, Mapping[str, Acumulado]],
     metadado: Mapping[str, Mapping[str, Any]],
     faltou_vertice: pd.Series,
     quarters: Sequence[str],
     fonte_versao: str,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Uma linha de procedência por célula **não nula** de coluna rastreável (CA-120)."""
+    """Uma linha de procedência por célula **não nula** de coluna rastreável (CA-120).
+
+    **D-s / `obs = media_3m`:** as colunas de `MEDIAS` consomem 3 observações por trimestre, e a
+    PK `(quarter, column)` admite **uma** linha por célula. A escolha registrada é a **última das
+    3** (`Acumulado.date_obs_max`), exatamente como as colunas de `ACUMULADAS` já faziam: é a
+    observação mais recente consumida, logo é a que torna `date_obs <= quarter_end` (e, na `asof`,
+    `date_obs + lag_dias <= quarter_end`) um limite **superior** verificável no Parquet. As outras
+    duas são os dois meses imediatamente anteriores, derivação determinística da grade — nenhuma
+    informação é perdida, e `relatorio_macro.json → medias_no_trimestre` publica a regra.
+    """
     linhas: list[dict[str, Any]] = []
     diagnostico: list[dict[str, Any]] = []
     indexado = macro.set_index("quarter")
@@ -1147,6 +1312,13 @@ def _montar_procedencia(
             ultima = _datas_consumidas(coluna, quarter, datas)
             if coluna in ACUMULADAS:
                 detalhe = acumulados.get(series_id, {}).get(quarter)
+                ultima = (
+                    pd.Timestamp(detalhe.date_obs_max)
+                    if detalhe is not None and detalhe.date_obs_max is not None
+                    else None
+                )
+            elif coluna in MEDIAS:
+                detalhe = medias.get(series_id, {}).get(quarter)
                 ultima = (
                     pd.Timestamp(detalhe.date_obs_max)
                     if detalhe is not None and detalhe.date_obs_max is not None
@@ -1384,6 +1556,7 @@ def montar_relatorio(
     provenance: pd.DataFrame,
     diagnostico: pd.DataFrame,
     acumulados: Mapping[str, Mapping[str, Acumulado]],
+    medias: Mapping[str, Mapping[str, Acumulado]],
     celulas_conferidas: int,
     motivo_focus: str,
     sensibilidade: Mapping[str, Any],
@@ -1475,13 +1648,48 @@ def montar_relatorio(
             },
         },
         "ciclo_selic": {
-            "regra": f"|delta| <= {LIMIAR_SELIC_PP} pp -> NEUTRO; < -{LIMIAR_SELIC_PP} -> CORTE; "
-            f"> +{LIMIAR_SELIC_PP} -> ALTA",
+            "regra": f"|delta| < {LIMIAR_SELIC_PP} pp -> NEUTRO; <= -{LIMIAR_SELIC_PP} -> CORTE; "
+            f">= +{LIMIAR_SELIC_PP} -> ALTA (D-t: movimento de 25 bps e ciclo, nao parada)",
+            "decisao": (
+                "D-t (2026-10-11), a partir do P1-2 do QA da Onda 2: a desigualdade passou de "
+                "estrita a nao estrita. Com a regra literal da metodologia 2, 7 trimestres com "
+                "|delta| = 0,25 exato saiam NEUTRO, entre eles 2024Q2 e 2024Q3 (cortes reais de "
+                "25 bps). Aguarda ratificacao do Edu."
+            ),
             "distribuicao": {
                 estado: int(sum(1 for c in ciclos if c == estado))
                 for estado in sorted({c for c in ciclos if c is not None})
             },
             "sem_delta": int(sum(1 for c in ciclos if c is None)),
+        },
+        "medias_no_trimestre": {
+            "regra": (
+                "nivel trimestral = media aritmetica dos 3 meses do trimestre, janela "
+                "(fim de T-1, fim de T]; menos de 3 meses -> NULL com motivo, nunca media parcial"
+            ),
+            "decisao": (
+                "D-s (2026-10-11), a partir do P1-1 do QA da Onda 2: metodologia 2 diz 'IBC-Br: "
+                "media do trimestre' e a implementacao lia o fim de periodo. O custo medido da "
+                "leitura antiga foi max|dif| 4,26 pp em ibcbr_yoy, 4,31 pp no hiato e 7 de 67 "
+                "trimestres trocando o sinal do hiato (logo de quadrante na V1). pib_yoy nao "
+                "muda: o PIB do SIDRA ja e trimestral na fonte. Aguarda ratificacao do Edu."
+            ),
+            "procedencia": (
+                "obs = media_3m: uma linha de procedencia por celula, com date_obs = a ULTIMA "
+                "das 3 observacoes (a mais recente consumida), igual ao que ACUMULADAS ja fazia"
+            ),
+            "colunas": sorted(MEDIAS),
+            "series": {
+                series_id: {
+                    "trimestres_com_valor": sum(1 for a in por_q.values() if a.value is not None),
+                    "trimestres_incompletos": sorted(
+                        a.quarter
+                        for a in por_q.values()
+                        if a.motivo_nulo == MOTIVO_TRIMESTRE_INCOMPLETO
+                    ),
+                }
+                for series_id, por_q in sorted(medias.items())
+            },
         },
         "diff_vs_alinhado_trimestral": {
             "celulas_conferidas_sem_tolerancia": celulas_conferidas,
@@ -1508,16 +1716,23 @@ def _motivo_de_nulo_derivado(coluna: str, macro: pd.DataFrame) -> str | None:
     if coluna in ("ibcbr_yoy_trend", "ibcbr_gap"):
         return (
             f"{MOTIVO_JANELA_CURTA}: a média móvel de {N_TRIMESTRES_TENDENCIA} trimestres exige "
-            f"janela cheia e o IBC-Br (SGS 24364) começa em 2004, logo o a/a começa em 2005Q1 — "
-            f"o primeiro hiato possível é 2009Q4. Mais 15 trimestres só com IBC-Br anterior a "
-            f"2004, que não existe. CA-007 **não é satisfazível** com a série real (ver relatório)"
+            f"janela cheia e o IBC-Br (SGS 24364) começa em jan/2004, logo a média do trimestre "
+            f"(D-s) começa em 2004Q1 e o a/a em 2005Q1 — o primeiro hiato possível é 2009Q4. "
+            f"Mais 15 trimestres só com IBC-Br anterior a 2004, que não existe. CA-007 **não é "
+            f"satisfazível** com a série real (ver relatório)"
         )
     if coluna in ACUMULADAS:
         return MOTIVO_TRIMESTRE_INCOMPLETO
-    if coluna in ("pib_yoy", "ibcbr_yoy", "pib_qoq_sa"):
+    if coluna == "ibcbr_yoy":
         return (
-            "PIB (SIDRA, até 2026Q2) e IBC-Br (SGS, até jul/2026) não cobrem 2026Q3: a lacuna "
-            "passa de 5 dias úteis e a célula é NULL por CA-061/CA-067, nunca estimativa (CA-060)"
+            f"{MOTIVO_TRIMESTRE_INCOMPLETO}: o IBC-Br vai até jul/2026, então 2026Q3 tem 1 dos 3 "
+            f"meses e a média do trimestre (D-s) não fecha — NULL com motivo, nunca média "
+            f"parcial (CA-060/CA-061, Anti-SPEC §10.1.1)"
+        )
+    if coluna in ("pib_yoy", "pib_qoq_sa"):
+        return (
+            "PIB (SIDRA, até 2026Q2) não cobre 2026Q3: a lacuna passa de 5 dias úteis e a célula "
+            "é NULL por CA-061/CA-067, nunca estimativa (CA-060)"
         )
     return MOTIVO_SERIE_SEM_VALOR
 
@@ -1590,6 +1805,13 @@ def construir(
     # A guarda de procedência de F-013 na entrada desta camada (CA-055) e o pacote mínimo (CA-076).
     validar_procedencia(raw, declarado)
     exigir_series(fatiar_para_alinhamento(raw)[0], declarado, SERIES_EXIGIDAS)
+    # **D-v (P1-3 do QA da Onda 2).** `exigir_series` contra `raw_series` não cobria o modo de
+    # falha que o QA achou: `alinhado_trimestral` **sem** uma série exigida fazia o build concluir
+    # em silêncio, porque a régua reexpressa em `observacoes_de_fim_de_periodo` cobre a ausência e
+    # só o contador de células conferidas caía (1.328 → 1.245). A feature afirma que "todo nível é
+    # a célula de F-014": então a série exigida tem de estar **nos dois** artefatos, e a ausência
+    # é `BLOQUEADO — FONTE INDISPONÍVEL` (CA-076), não uma reconstrução silenciosa.
+    exigir_series(alinhado, declarado, SERIES_EXIGIDAS)
 
     cal = calendario if calendario is not None else Calendario.do_parquet(raiz=raiz)
     trimestres = grade_estendida(cal, quarters=quarters)
@@ -1673,6 +1895,9 @@ def construir(
             )
         }
 
+    # D-s: o nível trimestral das séries de `MEDIAS` é a média dos 3 meses do trimestre.
+    medias = medias_no_trimestre(raw, trimestres=trimestres)
+
     metadado = metadado_de_procedencia(raw)
     if focus is not None:
         # A procedência aponta para a entrada do **catálogo** (`FOCUS_ANUAIS`,
@@ -1686,6 +1911,7 @@ def construir(
     macro, provenance, diagnostico = montar_macro(
         observacoes=observacoes,
         acumulados=acumulados,
+        medias=medias,
         metadado=metadado,
         trimestres=trimestres,
         quarters=janela,
@@ -1710,14 +1936,14 @@ def construir(
     )
 
     todos = [t.quarter for t in trimestres]
-    ibcbr_yoy_estendido = variacao_por_razao(
-        _coluna(_niveis_wide(observacoes, todos), "BCB_SGS_24364", todos), 4
-    )
+    # D-s: a sensibilidade de `min_periods` é medida sobre o **mesmo** a/a que a tabela publica.
+    ibcbr_yoy_estendido = variacao_por_razao(serie_de_medias(medias, SERIE_DO_IBCBR, todos), 4)
     relatorio = montar_relatorio(
         macro=macro,
         provenance=provenance,
         diagnostico=diagnostico,
         acumulados=acumulados,
+        medias=medias,
         celulas_conferidas=celulas,
         motivo_focus=motivo_focus,
         sensibilidade=sensibilidade_da_tendencia(ibcbr_yoy_estendido, janela),

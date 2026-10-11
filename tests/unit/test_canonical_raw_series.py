@@ -46,6 +46,7 @@ from apps.pipeline.canonical.build_raw_series import (  # noqa: E402
     descobrir_parquets_de_serie,
     exigir_series,
     materializar_catalogo,
+    normalizar_fim_de_linha,
     validar_frequencia_nativa,
     validar_procedencia,
     validar_sem_mistura_de_fontes,
@@ -612,6 +613,55 @@ def test_versao_build_muda_quando_um_schema_do_portao_muda(tmp_path: Path, modul
     alvo = next(c for c in copias if c.name == modulo)
     alvo.write_bytes(alvo.read_bytes() + b"\n# coluna nova\n")
     assert versao_build(copias) != versao_build()
+
+
+# ── P1-4 (QA da Onda 2): `versao_build` nao pode depender do fim de linha ───
+
+
+def test_normalizar_fim_de_linha_colapsa_crlf_e_cr_solto() -> None:
+    """A funcao e a correcao: CRLF e CR solto viram LF, LF fica como esta."""
+    assert normalizar_fim_de_linha(b"a\r\nb\r\n") == b"a\nb\n"
+    assert normalizar_fim_de_linha(b"a\rb") == b"a\nb"
+    assert normalizar_fim_de_linha(b"a\nb\n") == b"a\nb\n"
+    assert normalizar_fim_de_linha(b"") == b""
+
+
+def test_versao_build_e_a_mesma_em_crlf_e_em_lf(tmp_path: Path) -> None:
+    """**P1-4 / D-v:** o mesmo commit tem de dar o mesmo `versao_build` nos dois checkouts.
+
+    `versao_build` hasheava `read_bytes()` cru, entao `fonte_versao` mudava entre um checkout
+    CRLF (Windows, sem `.gitattributes`) e um LF (CI) **sem que uma celula de dado mudasse** —
+    quebrando o passo 4 do gate da classe D (dataset congelado por `sha256` + tag git) e CA-121
+    entre ambientes. O QA mediu isso no artefato publicado: `5cd7bdaf…` em CRLF contra
+    `54c841bb…` em LF, com 2 dos 7 modulos ja em LF no disco.
+
+    Aqui as duas arvores saem do MESMO conteudo logico, so com o fim de linha trocado, e o hash
+    tem de ser identico — e igual ao do disco, qualquer que seja o checkout desta maquina.
+    """
+    em_lf = tmp_path / "lf"
+    em_crlf = tmp_path / "crlf"
+    em_lf.mkdir()
+    em_crlf.mkdir()
+    copias_lf: list[Path] = []
+    copias_crlf: list[Path] = []
+    for origem in caminhos_dos_componentes():
+        corpo_lf = normalizar_fim_de_linha(origem.read_bytes())
+        destino_lf = em_lf / origem.name
+        destino_lf.write_bytes(corpo_lf)
+        copias_lf.append(destino_lf)
+        destino_crlf = em_crlf / origem.name
+        destino_crlf.write_bytes(corpo_lf.replace(b"\n", b"\r\n"))
+        copias_crlf.append(destino_crlf)
+
+    # As duas arvores sao, de proposito, bit-a-bit DIFERENTES em disco.
+    assert any(
+        a.read_bytes() != b.read_bytes() for a, b in zip(copias_lf, copias_crlf, strict=True)
+    )
+    assert versao_build(copias_lf) == versao_build(copias_crlf) == versao_build()
+
+    # ... e normalizar nao e ignorar o conteudo.
+    copias_crlf[0].write_bytes(copias_crlf[0].read_bytes() + b"\r\n# linha nova\r\n")
+    assert versao_build(copias_crlf) != versao_build(copias_lf)
 
 
 def test_relatorio_carrega_catalogo_sha256_e_os_componentes(processed_minimo: Path) -> None:
