@@ -57,96 +57,35 @@ qualquer mudança na camada canônica — ver `AGENTS.md §2`.
 
 > Máximo 2 itens simultâneos. Se tiver mais, você está dispersando.
 
-### [~] F-009 — Job diário de arquivamento ANBIMA (`ms_AAMMDD.txt` + Curva Zero) — **implementada — aguardando QA (`docs/plans/qa/ONDA-0-QA.md`)**
+**Nada em implementação em 2026-10-11 (madrugada).** A Onda 1 fechou as 7 features de extração
+(F-002..F-008) e a consolidação alinhou as convenções divergentes entre elas; as 7 estão
+`[~] implementada — aguardando QA` em §2, e o próximo passo é o **subagente de QA** escrever
+`docs/plans/qa/ONDA-1-QA.md`. Só com o veredito `APROVADO` lá os itens descem para §3.
 
-- **Risco:** B · **CI alvo:** N1 · **Branch:** `data/anbima-arquivamento`
-- **Cobre:** RF-010 · e-mail: **A5, A6**
-- **CAs da SPEC:** CA-027, CA-028, CA-029
-- **Por que é a primeira:** a janela é **rolante (~20 dias úteis)**. Cada dia sem o job é um dia de série
-  proprietária **perdido para sempre** (riscos L6/R3). Não depende de nenhuma decisão humana.
-- **Estado (2026-10-10):** **implementada — aguardando QA**. Veredito do subagente de QA em
-  `docs/plans/qa/ONDA-0-QA.md`; só depois disto o orquestrador move o item para §3. Rodada ao vivo:
-  41 arquivos de dados + 41 manifests arquivados, idempotência e ausência confirmadas na fonte.
-  Pendências que **não** bloqueiam o QA: criar a tarefa agendada (é do Edu, `schtasks` no runbook §3)
-  e migrar a camada HTTP para `apps.pipeline.common` (ver §6).
+**Consolidação da Onda 1 — o que mudou depois dos 7 relatórios** (decisões D-a..D-h, todas
+registradas em `docs/plans/DECISIONS_LOG.md §2.1` como **provisórias, aval de Edu pendente**):
 
-**DoR específica** — [x] URLs e formatos confirmados (`ms{AAMMDD}.txt`, POST `CZ-down.asp`);
-[x] `ausencia_e_caso_normal = True` previsto no `ExtractorConfig`; [x] sem bloqueio.
-
-**Escopo incluído:** download idempotente diário, gravação versionada por data em
-`data/raw/anbima-ms/` e `data/raw/anbima-ettj/`, parse mínimo de validação, log de dia ausente.
-**Excluído:** uso dessas séries no canônico (a curva histórica vem do Tesouro — ADR-004);
-agendador do sistema (o Edu dispara; não há cron no projeto).
-
-**Arquivos (reais, como implementado):** `apps/pipeline/jobs/anbima_daily.py`,
-`tests/unit/test_anbima_daily.py`, `tests/fixtures/anbima-ms/` (`ms__2026-10-09.txt`,
-`ms__erro_html.txt`), `tests/fixtures/anbima-ettj/` (`cz__2026-10-09.csv`, `cz__2026-10-08.csv`,
-`cz__vazio.csv`, `cz__saida_xls_e_html.html`), `docs/wiki/runbooks/job-diario-anbima.md`.
-**Comando:** `python -m apps.pipeline.jobs.anbima_daily --date AAAA-MM-DD --backfill N`
-(também `--fonte ms|cz`; sem argumento = dia de hoje, as duas fontes).
-**Saída:** `data/raw/anbima-ms/ms_AAMMDD.txt` e `data/raw/anbima-ettj/cz_AAMMDD.csv`, cada um com
-manifest `.manifest.json` ao lado.
-
-| Teste | Tipo | Cobre CA |
+| # | Decisão | Onde pegou |
 |---|---|---|
-| rodar 2x no mesmo dia não duplica nem sobrescreve diferente | integration | CA-027 |
-| resposta de 0 bytes / 404 → sucesso com registro | unit negativo | CA-028 |
-| parse do `ms*.txt` (`@`, `skiprows=2`, latin-1, 5 títulos) | contract | CA-029 |
-| `saida=xls` do CZ é HTML → rejeitado por magic bytes | unit negativo | CA-029 |
+| D-a | `date` de série **mensal/trimestral** = **fim de período** civil | F-003 corrigido (`fim_do_periodo`); F-004 já era assim |
+| D-b | `vintage` = **data (sem hora) do `collected_at` do manifesto do bruto**, uniforme | F-002, F-003, F-004, F-005, F-006, F-007 |
+| D-c | glob do `--offline` filtra `*.meta.json` em **todo** extrator | F-002, F-005, F-008 (defensivo); F-003/F-006 não usam glob; F-004/F-007 já filtravam |
+| D-d | catálogo **132 → 134** (`ACWI_BRL`, `SP500_BRL`, `fonte=DERIVADO`) aceito | `CONTRACTS.md §2.1`, `README.md`, `AUDITORIA-HARNESS.md` |
+| D-e | CA-004/CA-005 da SPEC não fecham no dado real → proposta registrada, **SPEC intocada** | §4 deste arquivo |
+| D-f | formato HTML da fonte do calendário **ratificado** + schema migrado para `packages/shared/schemas/calendario.py` | F-008 |
+| D-g | `converter_para_brl`/`carregar_ptax` → `apps/pipeline/transform/cambio.py` | F-007 |
+| D-h | B3 ⊂ ANBIMA em 69 datas (todo 4T precisa 1 d.u. de ffill) | DoR de **F-014** |
 
-**Anti-SPEC específica:** §10.1.3 (janela rolante nunca é backfill), base.
-
----
-
-### [~] F-001 — Infra de extração (cliente HTTP, parsing e guardas) — **implementada — aguardando QA (`docs/plans/qa/ONDA-0-QA.md`)**
-
-- **Risco:** B · **CI alvo:** N1 · **Branch:** `feat/infra-extracao`
-- **Cobre:** RF-049 (e é pré-requisito dos riscos R1, R2, R4, R10-R13 da pesquisa) · e-mail: base de A/B/C
-- **CAs da SPEC:** CA-003, CA-022, CA-035, CA-045, CA-123, CA-124
-
-**DoR específica** — [x] fontes e pegadinhas levantadas em `docs/research/fontes-de-dados.md`;
-[x] `ExtractorConfig` já existe em `packages/shared/schemas/series_catalog.py`; [x] sem bloqueio humano.
-
-- **Estado (2026-10-10):** **implementada — aguardando QA**. Veredito do subagente de QA em
-  `docs/plans/qa/ONDA-0-QA.md`; só depois disto o orquestrador move o item para §3. 108 testes
-  unitários da infra verdes, nenhuma chamada de rede. Decisão aberta remanescente: `--record` em
-  `tests/conftest.py` (ver §6 e `docs/wiki/context/F-001.md §7`).
-
-**Escopo incluído:** cliente HTTP com **User-Agent de browser** em toda requisição, retry com backoff,
-timeout; **validador de shape** (corpo é JSON array? tem chave `error`/`erro`? começa com `<`?);
-**normalizadores de número** — na implementação viraram **dois**, `para_float_ptbr` (`"38.484,84"` → `38484.84`) e `para_float_ponto_decimal`, cada um levantando na convenção do outro (`DECISIONS_LOG §2`); leitor com **encoding explícito**
-por fonte; checagem de **magic bytes** (`PK` = XLSX, `<` = HTML); helper de fatiamento de janela
-(≤ 10 anos); gravação em `data/raw/<fonte>/` e `data/processed/`; **primitiva de cache condicional**
-(`validadores_condicionais(alvo)` lendo ETag/Last-Modified do manifesto + `etag=`/`last_modified=` no
-`ClienteHTTP.get` + `RespostaBruta.nao_modificada` para o 304) — necessária para o arquivo de 14,6 MB
-do Tesouro (R21).
-**Excluído:** a **política** de cache por fonte, isto é, quem revalida, com que frequência e o que
-fazer com o 304 (→ F-030; aqui entra só a primitiva); qualquer extrator concreto.
-
-**Arquivos (reais, como implementado):** `apps/pipeline/common/__init__.py`, `.../http.py`,
-`.../parsing.py`, `.../io_layers.py`, `.../logging_setup.py`, `.../errors.py`,
-`tests/unit/test_common_http.py`, `tests/unit/test_common_parsing.py`,
-`tests/unit/test_common_io_layers.py`, `tests/unit/test_common_errors.py`,
-`tests/fixtures/common/` (+ `README.md` de procedência); `pyproject.toml` ganhou `"apps"` em
-`[tool.hatch.build.targets.wheel] packages`.
-
-> **Ajuste do Feature Contract — renomeação `extract/` → `common/` (2026-10-10).** O contrato original
-> dizia `apps/pipeline/extract/{http,parsing,io_layers}.py`. A implementação ficou em
-> `apps/pipeline/common/` porque: (i) é o caminho que o briefing da Onda 0 e o `# TODO(F-001)` já
-> gravado em `apps/pipeline/jobs/anbima_daily.py` assumem; (ii) deixa `apps/pipeline/extract/` livre
-> para os **extratores concretos** de F-002…F-008, sem misturar infra compartilhada com fonte; e
-> (iii) o nome diz o que o pacote é — infra comum, não um extrator. O import passa a ser
-> `from apps.pipeline.common import X`. Nenhum CA muda. Ver `docs/wiki/context/F-001.md §7`.
-
-| Teste | Tipo | Cobre CA |
-|---|---|---|
-| HTTP 200 com corpo de erro → levanta e não grava | unit negativo | CA-003 |
-| número pt-BR com ponto de milhar converte certo | unit | CA-035 |
-| `.xls` que é XLSX é detectado por magic bytes | unit | CA-030 (pré) |
-| leitor sem `encoding` explícito falha no lint do próprio teste | unit | CA-022 |
-| requisição sem UA é bloqueada por asserção do cliente | unit | CA-045 |
-
-**Anti-SPEC específica:** §10.1.5 (HTTP 200 ≠ sucesso), §10.4.26 (encoding), §10.4.23 (sem rede no CI).
+**Evidência da consolidação:** `ruff check` e `ruff format --check` limpos e **535 testes unitários
+verdes** sem rede; 2 rodadas `--offline` de todos os 8 extratores com **hash idêntico** nos 53
+Parquets; 51 Parquets de `processed_series` com as 8 colunas, `vintage` em formato data uniforme, M/Q
+em fim de período e PK única; SGS 433 × SIDRA `t/1737 v/63` passam a casar por `date` em **273 meses**
+com `max|dif| = 0`, e SGS 22109 × SIDRA `t/1621 v/584` em **90 trimestres** com `max|dif| = 0`
+(antes, 0 linhas casavam por `date`). Os dois últimos deixaram de ser script de sessão e viraram
+teste: **`tests/unit/test_contract_sgs_sidra.py`** (reconciliação entre fontes) e
+**`tests/unit/test_processed_layer_conventions.py`** (varredura de toda série em `data/processed/`).
+Os dois **pulam** quando `data/processed/` está vazio, porque `data/` é reconstruível e fica fora do
+git — é o que permite ao QA rodá-los sem rede e ao CI N1 ignorá-los.
 
 ---
 
@@ -201,7 +140,7 @@ divergência explicada + reconstrução completa de `data/canonical/`.
 
 ## PACOTE MÍNIMO — caminho crítico para 2026-10-14
 
-### [ ] F-002 — Extrator ANBIMA S3: índices IMA (esforço baixo, maior valor/hora)
+### [~] F-002 — Extrator ANBIMA S3: índices IMA — **implementada — aguardando QA (`docs/plans/qa/ONDA-1-QA.md`)**
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `data/anbima-ima`
 - **Cobre:** RF-011 · e-mail: **B1, B2**
@@ -216,8 +155,21 @@ divergência explicada + reconstrução completa de `data/canonical/`.
 **Excluído:** `IMAC` (descontinuado 2021) e `IHFA` (fora do e-mail); reconciliação com SGS 12461-12469
 (fica em F-030 como teste de contrato opcional).
 
-**Arquivos:** `apps/pipeline/extract/anbima_s3.py`, `tests/contract/test_anbima_s3.py`,
-`tests/unit/test_anbima_s3.py`, `tests/fixtures/anbima_s3/*.xlsx`, `docs/wiki/modules/anbima.md`.
+**Arquivos (reais, como implementado):** `apps/pipeline/extract/anbima_s3.py`,
+`apps/pipeline/extract/__init__.py` (docstring do pacote, compartilhado com F-003..F-008),
+`tests/unit/test_extract_anbima_s3.py`, `tests/fixtures/anbima-ima/` (3 recortes reais +
+`imab__erro_accessdenied.xml` + `README.md` de procedência), `docs/wiki/modules/anbima.md`.
+**Saída:** `data/raw/anbima-ima/<SLUG>__2026-10-09.xlsx` (+ `.meta.json`) e
+`data/processed/anbima-ima/ANBIMA_<SLUG>.parquet` — 9 séries, 5.407-6.700 linhas cada.
+**Comando:** `python -m apps.pipeline.extract.anbima_s3 [--indices IMAB IRFM] [--offline]`
+
+> **Ajuste do Feature Contract — nomes de arquivo (2026-10-11, consolidação da Onda 1).** O
+> contrato pedia `tests/contract/test_<fonte>.py` e `tests/fixtures/<fonte_com_underscore>/`.
+> A implementação seguiu o briefing da onda e `tests/fixtures/README.md`: **um** arquivo de
+> teste `tests/unit/test_extract_<modulo>.py` e fixture em `tests/fixtures/<fonte-com-hifen>/`,
+> casando com a pasta de `data/raw/`. Não existe `tests/contract/`: o contrato vivo contra a
+> fonte é o teste `@pytest.mark.network`, que o CI N1 exclui. Vale para F-002..F-008 e não
+> muda nenhum CA.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -230,7 +182,7 @@ divergência explicada + reconstrução completa de `data/canonical/`.
 
 ---
 
-### [ ] F-003 — Extrator BCB SGS: IPCA, IBC-Br, Selic, CDI, PTAX
+### [~] F-003 — Extrator BCB SGS: IPCA, IBC-Br, Selic, CDI, PTAX — **implementada — aguardando QA (`docs/plans/qa/ONDA-1-QA.md`)**
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `data/bcb-sgs`
 - **Cobre:** RF-001, RF-003, RF-005, RF-006, RF-015 · e-mail: **A1, A2, A4, B3, C1**
@@ -245,9 +197,23 @@ acumulação geométrica do CDI/Selic por trimestre.
 **Excluído:** séries `a_confirmar` (21619, 4192, DBGG pré-2008) e `descartada` (13762, 24369);
 Focus (→ F-010).
 
-**Arquivos:** `apps/pipeline/extract/bcb_sgs.py`, `apps/pipeline/transform/acumulacao.py`,
-`tests/contract/test_bcb_sgs.py`, `tests/unit/test_acumulacao.py`, `tests/fixtures/bcb_sgs/*.json`,
-`docs/wiki/modules/sgs.md`.
+**Arquivos (reais, como implementado):** `apps/pipeline/extract/bcb_sgs.py`,
+`tests/unit/test_extract_bcb_sgs.py`, `tests/fixtures/sgs/` (9 fixtures reais + `README.md`),
+`tests/unit/test_contract_sgs_sidra.py` (reconciliação SGS × SIDRA por `date`, criada na
+consolidação da onda), `docs/wiki/modules/sgs.md`.
+**Saída:** `data/raw/sgs/<codigo>_<inicio>__<fim>.json` (43 fatias + manifesto) e
+`data/processed/sgs/<series_id>.parquet` — 15 séries, 44.447 linhas, frequência nativa.
+**Comando:** `python -m apps.pipeline.extract.bcb_sgs [--series BCB_SGS_433] [--todas] [--offline]`
+
+> **Ajuste do Feature Contract — nomes de arquivo e escopo (2026-10-11).** Vale a nota de
+> renomeação de F-002 (`tests/unit/test_extract_bcb_sgs.py` + `tests/fixtures/sgs/`, sem
+> `tests/contract/`). Além dela: **`apps/pipeline/transform/acumulacao.py` e
+> `tests/unit/test_acumulacao.py` não foram criados** — a acumulação geométrica de CDI/Selic
+> em produção (CA-014/015/016) é **F-017**; aqui ficaram a série diária na frequência nativa e
+> os testes que travam o fator acumulado de 2006 e 2015 sobre o Parquet.
+> `apps/pipeline/transform/` passou a existir na consolidação da onda, com `cambio.py` (D-g), e
+> é lá que F-017 entra. **`date` de série mensal/trimestral é fim de período** desde a
+> consolidação (D-a): o SGS devolve o 1º dia do período e `fim_do_periodo` converte.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -263,7 +229,7 @@ Focus (→ F-010).
 
 ---
 
-### [ ] F-004 — Extrator IBGE SIDRA: IPCA número-índice e PIB trimestral
+### [~] F-004 — Extrator IBGE SIDRA: IPCA número-índice e PIB trimestral — **implementada — aguardando QA (`docs/plans/qa/ONDA-1-QA.md`)**
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `data/ibge-sidra`
 - **Cobre:** RF-002, RF-004 · e-mail: **A1, A7**
@@ -277,8 +243,20 @@ PIB índice de volume dessazonalizado e variação T/T−1; tratamento da **prim
 **Excluído:** abertura setorial do PIB por `c11255` (fase 2); IPCA por grupos (L13, `a_confirmar`);
 desemprego (L9).
 
-**Arquivos:** `apps/pipeline/extract/ibge_sidra.py`, `tests/contract/test_ibge_sidra.py`,
-`tests/fixtures/ibge_sidra/*.json`, `docs/wiki/modules/sidra.md`.
+**Arquivos (reais, como implementado):** `apps/pipeline/extract/ibge_sidra.py`,
+`tests/unit/test_extract_ibge_sidra.py`, `tests/fixtures/sidra/` (4 recortes reais feitos pela
+**fonte** via `p/` + 3 fixtures de erro reais + `README.md`), `docs/wiki/modules/sidra.md`.
+**Saída:** `data/raw/sidra/<slug>__<data_ref>.json` (+ `.meta.json`) e
+`data/processed/sidra/<series_id>.parquet` — 6 séries (562 obs mensais, 122 trimestrais).
+**Comando:** `python -m apps.pipeline.extract.ibge_sidra [--series SIDRA_1737_V63] [--offline]`
+
+> **Ajuste do Feature Contract — nomes de arquivo (2026-10-11, consolidação da Onda 1).** O
+> contrato pedia `tests/contract/test_<fonte>.py` e `tests/fixtures/<fonte_com_underscore>/`.
+> A implementação seguiu o briefing da onda e `tests/fixtures/README.md`: **um** arquivo de
+> teste `tests/unit/test_extract_<modulo>.py` e fixture em `tests/fixtures/<fonte-com-hifen>/`,
+> casando com a pasta de `data/raw/`. Não existe `tests/contract/`: o contrato vivo contra a
+> fonte é o teste `@pytest.mark.network`, que o CI N1 exclui. Vale para F-002..F-008 e não
+> muda nenhum CA.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -292,7 +270,7 @@ desemprego (L9).
 
 ---
 
-### [ ] F-005 — Extrator Tesouro Direto (taxas e PUs de títulos públicos)
+### [~] F-005 — Extrator Tesouro Direto (taxas e PUs de títulos públicos) — **implementada — aguardando QA (`docs/plans/qa/ONDA-1-QA.md`)**
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `data/tesouro-direto`
 - **Cobre:** RF-008 · e-mail: **A5**
@@ -305,8 +283,23 @@ desemprego (L9).
 gravação em `data/processed/tesouro/`.
 **Excluído:** interpolação de vértices e inclinação (→ **F-016, classe C**); ANBIMA `ms*.txt` (→ F-009).
 
-**Arquivos:** `apps/pipeline/extract/tesouro_direto.py`, `tests/contract/test_tesouro_direto.py`,
-`tests/fixtures/tesouro/td_amostra.csv`, `docs/wiki/modules/tesouro.md`.
+**Arquivos (reais, como implementado):** `apps/pipeline/extract/tesouro_direto.py`,
+`tests/unit/test_extract_tesouro_direto.py`, `tests/fixtures/tesouro-direto/` (recorte real de
+171 linhas, HTML de erro real do CKAN, 1 fixture sintética de acento nomeada como tal +
+`README.md`), `docs/wiki/modules/tesouro.md`.
+**Saída:** `data/raw/tesouro-direto/precotaxatesourodireto__AAAA-MM-DD.csv` (14,6 MB, ETag e
+Last-Modified no manifesto) e `data/processed/tesouro-direto/td_painel.parquet` — **886.300
+linhas, 750 `series_id`** no padrão `TD_<SIGLA>_<AAAAMMDD do vencimento>_<METRICA>`.
+**Comando:** `python -m apps.pipeline.extract.tesouro_direto [--offline] [--forcar]`
+
+> **Ajuste do Feature Contract — caminhos (2026-10-11).** O contrato dizia
+> `data/processed/tesouro/`, `tests/contract/test_tesouro_direto.py` e
+> `tests/fixtures/tesouro/td_amostra.csv`. Implementado em `data/processed/tesouro-direto/`,
+> `tests/unit/test_extract_tesouro_direto.py` e `tests/fixtures/tesouro-direto/` — o slug com
+> hífen é a convenção de `tests/fixtures/README.md` e casa com `data/raw/`. CA-021, que o
+> contrato marcava `integration`, ficou como guarda unitária + teste `@pytest.mark.network`
+> sobre o arquivo completo. **Um** Parquet de painel, não um por `series_id`: 750 arquivos de
+> 5 KB seriam piores para o DuckDB (ADR-006) e para o join do canônico.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -319,7 +312,7 @@ gravação em `data/processed/tesouro/`.
 
 ---
 
-### [ ] F-006 — Extrator API B3: índices amplos, setoriais e IFIX
+### [~] F-006 — Extrator API B3: índices amplos, setoriais e IFIX — **implementada — aguardando QA (`docs/plans/qa/ONDA-1-QA.md`)**
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `data/b3-indices`
 - **Cobre:** RF-012, RF-013 · e-mail: **B4, B5**
@@ -335,8 +328,18 @@ provisório (best-effort + janela própria) está em ADR-005 e **não bloqueia**
 **Excluído:** `IFIL` (não é segmento, é liquidez); COTAHIST (fase 2); FII por segmento (→ F-012);
 confirmação de retorno total índice a índice (gap **G-01**, fica como pendência declarada).
 
-**Arquivos:** `apps/pipeline/extract/b3_indices.py`, `tests/contract/test_b3_indices.py`,
-`tests/fixtures/b3/*.json`, `docs/wiki/modules/b3.md`.
+**Arquivos (reais, como implementado):** `apps/pipeline/extract/b3_indices.py`,
+`apps/pipeline/extract/__init__.py` (compartilhado), `tests/unit/test_extract_b3_indices.py`,
+`tests/fixtures/b3/` (7 respostas reais + 3 de erro/borda, todas de 2026-10-10 + `README.md`),
+`docs/wiki/modules/b3.md`.
+**Saída:** `data/raw/b3/<COD>/<ano>.json` (231 respostas + 231 manifestos) e
+`data/processed/b3/B3_<COD>.parquet` — 11 séries, **54.650 linhas**.
+**Comando:** `python -m apps.pipeline.extract.b3_indices [--codigos IBOV IFIX] [--anos 2006 2026] [--offline]`
+
+> **Ajuste do Feature Contract — nomes de arquivo (2026-10-11).** Vale a nota de renomeação de
+> F-002 (`tests/unit/test_extract_b3_indices.py`, sem `tests/contract/`). O nome do bruto é
+> `<ano>.json` dentro da pasta do índice, não o `<id>__<AAAA-MM-DD>` de `nome_arquivo_raw`: o
+> arquivo é a matriz de um ano inteiro, então a referência é o ano e o índice já é o diretório.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -351,7 +354,7 @@ scrapear o shell Angular), base.
 
 ---
 
-### [ ] F-007 — Extrator internacional: Yahoo `^GSPC` + MSCI ACWI (NETR) em BRL
+### [~] F-007 — Extrator internacional: Yahoo `^GSPC` + MSCI ACWI (NETR) em BRL — **implementada — aguardando QA (`docs/plans/qa/ONDA-1-QA.md`)**
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `data/internacional`
 - **Cobre:** RF-016 · e-mail: **C1**
@@ -367,9 +370,26 @@ marcação de `is_total_return`.
 **Excluído:** ouro (`GOLD_BRL` depende do gap **G-03** — sem fonte confirmada, retorna
 `BLOQUEADO — FONTE INDISPONÍVEL`); ETFs `ACWI`/`URTH`/`IVVB11` (não cobrem 2006); FRED (→ F-011).
 
-**Arquivos:** `apps/pipeline/extract/yahoo.py`, `apps/pipeline/extract/msci.py`,
-`tests/contract/test_msci.py`, `tests/contract/test_yahoo.py`, `tests/fixtures/{yahoo,msci}/*.json`,
+**Arquivos (reais, como implementado):** `apps/pipeline/extract/yahoo.py`,
+`apps/pipeline/extract/msci.py`, `apps/pipeline/transform/cambio.py` +
+`apps/pipeline/transform/__init__.py` (a conversão a BRL, movida na consolidação — D-g),
+`packages/shared/schemas/series_catalog_data.py` (**+2 entradas**: `ACWI_BRL` e `SP500_BRL`,
+`fonte=DERIVADO`; o catálogo passou de 132 para **134** séries),
+`tests/unit/test_extract_yahoo.py`, `tests/unit/test_extract_msci.py`,
+`tests/fixtures/yahoo/` (6 respostas reais), `tests/fixtures/msci/` (4 respostas reais),
 `docs/wiki/modules/internacional.md`.
+**Saída:** `data/processed/yahoo/{YAHOO_GSPC,YAHOO_TNX,YAHOO_VIX,YAHOO_DXY,SP500_BRL}.parquet`
+e `data/processed/msci/{MSCI_ACWI_NETR,MSCI_WORLD_NETR,MSCI_USA_NETR,MSCI_EM_NETR,ACWI_BRL}.parquet`.
+**Comando:** `python -m apps.pipeline.extract.yahoo [--tickers GSPC] [--offline] [--sem-brl]`
+e `python -m apps.pipeline.extract.msci [--offline]`
+
+> **Ajuste do Feature Contract — nomes de arquivo e 2 arquivos a mais (2026-10-11).** Vale a
+> nota de renomeação de F-002 (`tests/unit/test_extract_{yahoo,msci}.py`, sem
+> `tests/contract/`). Dois acréscimos **sancionados** na consolidação: (i) as 2 entradas de
+> catálogo das séries derivadas em BRL (D-d), cada uma com `is_total_return` explícito, porque
+> `ProcessedSeriesSchema` não tem essa flag e o lugar dela é o catálogo; (ii)
+> `apps/pipeline/transform/cambio.py`, para onde desceram `converter_para_brl` e
+> `carregar_ptax` (D-g) — antes `msci.py` importava `yahoo.py` só por causa delas.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -383,7 +403,7 @@ marcação de `is_total_return`.
 
 ---
 
-### [ ] F-008 — Calendário de dias úteis (ANBIMA)
+### [~] F-008 — Calendário de dias úteis (ANBIMA) — **implementada — aguardando QA (`docs/plans/qa/ONDA-1-QA.md`)**
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `data/calendario`
 - **Cobre:** RF-018 · e-mail: **A4, B3**
@@ -396,8 +416,27 @@ mapeado; [x] sem decisão humana pendente.
 `dias_uteis(inicio, fim)`, usada por **toda** acumulação e alinhamento.
 **Excluído:** calendário de outras praças; feriados estaduais.
 
-**Arquivos:** `apps/pipeline/transform/calendario.py`, `tests/unit/test_calendario.py`,
-`tests/fixtures/anbima/feriados.xls`.
+**Arquivos (reais, como implementado):** `apps/pipeline/extract/calendario_anbima.py`,
+`packages/shared/schemas/calendario.py` (`CalendarioDiasUteisSchema`, migrado na consolidação
+— D-f) + export em `packages/shared/schemas/__init__.py`,
+`tests/unit/test_extract_calendario_anbima.py`, `tests/fixtures/anbima-feriados/` (4 páginas
+reais + 404 real de 2000 + 512 bytes reais do cabeçalho BIFF da planilha + `README.md`),
+`docs/wiki/modules/calendario.md`.
+**Saída:** `data/raw/anbima-feriados/<ano>__<ano>-12-25.html` (30 páginas + manifesto) +
+`feriados_nacionais__2099-12-31.xls` (a planilha da SPEC, arquivada como **fonte de registro**)
+e `data/processed/calendario/dias_uteis_anbima.parquet` — 10.957 dias civis, 2001→2030,
+7.530 dias úteis, 367 feriados.
+**Comando:** `python -m apps.pipeline.extract.calendario_anbima [--anos 2006 2026] [--offline]`
+
+> **Ajuste do Feature Contract — pasta, nomes e formato da fonte (2026-10-11).** O contrato
+> pedia `apps/pipeline/transform/calendario.py` + `tests/unit/test_calendario.py` +
+> `tests/fixtures/anbima/feriados.xls`. Implementado em `apps/pipeline/extract/` porque o
+> módulo **baixa** da fonte (o que se faz com o calendário depois é F-014), com a renomeação de
+> teste e fixture de F-002. O dado vem das páginas HTML `fer_nacionais/<ano>.asp` da **mesma**
+> fonte, e não do `.xls` que a SPEC nomeia — que é XLS/BIFF real e exigiria dependência nova;
+> decisão **ratificada** na consolidação e registrada em `DECISIONS_LOG §2`. O schema do
+> DataFrame nasceu dentro do extrator e foi migrado para `packages/shared/schemas/calendario.py`
+> (D-f), porque é contrato de dado e F-014/F-017 vão importá-lo sem depender do extrator.
 
 | Teste | Tipo | Cobre CA |
 |---|---|---|
@@ -539,7 +578,34 @@ independente** (quem escreveu não confere).
 - **Depende de:** F-008 (calendário), F-013 (raw_series)
 
 **DoR específica** — [x] convenção congelada em ADR-006 (último dia útil, ffill <= 5, encadeamento
-geométrico); [x] calendário ANBIMA disponível; [ ] ADR-006 validado pelo Edu.
+geométrico); [x] calendário ANBIMA disponível (`data/processed/calendario/dias_uteis_anbima.parquet`,
+F-008: 2001→2030, 7.530 d.u.); [ ] ADR-006 validado pelo Edu; **[ ] decisão explícita sobre a grade
+das séries da B3 (D-h) — ver abaixo, é item de DoR, não detalhe de implementação.**
+
+> **D-h — a B3 fecha em dias que o calendário bancário considera úteis.** Medido por F-008 contra
+> 20 anos de série: o conjunto de dias úteis da ANBIMA é **idêntico** ao do CDI (SGS 12) e ao do
+> IMA-B em 2006-2025 (5.022 × 5.022, zero diferença nas duas pontas), mas o IBOV tem **4.953** —
+> **B3 ⊂ ANBIMA em 69 datas**, nunca o contrário. As 69 são feriados municipais/estaduais de São
+> Paulo e os dias de emenda de fim de ano: 24/12 (14×), 31/12 (14×), 25/01 Aniversário de SP (12×),
+> 20/11 (11×, antes de ser nacional), 09/07 Revolução Constitucionalista (11×), 29 e 30/12 (3×
+> cada) e 12/06/2014.
+>
+> **Consequência:** em **20 dos 83 trimestres** — **todos os 4ºs trimestres de 2006 a 2025** — o
+> último dia útil pela ANBIMA **não tem observação da B3**. Nenhum outro trimestre tem o problema,
+> e o CDI tem observação nos 83. Então **toda série da B3 vai carregar `ffill_dias_uteis = 1` em
+> todo 4T** — é o caso que ADR-006 §(b).8 / CA-066 já resolvem, mas tem de ser **escolhido**, não
+> descoberto no meio do cálculo:
+>
+> - **(a) default do ADR-006:** manter o fim de período bancário e aceitar 1 d.u. de ffill nas
+>   séries da B3 no 4T. Uma grade só para macro e ativos; o ffill fica registrado em
+>   `macro_quarterly_provenance` e aparece na página de limitações.
+> - **(b) grade própria da B3:** usar a última negociação da B3 para séries da B3. Elimina o ffill
+>   e cria **duas grades** de fim de trimestre — o que exige declarar, em toda tabela e figura, qual
+>   grade cada linha usa.
+>
+> Escolher **(b) é decisão de alinhamento, classe C, e não é do extrator**. O calendário entrega as
+> duas: `ajustar_para_tras` dá a grade bancária e `dia_util_anterior(d, 1)` dá o passo de ffill.
+> Detalhe completo em `docs/wiki/modules/calendario.md` e `docs/wiki/modules/canonical.md`.
 
 **Escopo incluído:** cálculo do `quarter_end` dos 83 trimestres; reindexação de séries diárias/mensais
 para a grade; `ffill_dias_uteis`; `NULL` registrado acima de 5 d.u.; detecção de data duplicada/fora
@@ -1142,6 +1208,19 @@ trimestre anterior. Sem dashboard hospedado (fora de escopo). CI N1.
       propostos** — 2026-10-10 (classe A) — `docs/specs/SPEC.md`, `docs/contracts/CONTRACTS.md`,
       `packages/shared/schemas/`, `docs/decisions/adr/`, `docs/plans/PLAN.md`
 - [x] **F-032 — `DECISIONS_LOG` inicial com as 12 substituições de fonte (todas provisórias, aguardando aval de Edu/Alexandre)** — 2026-10-10 (classe A) — `docs/plans/DECISIONS_LOG.md`
+- [x] **F-001 — Infra de extração (`apps/pipeline/common/`: cliente HTTP com UA de browser e retry,
+      validador de shape, dois normalizadores de número, encoding por fonte, magic bytes,
+      fatiamento de janela, camadas `raw`/`processed` com manifesto e hash, primitiva de cache
+      condicional)** — 2026-10-10 (classe B) — **QA aprovado** em `docs/plans/qa/ONDA-0-QA.md`;
+      o re-QA do fix QA-01 (escala de `para_float_ptbr`) foi verificado pelo orquestrador.
+      Renomeação `extract/` → `common/` registrada no contrato. Dívidas remanescentes em §6
+      (`--record` em `conftest.py`). Permanente em `docs/wiki/architecture.md`
+- [x] **F-009 — Job diário de arquivamento ANBIMA (`ms_AAMMDD.txt` + Curva Zero, janela rolante de
+      ~20 d.u.)** — 2026-10-10 (classe B) — **QA aprovado** em `docs/plans/qa/ONDA-0-QA.md`;
+      41 arquivos + 41 manifestos arquivados ao vivo, idempotência e dia ausente confirmados na
+      fonte. Pendências que não bloqueiam: tarefa agendada (é do Edu, `schtasks` no runbook) e
+      migração da camada HTTP para `apps.pipeline.common` (§6). Permanente em
+      `docs/wiki/modules/anbima.md` + `docs/wiki/runbooks/job-diario-anbima.md`
 
 ---
 
@@ -1166,6 +1245,21 @@ O que isso muda e o que **não** muda:
   **não existe classe A/B para publicação.**
 - Registro datado em `docs/plans/DECISIONS_LOG.md §2`. Também nesta data: repositório remoto GitHub
   conectado (`main`) e **Supabase descartado na v1** → **ADR-007 (Aceita)**.
+
+### Itens da SPEC que o dado real não fecha (não editei a SPEC — `AGENTS.md §8`)
+
+- [ ] **SPEC CA-004/CA-005 — limiares irrealistas, proposta em `DECISIONS_LOG §2` (D-e).**
+      **CA-004** pede número-índice "monotônico não decrescente em **>= 99%** dos meses"; a série
+      real `SIDRA_1737_V2266` tem **0,9626** no histórico completo (21 meses de deflação de
+      verdade, 199708→202608) e **0,9435** de 2006 em diante. **CA-005** pede tolerância
+      **<= 1e-6** entre a razão do número-índice e o encadeamento geométrico de `v/63`; medido:
+      **3,52e-04 pp** em 83 trimestres, contra um limite **analítico** de 3,97e-04 pp que vem das
+      **2 casas decimais** com que o IBGE publica o número-índice. Nenhum dos dois é defeito do
+      extrator: o código afirma a medição, e o teste de CA-005 exige também `<= 2×` o limite do
+      arredondamento, que é o que prova que as duas séries são **a mesma coisa** em vez de só
+      "parecidas". **Proposta:** CA-004 → 90% (ou reescrita como "não é série de variação");
+      CA-005 → 1e-3 pp. **Quem decide:** Edu. Até lá, `MONOTONIA_MINIMA = 0,90` e a tolerância de
+      1e-3 pp estão no código de F-004, com o desvio escrito no docstring e no `DECISIONS_LOG`.
 
 > **8 decisões de Edu/Alexandre seguem abertas** (bloqueavam o início da implementação — ver o estado de
 > 2026-10-10 acima). Origem: `docs/product/PRD.md §13.2`
@@ -1246,12 +1340,36 @@ implementadas com o padrão provisório, mas **não publicadas** sem ADR aceito.
   tem camada HTTP e normalizador de número próprios (`_sessao`/`baixar`/`detectar_corpo_suspeito`/
   `_para_float_br`), anteriores a F-001; o `# TODO(F-001)` já está no módulo. Trocar por `ClienteHTTP` +
   `detectar_formato`/`exigir_formato` + `para_float_ptbr`. **Os testes de parse não devem mudar** — se
-  mudarem, a migração regrediu (`docs/wiki/context/F-001.md §6.2`, `context/F-009.md §6.2`).
+  mudarem, a migração regrediu (`docs/wiki/modules/anbima.md`, `docs/wiki/architecture.md`).
 - **Decisão aberta — `--record` em `tests/conftest.py`:** `tests/fixtures/README.md` atribuía a flag a
   F-001, mas `conftest.py` é arquivo compartilhado da onda e não estava na lista de arquivos de F-001;
   ficou **não implementada**. Opções: feature A própria, ou `pytest_addoption` acrescentado pelo
-  orquestrador. Nada depende disso para gravar fixture (hoje é script de sessão) —
-  ver `docs/wiki/context/F-001.md §7`.
+  orquestrador. Nada depende disso para gravar fixture (hoje é script de sessão).
+
+**Dívidas remanescentes da Onda 1** (nenhuma bloqueia o QA; levantadas pelos 7 relatórios e
+confirmadas na consolidação):
+
+- **Cache condicional por fonte fica em F-030.** A primitiva existe desde F-001 e os manifestos já
+  gravam `ETag`/`Last-Modified` onde a fonte os serve (S3 da ANBIMA, CKAN do Tesouro — que responde
+  **304 com 0 byte** e evita 14,6 MB por rodada, medido ao vivo; a planilha de feriados). Nenhum
+  extrator liga a revalidação: `cache_condicional=False` em todos. A **política** (quem revalida, com
+  que frequência, o que fazer com o 304) é F-030. Yahoo, MSCI, B3 e apisidra não serviram validador
+  útil nesta sessão.
+- **Reextrair 2026 da B3 depois do Comitê.** `data/processed/b3/*.parquet` fecha 2026 com 194 pontos
+  (até 09/10). Quem rodar depois de 14/10 precisa reextrair o ano corrente — `--anos 2026` basta.
+- **`MSCI_BRAZIL` continua `a_confirmar`:** o código `705000` devolve `INDEX_LEVELS: []` com HTTP 200
+  (fixture gravada como caminho de erro). Nenhum identificador foi inventado.
+- **`GOLD_BRL` segue `BLOQUEADO — FONTE INDISPONÍVEL`** (gap G-03). Nenhum proxy adotado.
+- **Duration (d.u.) e PMR do IMA não são extraídos.** As 7 colunas derivadas da planilha da ANBIMA
+  ficaram de fora porque `processed_series` é **uma métrica por série**. Se F-016 pedir Duration do
+  IMA, é **série nova no catálogo** (`ANBIMA_<SLUG>_DURATION`), não coluna extra no Parquet.
+- **G-01 — retorno total dos 9 setoriais da B3** continua declarado e não resolvido:
+  `is_total_return` é `True` só em IBOV e IFIX; nos setoriais segue `None` e tem de ir para a página
+  de limitações (F-028).
+- **`entrada_do_catalogo` ainda é importada de `extract/yahoo.py` por `extract/msci.py`** (3 linhas
+  sobre o catálogo). Com D-g o acoplamento pesado saiu; este resto desce quando F-011 tocar os dois.
+- **Retenção de `data/raw/`:** 14,6 MB por download efetivo do Tesouro e 2,2 MB de respostas da B3.
+  Sem política de expurgo — também F-030.
 
 ---
 

@@ -85,15 +85,22 @@ truncamento sem aviso, filtros ignorados) · janela rolante e descontinuações 
 anti-bot (FRED pode estar bloqueado) · unidade/escala/formato mentirosos · overfitting e confusão
 descritivo × preditivo.
 
-## 8. Estado atual (2026-10-10, pós-housekeeping)
+## 8. Estado atual (2026-10-11, pós-consolidação da Onda 1)
 
-- **Fase:** **harness estruturado** — escopo → pesquisa → PRD v1.0 → SPEC v1.0 + Anti-SPEC → contratos →
-  TODO (40 features) → PLAN (ondas) → `/agents-protocol`. **Aprovação do Edu ainda pendente** no PRD e na SPEC.
-- **Pipeline implementado:** **nenhum extrator** — `apps/pipeline/` e `apps/analysis/` vazios. O que existe
-  de código são os contratos em `packages/shared/schemas/` (6 módulos pandera/pydantic + 132 séries).
-- **Dataset canônico:** não existe. `data/raw/` tem só as amostras baixadas na pesquisa.
+- **Fase:** **extração pronta, canônico não começou** — escopo → pesquisa → PRD v1.0 → SPEC v1.0 +
+  Anti-SPEC → contratos → TODO (40 features) → PLAN (ondas) → Onda 0 (F-001, F-009, QA aprovado) →
+  Onda 1 (F-002..F-008, **aguardando QA**). **Aprovação do Edu ainda pendente** no PRD e na SPEC.
+- **Pipeline implementado:** 8 extratores em `apps/pipeline/extract/` + o job diário em `jobs/` + a
+  infra em `common/` + o início da transformação em `transform/cambio.py`; `apps/analysis/` segue
+  vazio. Contratos em `packages/shared/schemas/` (7 módulos pandera/pydantic + **134** séries).
+- **Dataset canônico:** não existe (é classe C, de F-013 em diante). Mas `data/processed/` tem **53
+  Parquets** — ~219 mil linhas de `processed_series` em 51 arquivos, o painel do Tesouro Direto
+  (886.300 linhas) e o calendário de dias úteis (2001→2030) —, todos reconstruíveis sem rede com
+  `--offline` e byte-idênticos entre rodadas.
 - **Pesquisa:** concluída — fontes (`fontes-de-dados.md`) e metodologia (`metodologia-regimes-macro.md`).
-- **Decisões de fonte:** 12 substituições registradas como **provisórias** em
+- **Decisões de fonte e convenção:** 12 substituições + as **8 convenções da Onda 1** (D-a..D-h:
+  `date` em fim de período, `vintage` do manifesto, catálogo 134, calendário por HTML…) registradas
+  como **provisórias** em
   [`docs/plans/DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md); **ADR-001..006 em Proposta**.
 - **Ambiente:** `uv sync --extra dev` entrega o ambiente completo (deps corrigidas em 2026-10-10).
   **FRED bloqueado nesta máquina** → bloco internacional pelo plano B (Yahoo + MSCI + PTAX).

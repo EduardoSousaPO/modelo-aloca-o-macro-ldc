@@ -289,6 +289,31 @@ def ler_manifesto(alvo: Path) -> dict[str, Any] | None:
     return json.loads(caminho.read_text(encoding="utf-8"))
 
 
+def obtido_em_arquivado(alvo: Path) -> datetime | None:
+    """`obtido_em` do manifesto do bruto — a **única** origem de `collected_at`/`vintage`.
+
+    Convenção da Onda 1 (D-b, `docs/plans/DECISIONS_LOG.md §2`): `collected_at` da camada
+    processada sai daqui, não do relógio da rodada, e `vintage` é a **data** (sem hora) desse
+    `collected_at`. É o que torna `--offline` reprodutível: reprocessar o mesmo bruto duas vezes
+    produz o mesmo Parquet, byte a byte, porque nenhum dos dois valores depende de quando o
+    reprocessamento aconteceu.
+
+    Devolve `None` quando não há manifesto, quando o campo está vazio ou quando a string não é
+    ISO-8601 (manifesto de outra versão) — quem chama decide o fallback.
+    """
+    manifesto = ler_manifesto(alvo)
+    if not manifesto:
+        return None
+    bruto = manifesto.get("obtido_em")
+    if not bruto:
+        return None
+    try:
+        return datetime.fromisoformat(str(bruto))
+    except ValueError:
+        _log.warning("manifesto de %s com obtido_em inválido: %r", Path(alvo).name, bruto)
+        return None
+
+
 def validadores_condicionais(alvo: Path) -> tuple[str | None, str | None]:
     """`(etag, last_modified)` do que já está arquivado — entrada de `ClienteHTTP.get`."""
     manifesto = ler_manifesto(alvo)

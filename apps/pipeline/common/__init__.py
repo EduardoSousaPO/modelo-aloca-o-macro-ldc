@@ -30,7 +30,8 @@ arquivar_bruto(                               # bruto imutável + sha256 + manif
 )
 ```
 
-Context Pack para quem vai escrever extrator: `docs/wiki/context/F-001.md`.
+Para quem vai escrever extrator: `docs/wiki/architecture.md` (topologia das camadas) e
+`docs/wiki/modules/<fonte>.md` (o que cada fonte já entregou e onde ela mente).
 """
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ from apps.pipeline.common.errors import (
     NumeroNaoReconhecido,
     RespostaDeErroComStatus200,
     RespostaTruncada,
+    SerieInconsistente,
     UserAgentObrigatorio,
 )
 from apps.pipeline.common.http import (
@@ -77,6 +79,7 @@ from apps.pipeline.common.io_layers import (
     gravar_processado_parquet,
     ler_manifesto,
     nome_arquivo_raw,
+    obtido_em_arquivado,
     raiz_repo,
     sha256_de,
     validadores_condicionais,
@@ -126,6 +129,7 @@ __all__ = [
     "RespostaDeErroComStatus200",
     "RespostaTruncada",
     "ResultadoArquivamento",
+    "SerieInconsistente",
     "Transporte",
     "UserAgentObrigatorio",
     "arquivar_bruto",
@@ -148,6 +152,7 @@ __all__ = [
     "nome_arquivo_raw",
     "normalizar_rotulo",
     "obter_logger",
+    "obtido_em_arquivado",
     "para_data",
     "para_float_ponto_decimal",
     "para_float_ptbr",

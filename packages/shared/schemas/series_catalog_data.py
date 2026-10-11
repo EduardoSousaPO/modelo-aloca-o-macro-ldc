@@ -1387,6 +1387,45 @@ _INTERNACIONAL: list[dict[str, Any]] = [
         "fonte_instavel": True,
         "obs": "O codigo 705000 testado devolveu lista vazia. Fora do escopo minimo.",
     },
+    # As 2 linhas abaixo sao as series DERIVADAS em BRL de F-007 (CA-047): nivel em USD
+    # multiplicado pela PTAX de venda (BCB_SGS_1, F-003) do MESMO dia util, sem ffill e sem
+    # interpolacao. data_inicio = primeiro dia em que as duas pontas existem (a PTAX extraida
+    # por F-003 comeca em 2004-01-02). Os asset_id correspondentes estao em
+    # packages/shared/schemas/asset_returns_quarterly.py (ATIVOS_INTERNACIONAIS, ADR-003).
+    {
+        "series_id": "ACWI_BRL",
+        "nome": "MSCI ACWI net total return convertido a BRL pela PTAX",
+        "item_email": "C1",
+        "fonte": "DERIVADO",
+        "identificador": "MSCI_ACWI_NETR * BCB_SGS_1 (PTAX venda, mesmo dia util)",
+        "fonte_url": URL_MSCI.format(cod=892400, variant="NETR"),
+        "freq": "D",
+        "unit": "index",
+        "data_inicio": "2004-01-02",
+        "transformacao_padrao": "ultimo_dia_util_do_trimestre",
+        "confianca": "NAO_VERIFICADO",
+        "is_total_return": True,
+        "obs": "Serie CONSTRUIDA por nos (F-007). Dia sem PTAX do mesmo dia util sai da serie: "
+        "nenhum cambio e herdado do dia anterior nem interpolado (Anti-SPEC 10.1.1/10.1.4). "
+        "Retorno total — comparavel com IMA-B/IFIX no mesmo heatmap.",
+    },
+    {
+        "series_id": "SP500_BRL",
+        "nome": "S&P 500 (indice de preco) convertido a BRL pela PTAX",
+        "item_email": "C1",
+        "fonte": "DERIVADO",
+        "identificador": "YAHOO_GSPC * BCB_SGS_1 (PTAX venda, mesmo dia util)",
+        "fonte_url": URL_YAHOO.format(ticker="^GSPC"),
+        "freq": "D",
+        "unit": "index",
+        "data_inicio": "2004-01-02",
+        "transformacao_padrao": "ultimo_dia_util_do_trimestre",
+        "confianca": "NAO_VERIFICADO",
+        "is_total_return": False,
+        "obs": "Serie CONSTRUIDA por nos (F-007). O ^GSPC e PRICE RETURN: comparar com retorno "
+        "total domestico sem declarar a flag viola a Anti-SPEC 10.2.12. Para os EUA em retorno "
+        "total use MSCI_USA_NETR.",
+    },
     # data_inicio das 7 linhas abaixo = coluna "Inicio real" da tabela de IDs verificados em
     # docs/research/fontes-de-dados.md secao C10 (medido com cosd=1900-01-01) — nao e palpite.
     # DFF e FEDFUNDS compartilham a linha da pesquisa (1954-07-01).

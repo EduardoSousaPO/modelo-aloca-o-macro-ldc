@@ -1,39 +1,48 @@
-# Módulo `anbima` — ANBIMA + Tesouro Direto (renda fixa pública)
+# Módulo `anbima` — índices IMA (bucket S3) + job diário de janela rolante
 
-> Síntese — fonte de verdade: `docs/research/fontes-de-dados.md §A4, §A5, §B6`. **Estado (2026-10-10): só o job diário F-009 está implementado** (`apps/pipeline/jobs/anbima_daily.py`, aguardando QA); nenhum extrator de histórico.
+> Verdade: `apps/pipeline/extract/anbima_s3.py`, `apps/pipeline/jobs/anbima_daily.py` +
+> `research/fontes-de-dados.md §A4, §A5, §B6`. **Estado (2026-10-11): F-002 e F-009 implementados**
+> (F-009 com QA aprovado; F-002 aguardando QA da Onda 1). Curva do Tesouro →
+> [`tesouro.md`](./tesouro.md); calendário de dias úteis → [`calendario.md`](./calendario.md).
+> Entrega o benchmark de RF do heatmap (IMA, diário, desde 2000) e **arquiva** as duas séries de
+> janela rolante da ANBIMA, que se perdem para sempre se o job não rodar.
 
-## Propósito
+## `data/processed/anbima-ima/` — 9 séries, 0,00% de nulos, `freq=D`, `unit=index`
 
-Cobrir a renda fixa pública: **índices IMA** (benchmark de RF do heatmap), **taxas de títulos públicos** e a **inclinação da curva**. O **Tesouro Direto** entra aqui por ser o substituto aceito da ETTJ histórica da ANBIMA (S-01/S-02 no `DECISIONS_LOG`); o **calendário de dias úteis** também, por ser insumo de todo o alinhamento trimestral.
+| `series_id` | linhas | janela | 1º valor | último |
+|---|---|---|---|---|
+| `ANBIMA_IMAB` · `IMAB5` · `IMAB5MAIS` | 5.795 | **2003-09-16** → 2026-10-09 | **723,070317** · 775,879343 · 715,675793 | 12.656,5 · 12.107,2 · 14.075,9 |
+| `ANBIMA_IRFM` | 6.700 | **2000-02-01** → 2026-10-09 | 863,150015 | 24.498,8 |
+| `ANBIMA_IRFM1` · `IRFM1MAIS` | 6.488 | 2000-12-01 → 2026-10-09 | 1.000,000000 | 21.220,1 · 26.818,3 |
+| `ANBIMA_IMAGERAL` · `IMAS` | 6.237 · 6.245 | 2001-12 → 2026-10-09 | 532,621995 · 550,485024 | 10.784,9 · 9.029,7 |
+| `ANBIMA_IMAGERALEXC` | 5.407 | 2005-03-31 → 2026-10-09 | 1.000,000000 | 10.635,3 |
 
-## Séries / RFs cobertos
+As 9 têm **63 observações no 1T2006**, pontas inclusive. Reconciliação independente: IRF-M em
+2006-01-02 = **2.554,550434** e IMA-S = **1.147,988972**, idênticos às séries SGS 12461/12462 da
+pesquisa — duas fontes, o mesmo número. `IMAC` (descontinuado 2021) e `IHFA` (fora do e-mail) não
+entram. `vintage` = data do `collected_at` do manifesto (D-b); `--offline` reproduz tudo.
 
-| Série | Identificador | RF |
-|---|---|---|
-| IMA-B · 5 · 5+ | S3 `IMAB`, `IMAB5`, `IMAB5MAIS` (16/09/2003→) | RF-011 |
-| IRF-M · 1 · 1+ · IMA-Geral · IMA-S | S3 `IRFM`, `IRFM1`, `IRFM1MAIS`, `IMAGERAL`, `IMAS` (01/02/2000→) | RF-011 |
-| Taxas e PUs de títulos públicos | Tesouro Transparente `precotaxatesourodireto.csv` (31/12/2004→) | RF-008 |
-| Vértices interpolados + inclinação real/nominal | derivado do Tesouro Direto | RF-009 |
-| Job diário: taxas indicativas + Curva Zero | `ms{AAMMDD}.txt` · `CZ-down.asp` (**POST**, `saida=csv`) | RF-010 |
-| Calendário de dias úteis / feriados | arquivo ANBIMA | RF-018 |
+## Job diário (F-009) — bordas reais medidas
 
-## Fonte primária e fallback
+`ms*.txt` tinha dado desde **2026-09-11** (09 e 10/09 → HTTP **404**); Curva Zero desde **2026-09-14**
+(11/09 e antes → HTTP **200 com 0 bytes**). ~20-21 d.u., e a borda **anda todo dia útil**. Na Curva
+Zero use **`saida=csv`**: `saida=xls` devolve HTML `<table>`. Republicação da mesma data com conteúdo
+diferente vira **vintage novo** (`__v2`), nunca sobrescrita.
 
-- **Primária:** bucket **S3 público da ANBIMA** (`*-HISTORICO.xls`, grátis, sem cadastro) · CKAN do Tesouro Transparente · `anbima.com.br/informacoes/...` para o job diário. **Valor-canário:** IMA-B 16/09/2003 = **723,070317**.
-- **Fallback:** SGS 12461-12469 (IMA) — **descontinuadas em 22/05/2023**, só conferência cruzada; ANBIMA Feed (**pago**, fora do caminho crítico); `pyield` para DI futuro.
+## Armadilhas
 
-## Job diário (F-009) — medido em 2026-10-10
+- **O `.xls` do S3 é XLSX** (magic `PK\x03\x04`) → `exigir_formato` + `read_excel(BytesIO,
+  engine="openpyxl")`. O mesmo conteúdo salvo como `.xls` faz o openpyxl recusar **pela extensão**:
+  é por isso que o bruto é arquivado como `.xlsx`.
+- **`series_id` vem do SLUG do catálogo, nunca do rótulo da planilha.** O rótulo é **guarda**
+  (`ROTULOS_ESPERADOS`): a fonte **move o hífen** (`IMA - Geral ex-C` → `IMA-GERALEX-C` vs
+  `IMA-GERAL-EX-C`), então normalizar espaço não basta — precisa de mapa explícito (CB-015).
+- **Erro é HTTP 403 com XML `AccessDenied`**, tanto para SLUG inexistente quanto para listagem do
+  bucket — daí os SLUGs hard-coded, conferidos contra o catálogo no `import`.
+- **`data_ref` do bruto = última data do histórico**, não "hoje": rodar duas vezes no mesmo dia é
+  byte-idêntico, e uma republicação com números diferentes bate em `ConteudoDivergente` (R8).
+- **`print` de seta Unicode quebra no Windows** (cp1252): os `resumo()` são **só ASCII**, com teste.
+- **Duration (d.u.), PMR e as variações da planilha não são extraídas:** `processed_series` é uma
+  métrica por série. Se F-016 pedir Duration do IMA, é **série nova no catálogo**, não coluna extra.
 
-- **Bordas reais da janela rolante:** `ms*.txt` só tem dado desde **2026-09-11** (09 e 10/09 → HTTP **404**); Curva Zero desde **2026-09-14** (11/09 e antes → HTTP **200 com 0 bytes**). Mais novo nas duas: 09/10. São ~20-21 d.u. e a borda **anda todo dia útil**.
-- **Formato real da Curva Zero:** usar **`saida=csv`** (CSV latin-1: betas Svensson + 65 vértices). **`saida=xls` devolve HTML `<table>`**, não planilha — decidir o leitor pelo magic byte, nunca pela extensão.
-- **Convenção de arquivo:** `data/raw/anbima-ms/ms_AAMMDD.txt` e `data/raw/anbima-ettj/cz_AAMMDD.csv`, cada um com **manifest sidecar** `<arquivo>.manifest.json` (`url`, `data_ref`, `sha256`, `bytes`, `collected_at`, formato, encoding, nº de registros, veredito). Republicação da mesma data com conteúdo diferente vira **vintage novo** (`__v2`), nunca sobrescrita. `Msec_txt.txt` (URL do último dia útil) veio byte a byte idêntico a `ms_261009.txt`.
-
-## Armadilhas conhecidas (pesquisa)
-
-- **R11 · formatos mentirosos:** o `.xls` do S3 **é XLSX** (magic `PK`) → `engine="openpyxl"` a partir de `BytesIO` (openpyxl recusa a extensão `.xls`); o `.xls` da Curva Zero **é HTML `<table>`** → `read_html` + `lxml`. Sniffar os 4 primeiros bytes sempre.
-- **R8 · janela rolante de ~20 d.u.:** `ms*.txt` e Curva Zero apagam o passado (`Dt_Ref=02/01/2006` → 0 bytes). Nunca usar como backfill; **o job F-009 tem de estar ligado** — cada dia sem ele é série proprietária perdida para sempre.
-- **R14 · rótulos instáveis / R7 · R12:** a coluna `Índice` alterna `IMA-B`/`IMA - B`, `IMA-GERAL`/`IMA - Geral` → normalizar removendo todo espaço antes de agrupar, e o slug de "5+" é `5MAIS`; listagem do bucket bloqueada (`AccessDenied`) → slugs hard-coded + teste de disponibilidade; o arquivo é `ms{AAMMDD}.txt`, **não** `ms{ddmmaa}.txt`; encoding **latin-1** em `ms`/`CZ`/CSV do Tesouro.
-- **R6/L5/R17:** não usar `data-api.prd.anbima.com.br` (JWT com reCAPTCHA de uso único → 418); sem ponta longa nominal antes de ~2010, a inclinação principal é **real** (S-03); arquivo atrasado é caso **normal** → retry + registro, nunca falha.
-
-**Features do TODO:** **F-001** · **F-002** (S3 IMA) · **F-005** (Tesouro) · **F-008** (calendário) ·
-**F-009** (job diário, implementado) · **F-016** (curva, C) · **F-017** (retornos de RF) · **F-030** (canário).
+**Features:** **F-002** e **F-009** (implementados) · **F-016** (curva, C) · **F-017** · **F-030**.

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Índices</title>
+  <base href="/indexPage/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script type="text/javascript" src="/indexPage/ruxitagentjs_ICANVfgqru_10345260810170330.js" data-dtconfig="rid=RID_89657381|rpid=311334554|domain=b3.com.br|reportUrl=/indexPage/rb_ea8d7b8f-040c-423b-b726-54310cab2c40|app=fd69ce40c52bd20e|cuc=kju5m9kg|owasp=1|mel=100000|featureHash=ICANVfgqru|dpvc=1|lastModification=1789825341339|tp=500,50,0|rdnt=1|uxrgce=1|srbbv=2|agentUri=/indexPage/ruxitagentjs_ICANVfgqru_10345260810170330.js"></script><link rel="icon" type="image/x-icon" href="favicon.ico">
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=UA-94042116-5"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'UA-94042116-5');
+  </script>
+<link rel="stylesheet" href="/indexPage/styles.6974b3d0a8fd89599f8a.css"></head>
+
+<body>
+  <app-root></app-root>
+<script src="/indexPage/runtime-es2015.9a134629ba2be2342faf.js" type="module"></script><script src="/indexPage/runtime-es5.9a134629ba2be2342faf.js" nomodule defer></script><script src="/indexPage/polyfills-es5.cb20faed44193e59a687.js" nomodule defer></script><script src="/indexPage/polyfills-es2015.798f07ce8a65b1df98bb.js" type="module"></script><script src="/indexPage/scripts.766930f48d35062e7a23.js" defer></script><script src="/indexPage/main-es2015.734bba7ef4f937ebc80b.js" type="module"></script><script src="/indexPage/main-es5.734bba7ef4f937ebc80b.js" nomodule defer></script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4898bda2b383fbe',t:'MTc5MTY3NjQyNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+</html>

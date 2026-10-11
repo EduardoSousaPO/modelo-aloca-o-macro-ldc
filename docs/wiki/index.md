@@ -4,7 +4,7 @@
 > sintetizada**: não substitui ESCOPO-EMAIL/PRD/SPEC/CONTRACTS/ADR, referencia e resume.
 > Mantida via `/wiki ingest · context · lint · repair`.
 
-**Última revisão:** 2026-10-10 (housekeeping + `/wiki lint` → `repair`)
+**Última revisão:** 2026-10-11 (consolidação da Onda 1: `modules/` reescritos com o dado medido)
 **Saúde da wiki:** verde — `modules/` e `runbooks/` populados; índice alinhado aos arquivos que existem
 
 ## O projeto em 3 linhas
@@ -14,7 +14,7 @@ macro brasileiras e de desempenho de ativos/subsetores num dataset canônico **t
 para identificar **regimes macro** e medir como cada classe de ativo performou em momentos semelhantes.
 Alimenta o modelo de alocação macro doméstica + o dimensionamento da alocação internacional.
 **Prazo:** Comitê de Alocação em **2026-10-14**. Roda local — sem auth, pagamento ou deploy.
-**Estado:** harness estruturado; **nenhum extrator implementado**; 8 decisões bloqueantes abertas.
+**Estado (2026-10-11):** **camada de extração pronta** — F-001 e F-009 com QA aprovado, F-002..F-008 implementadas e **aguardando QA** (`docs/plans/qa/ONDA-1-QA.md`); 53 Parquets em `data/processed/`; camada canônica (classe C) não começou; 8 decisões bloqueantes abertas + as 8 convenções da Onda 1 (D-a..D-h) provisórias.
 
 ## Leitura inicial obrigatória
 
@@ -29,10 +29,10 @@ ativo · 4. [`AGENTS.md`](../../AGENTS.md) — papéis, A/B/C/D, autonomia/pausa
 | [overview.md](./overview.md) | o que o projeto entrega hoje, em 1 página | toda nova sessão |
 | [architecture.md](./architecture.md) | topologia fontes → raw → processed → canonical → análise | antes de mexer em módulo |
 | [log.md](./log.md) | histórico cronológico (≤ 200 linhas) | abertura de sessão; quando um número "parece estranho" |
-| [modules/](./modules/) | [`sgs`](./modules/sgs.md) · [`sidra`](./modules/sidra.md) · [`anbima`](./modules/anbima.md) · [`b3`](./modules/b3.md) · [`internacional`](./modules/internacional.md) · [`canonical`](./modules/canonical.md) · [`regimes`](./modules/regimes.md) | **antes de tocar o módulo** |
+| [modules/](./modules/) | [`sgs`](./modules/sgs.md) · [`sidra`](./modules/sidra.md) · [`anbima`](./modules/anbima.md) · [`tesouro`](./modules/tesouro.md) · [`b3`](./modules/b3.md) · [`internacional`](./modules/internacional.md) · [`calendario`](./modules/calendario.md) · [`canonical`](./modules/canonical.md) · [`regimes`](./modules/regimes.md) | **antes de tocar o módulo** |
 | [runbooks/](./runbooks/) | [reconstruir-dataset](./runbooks/reconstruir-dataset.md) · [fonte-fora-do-ar](./runbooks/fonte-fora-do-ar.md) | emergência ou operação repetida |
 | [features/](./features/) | resumo de 1 parágrafo por feature C/D mergeada | *(vazio — nenhuma C/D mergeada)* |
-| [context/](./context/) | Context Packs temporários por tarefa ativa | início de feature/fix |
+| [context/](./context/) | Context Packs temporários por tarefa ativa (**F-002..F-008**, até o QA da Onda 1) | início de feature/fix |
 
 ## Fontes de verdade (fora da wiki)
 
@@ -47,7 +47,7 @@ ativo · 4. [`AGENTS.md`](../../AGENTS.md) — papéis, A/B/C/D, autonomia/pausa
 | Risco A/B/C/D | [`plans/risk-classification.md`](../plans/risk-classification.md) | — |
 | Capacidades, ambiente e conectividade medidos | [`plans/skills-manifest.md`](../plans/skills-manifest.md) | `runbooks/fonte-fora-do-ar.md` |
 | Decisões arquiteturais | [`decisions/adr/`](../decisions/adr/) — **7 ADRs: ADR-001..006 em Proposta, ADR-007 Aceita** | `architecture.md` §5 |
-| Decisão operacional / **troca de fonte** | [`plans/DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md) — 12 substituições provisórias | linha em `log.md` |
+| Decisão operacional / **troca de fonte** | [`plans/DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md) — 12 substituições + **8 convenções da Onda 1** (§2.1), todas provisórias | linha em `log.md` |
 | Prompts do dia a dia | [`plans/prompts-cheatsheet.md`](../plans/prompts-cheatsheet.md) | — |
 | Rollback / operação | [`plans/infra-ops.md`](../plans/infra-ops.md) | `runbooks/reconstruir-dataset.md` §6 |
 | Checklists (daily-ops, feature-PR) | [`plans/checklists/`](../plans/checklists/) | — |

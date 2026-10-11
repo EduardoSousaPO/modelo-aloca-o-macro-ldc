@@ -68,6 +68,17 @@ class ConteudoDivergente(ErroDeExtracao):
     """
 
 
+class SerieInconsistente(ErroDeExtracao):
+    """O corpo abriu e é do formato certo, mas o conteúdo não é a série esperada.
+
+    Ticker/índice trocado, moeda trocada, granularidade diferente da pedida, data futura, data
+    repetida, nível nulo, `is_total_return` ausente numa conversão. Nasceu em
+    `extract/yahoo.py` e subiu para cá na consolidação da Onda 1 (D-g), quando a conversão a BRL
+    desceu para `apps/pipeline/transform/cambio.py` e passou a precisar do mesmo erro sem
+    importar um extrator.
+    """
+
+
 class NumeroNaoReconhecido(ErroDeExtracao):
     """A string não é um número na convenção declarada (R13).
 

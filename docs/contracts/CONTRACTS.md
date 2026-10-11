@@ -21,12 +21,13 @@ packages/shared/schemas/
 ├── raw_series.py               ← RawSeriesSchema, ProcessedSeriesSchema            (pandera)
 ├── series_catalog.py           ← SeriesCatalogEntry, ExtractorConfig,
 │                                  SeriesCatalogSchema, enums, load_catalog()       (pydantic+pandera)
-├── series_catalog_data.py      ← O CATÁLOGO COMO DADO — 132 séries
+├── series_catalog_data.py      ← O CATÁLOGO COMO DADO — 134 séries
 ├── macro_quarterly.py          ← MacroQuarterlySchema,
 │                                  MacroQuarterlyProvenanceSchema                   (pandera)
 ├── asset_returns_quarterly.py  ← AssetReturnsQuarterlySchema,
 │                                  RegimeAssetMetricsSchema                         (pandera)
-└── regimes.py                  ← RegimesSchema, RegimeNeighborsSchema, enums       (pandera)
+├── regimes.py                  ← RegimesSchema, RegimeNeighborsSchema, enums       (pandera)
+└── calendario.py               ← CalendarioDiasUteisSchema (grade de dias úteis)   (pandera)
 ```
 
 Fronteiras onde a validação é **obrigatória** (`wiki/architecture.md §4`):
@@ -52,11 +53,19 @@ Fronteiras onde a validação é **obrigatória** (`wiki/architecture.md §4`):
 | `value` | float | **sim** | nulo só por ausência esperada (feriado, mês sem divulgação) — nunca interpolado |
 | `source` | str | não | enum de 15 fontes (`BCB_SGS`, `IBGE_SIDRA`, `ANBIMA_S3`, `B3_API`, `TEVA_GCS`, `YAHOO`, `MSCI`, `FRED`, `IPEADATA`, `CVM`, `DERIVADO`, `MANUAL`, ...) |
 | `freq` | str | não | `D` \| `M` \| `Q` \| `A` — **frequência nativa** |
-| `vintage` | datetime | sim | data em que o valor foi conhecido; nulo = série não revisável |
+| `vintage` | datetime | sim | safra da extração: **a data (sem hora) do `collected_at`**, que sai do `obtido_em` do manifesto do bruto (D-b) — nulo só para tabela que não é série |
 | `unit` | str | não | `%`, `%/dia`, `%a.a.`, `pp`, `index`, `BRL`, `USD`, `ratio`, `bps`, `R$ milhoes` |
 | `collected_at` | datetime | não | quando o pipeline baixou |
 
 - **PK:** `(series_id, date, vintage)` → duas extrações do mesmo ponto coexistem como vintages (CA-056).
+- **Convenções da camada processada** (consolidação da Onda 1, `DECISIONS_LOG §2.1`, provisórias):
+  **(a)** `date` de série **mensal/trimestral** é o **fim de período civil** (`2026-09-30` para o
+  IPCA de setembro), o que faz duas fontes da mesma série casarem por `date` — SGS 433 × SIDRA
+  `t/1737 v/63` em 273 meses e SGS 22109 × SIDRA `t/1621 v/584` em 90 trimestres, `max|dif| = 0`;
+  **(b)** `collected_at` e `vintage` saem do **manifesto do bruto**, não do relógio da rodada, o
+  que torna o reprocessamento `--offline` byte-idêntico; **(c)** `vintage` é a **data** desse
+  `collected_at`, sem hora, porque identifica a *safra* — é o que mantém a PK única quando a
+  fonte revisa o passado **sem** acrescentar ponto novo (IBGE/IBC-Br).
 - **Check de DataFrame:** `sem_data_futura` — `date <= collected_at` (pega a meta Selic com data futura).
 - `strict=True`: coluna fora do schema **falha**. É o que impede DataFrame ad hoc (Anti-SPEC §10.4.24).
 - `ProcessedSeriesSchema` herda o mesmo contrato para `data/processed/`.
@@ -106,7 +115,14 @@ Fronteiras onde a validação é **obrigatória** (`wiki/architecture.md §4`):
 As 13 séries FRED (10 delas `ok`) continuam no catálogo com identificador confirmado pela pesquisa —
 e **não** contam no pacote mínimo. O plano B é Yahoo/MSCI/PTAX (S-09 no `DECISIONS_LOG.md`).
 
-### 2.1 Estado do catálogo em 2026-10-10 (132 séries, validadas por pydantic)
+### 2.1 Estado do catálogo em 2026-10-11 (**134** séries, validadas por pydantic)
+
+> **132 → 134 em 2026-10-11** (D-d em `DECISIONS_LOG §2.1`): F-007 acrescentou `ACWI_BRL` e
+> `SP500_BRL`, as séries em BRL derivadas de MSCI ACWI (NETR) e `^GSPC`, com `fonte=DERIVADO` e
+> **`is_total_return` explícito em cada uma** — `ProcessedSeriesSchema` tem 8 colunas e nenhuma
+> é essa flag, então o lugar dela (CA-047) é o catálogo. Com isso `DERIVADO` vai de 7 para
+> **9** entradas e as `ok` de 99 para **101** (pacote mínimo: de 89 para **91**). O número
+> vivo é `N_SERIES_ESPERADAS` em `tests/unit/test_schemas_smoke.py`.
 
 | Status | n | Leitura |
 |---|---|---|
@@ -323,7 +339,35 @@ z_usdbrl_var_12m, z_termos_troca_yoy)`.
 
 ---
 
-## 7. Como evoluir um contrato
+## 7. `calendario_dias_uteis` — grade de dias úteis da ANBIMA (RF-018)
+
+`packages/shared/schemas/calendario.py` · produzido por `apps/pipeline/extract/calendario_anbima.py`
+(F-008) · consumido por F-014 (alinhamento) e F-017 (retornos). **Acréscimo de 2026-10-11** (D-f): o
+schema nasceu dentro do extrator e migrou para o pacote de schemas, porque é contrato de dado.
+
+| Coluna | Tipo | Nulo? | Semântica |
+|---|---|---|---|
+| `data` | datetime | não | **PK**, única; a grade é **civil** e contínua (todo dia do intervalo) |
+| `dia_util` | bool | não | seg-sex **e** não feriado nacional |
+| `feriado` | string | sim | nome do feriado; nulo = não é feriado (independe de ser fim de semana) |
+| `fonte` | str | não | `isin=["ANBIMA_WEB"]` — **lista**, nunca tupla de 1 (ver abaixo) |
+
+- **Não é `processed_series`:** não tem `value`/`unit`/`freq`/`vintage`/`collected_at`. Não é uma série
+  de valores, é uma grade de datas com dois atributos — a procedência fica no manifesto de cada página
+  em `data/raw/anbima-feriados/*.meta.json` (`sha256`, URL, hora da coleta), e é isso que deixa o
+  Parquet **byte-idêntico** entre execuções (RF-048 conferível por `sha256`, não por "quase igual").
+- **Checks:** `grade_civil_sem_lacuna` (um dia por data, sem buraco, crescente), `feriado_nunca_e_dia_util`
+  e `fim_de_semana_nunca_e_dia_util`.
+- **Cobertura atual:** 2001-01-01 → 2030-12-31 (10.957 dias, 7.530 úteis, 367 feriados). Consulta fora
+  do intervalo **levanta** `ForaDaCoberturaDoCalendario` — "não sei" nunca vira "não tem feriado".
+- **Armadilha do pandera (medida):** `isin` de **um** valor tem de ser `list`. `isin=("ANBIMA_WEB",)`
+  reprova toda linha nesta versão, porque a tupla de um elemento é desempacotada e o `set` vira o
+  conjunto de *letras* da string. Tupla com 2+ itens funciona — é por isso que `FONTES_VALIDAS` em
+  `raw_series.py` passa.
+
+---
+
+## 8. Como evoluir um contrato
 
 1. Feature Contract **classe C** no `TODO.md` (schema canônico = classe C, `AGENTS.md §2`).
 2. Altere o schema em `packages/shared/schemas/` **primeiro**.

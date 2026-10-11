@@ -23,14 +23,23 @@ série conferidos na fonte + linha em `docs/wiki/log.md`).
 
 ## Estado atual (2026-10-10)
 
-**Harness estruturado; nenhum extrator implementado ainda.**
+**Camada de extração pronta e conferida; camada canônica não começou.**
 
 - Documentação completa: escopo → pesquisa → PRD → SPEC/Anti-SPEC → contratos → TODO (40 features) → PLAN.
-- Contratos de dados escritos em `packages/shared/schemas/` (6 módulos pandera/pydantic + catálogo de 132
-  séries). **Zero código de pipeline** em `apps/pipeline/` e `apps/analysis/`.
-- `data/raw/` tem as amostras da pesquisa (ANBIMA IMA, Tesouro Direto) **e** a janela arquivada pelo
-  job F-009 (`anbima-ms/`, `anbima-ettj/`, um manifest por arquivo); `data/processed/` e
-  `data/canonical/` estão **vazios**. Nada de `data/` vai para o git.
+- Contratos de dados em `packages/shared/schemas/` (7 módulos pandera/pydantic + catálogo de **134**
+  séries).
+- **9 features implementadas:** F-001 (infra) e F-009 (job diário) com **QA aprovado**; F-002..F-008
+  (ANBIMA IMA, BCB SGS, IBGE SIDRA, Tesouro Direto, API B3, Yahoo/MSCI, calendário de dias úteis)
+  **implementadas e aguardando QA** (`docs/plans/qa/ONDA-1-QA.md`). A camada de transformação nasceu
+  com `apps/pipeline/transform/cambio.py`; `apps/analysis/` segue vazio e `data/canonical/` também —
+  é tudo **classe C**, de F-013 em diante.
+- `data/processed/` tem **53 Parquets** reconstruíveis com um comando por fonte: ~219 mil linhas de
+  `processed_series` em 51 arquivos, mais o painel do Tesouro Direto (886.300 linhas, 750 `series_id`)
+  e o calendário de dias úteis (10.957 dias, 2001→2030). `data/raw/` tem o bruto de cada fonte com
+  manifesto (`sha256`, URL, hora da coleta) e a janela rolante arquivada pelo job F-009. **Nada de
+  `data/` vai para o git** — a fonte de verdade é o script.
+- Reprodutível sem rede: `python -m apps.pipeline.extract.<fonte> --offline` reconstrói o Parquet a
+  partir do bruto arquivado, byte a byte (verificado em 2 rodadas dos 8 extratores).
 - **7 ADRs** (ADR-001..006 em **Proposta**; **ADR-007 Aceita** — Supabase descartado na v1);
   12 substituições de fonte registradas como **provisórias** em
   [`docs/plans/DECISIONS_LOG.md`](docs/plans/DECISIONS_LOG.md).
@@ -66,11 +75,11 @@ internacional usa Yahoo + MSCI + PTAX (S-09 no `DECISIONS_LOG`).
 ```
 AGENTS.md · CLAUDE.md · TODO.md · README.md · pyproject.toml · .gitignore
 .github/workflows/ci.yml        ← CI N1 ativo; N2/N3 comentados
-apps/pipeline/                  ← extração, transformação, carga        (vazio)
+apps/pipeline/                  ← common/ · extract/ · transform/ · jobs/
 apps/analysis/                  ← notebooks, regimes, figuras           (vazio)
-packages/shared/schemas/        ← FONTE DE VERDADE dos contratos (pandera + pydantic, 132 séries)
+packages/shared/schemas/        ← FONTE DE VERDADE dos contratos (pandera + pydantic, 134 séries)
 data/raw/<fonte>/               ← resposta crua da fonte, imutável      (não versionado)
-data/processed/                 ← limpo e tipado, frequência nativa     (não versionado)
+data/processed/                 ← 53 Parquets, frequência nativa        (não versionado)
 data/canonical/                 ← dataset-base trimestral alinhado      (não versionado)
 tests/unit|integration|contract|e2e/
 infra/                          ← scripts auxiliares de ambiente

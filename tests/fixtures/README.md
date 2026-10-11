@@ -43,7 +43,7 @@ lixo silenciosamente.
 
 A flag `--record` **ainda não está implementada** — não entrou em F-001 porque `tests/conftest.py` é
 arquivo compartilhado da onda; é decisão aberta, registrada em `TODO.md §6` e
-`docs/wiki/context/F-001.md §7`.
+`TODO.md §6` (parking lot).
 
 Até ela existir, a fixture é gravada por **script de sessão**: um trecho avulso que faz a chamada real
 uma vez, grava o corpo cru com o nome da convenção e **não** fica no repo. O que fica é a

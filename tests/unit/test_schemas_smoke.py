@@ -7,7 +7,7 @@ intransponível por construção. Ver `docs/plans/AUDITORIA-HARNESS.md §F-7`.
 Os testes aqui não são placeholders. Eles fecham as invariantes do catálogo que, se quebrarem,
 quebram silenciosamente toda métrica calculada sobre `status = ok`:
 
-- o catálogo **carrega** (132 entradas, `series_id` únicos);
+- o catálogo **carrega** (`N_SERIES_ESPERADAS` entradas, `series_id` únicos);
 - nenhuma entrada `ok` carrega o identificador placeholder `a_confirmar` (CA-054);
 - nenhuma série **FRED** conta como usável no pacote mínimo, mesmo `ok`
   (`skills-manifest.md §3`: fonte bloqueada nesta máquina);
@@ -26,7 +26,13 @@ from typing import Any
 
 import pytest
 
-N_SERIES_ESPERADAS = 132
+#: Contagem exata do catálogo. Era **132** até 2026-10-10; **F-007** acrescentou as 2 séries
+#: derivadas em BRL (`ACWI_BRL`, `SP500_BRL`, `fonte = DERIVADO`), levando a 134.
+#: ATENÇÃO (orquestrador): o número 132 também é citado em `docs/contracts/CONTRACTS.md §2.1`,
+#: no `README.md` e em `docs/plans/AUDITORIA-HARNESS.md` — arquivos do orquestrador durante a
+#: onda (`AGENTS.md §8/§13`), que ficaram **sem** atualizar de propósito. Outro extrator da
+#: Onda 1 que acrescente série ao catálogo vai mexer nesta mesma linha.
+N_SERIES_ESPERADAS = 134
 RAIZ = Path(__file__).resolve().parents[2]
 
 
@@ -51,7 +57,7 @@ def catalogo_dados() -> tuple[dict[str, Any], ...]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def test_catalogo_tem_132_entradas(catalogo_dados: tuple[dict[str, Any], ...]) -> None:
+def test_catalogo_tem_a_contagem_esperada(catalogo_dados: tuple[dict[str, Any], ...]) -> None:
     """A contagem é citada em `CONTRACTS.md §2.1`, no README e na auditoria — não pode derivar."""
     assert len(catalogo_dados) == N_SERIES_ESPERADAS
 
@@ -112,8 +118,8 @@ def test_descontinuada_tem_data_fim(catalogo_dados: tuple[dict[str, Any], ...]) 
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def test_load_catalog_valida_as_132_entradas() -> None:
-    """`load_catalog()` é o portão de entrada do pipeline: tem de passar nas 132 de hoje."""
+def test_load_catalog_valida_todas_as_entradas() -> None:
+    """`load_catalog()` é o portão de entrada do pipeline: tem de passar em todas de hoje."""
     pytest.importorskip("pandera")
     from packages.shared.schemas.series_catalog import load_catalog, resumo_catalogo
 

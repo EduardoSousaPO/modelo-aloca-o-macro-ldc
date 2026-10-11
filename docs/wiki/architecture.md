@@ -5,10 +5,10 @@
 > **Fonte de verdade:** `docs/specs/SPEC.md` + `packages/shared/schemas/`.
 > Esta página existe para que qualquer agente entenda a topologia em < 5 min sem ler todo o SPEC.
 
-**Última revisão:** 2026-10-10
+**Última revisão:** 2026-10-11 (consolidação da Onda 1)
 **Versão do SPEC refletida:** **v1.0** (52 RFs → 128 CAs + Anti-SPEC §10, sagrada)
-**Status do código:** contratos escritos (`packages/shared/schemas/`, 6 módulos + catálogo de 132 séries).
-**Nenhum extrator implementado ainda** — execução começa pela Onda 0 de `docs/plans/PLAN.md`.
+**Status do código (2026-10-11):** contratos escritos (`packages/shared/schemas/`, **7** módulos + catálogo de **134** séries) e a **camada de extração pronta** — `apps/pipeline/common/` (infra), `extract/` (8 extratores), `jobs/` (job diário), `transform/cambio.py` (1ª peça da transformação); `data/processed/` tem 53 Parquets reconstruíveis com `--offline`. `data/canonical/` e `apps/analysis/` seguem vazios (classe C, de F-013 em diante).
+Ondas 0 e 1 fechadas: F-001 e F-009 com **QA aprovado**, F-002..F-008 **aguardando QA** (`docs/plans/qa/ONDA-1-QA.md`). As convenções da camada processada (`date` em fim de período, `vintage` do manifesto) estão em `docs/plans/DECISIONS_LOG.md §2.1`, ainda **provisórias**.
 
 ---
 
@@ -81,7 +81,7 @@ produz o mesmo **hash** (RF-048). Nada volta para a esquerda. Persistência: **P
 | `data/processed/` → `data/canonical/` | `RawSeriesSchema` + schema da tabela destino |
 | entrada/saída de `data/canonical/` | `MacroQuarterlySchema`, `AssetReturnsQuarterlySchema`, `RegimeAssetMetricsSchema`, `RegimesSchema`, `RegimeNeighborsSchema`, `SeriesCatalogSchema` |
 | config de extrator / janela | `ExtractorConfig` (pydantic) |
-| catálogo de séries | `SeriesCatalogEntry` (pydantic) + `series_catalog_data.py` (132 séries) |
+| catálogo de séries | `SeriesCatalogEntry` (pydantic) + `series_catalog_data.py` (**134** séries) |
 
 **Regra:** para documentar um contrato em `docs/contracts/CONTRACTS.md`, **primeiro** crie o schema em
 `packages/shared/schemas/`. O CONTRACTS.md é espelho legível, não fonte.

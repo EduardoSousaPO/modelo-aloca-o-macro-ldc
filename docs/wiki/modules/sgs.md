@@ -1,36 +1,44 @@
 # Módulo `sgs` — BCB (SGS + Olinda/Focus)
 
-> Síntese — fonte de verdade: `docs/research/fontes-de-dados.md §A1-A2` + `SPEC.md`. **Status: nenhum extrator implementado** (2026-10-10).
+> Verdade: `apps/pipeline/extract/bcb_sgs.py` + `research/fontes-de-dados.md §A1-A2`.
+> **Estado (2026-10-11): SGS implementado** (F-003, aguardando QA da Onda 1); **Focus não** (F-010).
+> Núcleo macro dos 20 anos — inflação, atividade, juros, câmbio. Maior cobertura, menor esforço.
 
-## Propósito
+## `data/processed/sgs/` — 15 séries, 44.447 linhas, 0,00% de nulos, todas cobrindo 1T2006
 
-Extrair do Banco Central o núcleo macro dos 20 anos — inflação, atividade, juros e câmbio
-(`apps/pipeline/extract/bcb_sgs.py`) — e as expectativas do Focus pela API Olinda/OData v4
-(`bcb_focus.py`). É a fonte de maior cobertura e menor esforço do projeto.
+| Série | Código | freq · linhas | janela | canário |
+|---|---|---|---|---|
+| IPCA mensal · 12m | **433** · **13522** | M · 273 | 2004-01-31 → 2026-09-30 | set/2026 = **0,82** · 4,58 |
+| IBC-Br dessaz. · bruto | **24364** · **24363** | M · 271 | → 2026-07-31 (lag ~45 d) | jan/2006 = **79,44731** · 75,88784 |
+| Selic over %/dia · % a.a. | **11** · **1178** | D · 5.719 | 2004-01-02 → 2026-10-09 | 03/01/2005 = **0,064826** |
+| Meta Selic | **432** | D · **8.319** | 2004-01-01 → 2026-10-10 | 02/01/2006 = 18,00 |
+| Selic acum. mês · % a.a. | **4390** · **4189** | M · 273 | → 2026-09-30 | — |
+| CDI %/dia · acumulado | **12** · **4389** | D · 5.718 | → 2026-10-08 | 03/01/2005 = **0,064893** |
+| PTAX venda · compra | **1** · **10813** | D · 5.719 | → 2026-10-09 | 09/10/2026 = **4,9892** · 4,9886 |
+| PIB volume dessaz. · bruto | **22109** · **22099** | Q · 90 | 2004-03-31 → 2026-06-30 | 2006T1 = **131,74** · 128,18 |
 
-## Séries / RFs cobertos
+Reconciliado: CDI 2006 = **15,0271%** (249 d.u.) e 2015 = 13,2392% por `prod(1+v/100)`; IPCA 433 ×
+SIDRA `v/63` casa em **273 meses** e PIB 22109 × SIDRA `t/1621` em **90 trimestres**, `max|dif| = 0`
+(`tests/unit/test_contract_sgs_sidra.py`). `--todas` traz mais 9 séries `ok` (núcleos do IPCA, IGP,
+DLSP, IC-Br) **nunca rodadas ao vivo** e sem canário declarado.
 
-| Série | Código | RF |
-|---|---|---|
-| IPCA mensal · IPCA 12m | SGS **433** · **13522** | RF-001 |
-| IBC-Br dessazonalizado | SGS **24364** | RF-003 |
-| Selic Over %/dia · % a.a. · meta | SGS **11** · **1178** · **432** | RF-005 |
-| CDI %/dia · acumulado | SGS **12** · **4389** | RF-006 |
-| PTAX BRL/USD venda | SGS **1** · **10813** | RF-015 |
-| Focus — IPCA, Selic, PIB, câmbio | Olinda `ExpectativasMercado*` (5 EntitySets) | RF-007 |
+## Convenções, bordas e armadilhas (medidas, não herdadas)
 
-## Fonte primária e fallback
+- **`date` de série M/Q = fim de período civil** (`fim_do_periodo`, D-a) — a API devolve o 1º dia.
+  Efeito medido: a linha do **mês corrente parcial** de 4390/4189 (01/10/2026 = 0,36% contra ~1,08%
+  de mês cheio) vira `2026-10-31`, cai no truncamento de data futura e é **descartada com log**.
+- **`vintage` = data do `collected_at` do manifesto do bruto** (D-b) → `--offline` byte-idêntico.
+- **`para_float_ponto_decimal`, nunca `para_float_ptbr`:** o JSON usa ponto decimal e trocar não
+  explode — muda a escala em silêncio (`"6.930"` → 6930,0). Travado em teste.
+- **`janela_maxima_dias` é o que liga o fatiamento** (diária ~5 anos → 5 fatias; M/Q = 1 fatia); o
+  piso de contagem vale para o **total**, não para a fatia, e é folgado de propósito.
+- **O erro de janela de 10 anos virou HTTP 406** (a pesquisa mediu 200), e **série inexistente devolve
+  XHTML com HTTP 200** — é essa a fixture de CA-003. Tudo passa por `validar_corpo_json_array`.
+- **Meta Selic (432) é série de calendário corrido:** mesmo valor em sábado, domingo e feriado
+  (`SERIES_DIARIAS_DE_CALENDARIO`), com continuidade **mais forte** — nenhum dia corrido ausente. Com
+  `dataFinal` futuro devolve até a próxima reunião do Copom; `truncar_em` corta (CA-013).
+- `/metadados` → 404 e `sgspub` → 502: códigos versionados no catálogo. Rate limit (429) existe.
+- **R16 · descontinuadas:** swaps 7801-7806 (2019) e IMA 12461-12469 (22/05/2023) **não entram**
+  (S-02, S-04); o portão é `status=ok` no catálogo, com teste.
 
-- **Primária:** `api.bcb.gov.br/dados/serie/bcdata.sgs.{cod}/dados?formato=json` · `olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata/...`
-- **Fallback:** Ipeadata (`BM366_TJOVER366`, `BM12_TJOVER12`, `BM12_IPCAEXP1212`), SIDRA `t/1737` para IPCA, `python-bcb` (mas `sgs.search` **não existe**).
-
-## Armadilhas conhecidas (pesquisa)
-
-- **R1 · erro com HTTP 200:** série diária rejeita janela > 10 anos devolvendo JSON de erro com status 200, e série inexistente devolve HTML com 200. Fatiar diárias em ≤ 5 anos e validar que o corpo é *array*.
-- **R2 · truncamento no Olinda:** `$top=20000` devolve 20.000 linhas **sem `nextLink`**; `$count` e `$apply` são ignorados sem erro. Omitir `$top` ou paginar com `$skip`.
-- **Formatos/datas:** `$format=text/csv` do Olinda tem separador **e** decimal vírgula → usar JSON; PTAX no Olinda vem em `MM-DD-YYYY`, o SGS em `dd/mm/aaaa` (R12).
-- **Sem metadados:** `/metadados` → 404 e `www3.bcb.gov.br/sgspub` → 502 → códigos versionados em `packages/shared/schemas/series_catalog_data.py`. Rate limit existe (429).
-- **R16 · descontinuadas:** swaps 7801-7806/7816-7827 (set/2019) e IMA 12461-12469 (22/05/2023) **não servem** → ver S-02 e S-04 no `DECISIONS_LOG`.
-
-**Features do TODO:** **F-001** (infra) · **F-003** (SGS) · **F-010** (Focus) · **F-011** (conectividade) ·
-**F-013**/**F-015** (consomem na camada canônica).
+**Features:** **F-003** (implementado) · **F-010** · **F-011** · **F-013**/**F-015**/**F-017**.

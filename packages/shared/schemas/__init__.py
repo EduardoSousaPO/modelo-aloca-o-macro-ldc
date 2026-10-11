@@ -6,6 +6,7 @@ Espelho legível: `docs/contracts/CONTRACTS.md` (nunca o contrário: primeiro o 
 | Módulo | O que define | SPEC |
 |---|---|---|
 | `raw_series` | `raw_series` / `processed_series` (granularidade nativa) | RF-020 |
+| `calendario` | `calendario_dias_uteis` (grade de dias úteis da ANBIMA) | RF-018 |
 | `series_catalog` | `SeriesCatalogEntry`, `ExtractorConfig`, `SeriesCatalogSchema` | RF-019 |
 | `series_catalog_data` | o catálogo **como dado** (uma entrada por série) | RF-019 |
 | `macro_quarterly` | `macro_quarterly` (83 trimestres) + procedência | RF-021, RF-047 |
@@ -21,6 +22,10 @@ from packages.shared.schemas.asset_returns_quarterly import (
     ASSET_IDS_VALIDOS,
     AssetReturnsQuarterlySchema,
     RegimeAssetMetricsSchema,
+)
+from packages.shared.schemas.calendario import (
+    FONTE_CALENDARIO,
+    CalendarioDiasUteisSchema,
 )
 from packages.shared.schemas.macro_quarterly import (
     COLUNAS_RASTREAVEIS,
@@ -62,10 +67,12 @@ __all__ = [
     "COLUNAS_RASTREAVEIS",
     "FEATURES_V3",
     "FONTES_BLOQUEADAS_NO_PACOTE_MINIMO",
+    "FONTE_CALENDARIO",
     "K_VIZINHOS_PADRAO",
     "LIMIAR_COBERTURA_2006",
     "N_TRIMESTRES_JANELA",
     "AssetReturnsQuarterlySchema",
+    "CalendarioDiasUteisSchema",
     "CicloSelic",
     "Confianca",
     "ExtractorConfig",

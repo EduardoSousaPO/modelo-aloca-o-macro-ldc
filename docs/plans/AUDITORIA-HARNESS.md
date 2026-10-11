@@ -13,6 +13,14 @@
 > validação **executada** do catálogo (132 entradas, contagens por fonte/status/item) e execução real de
 > `ruff check`, `ruff format --check` e `pytest tests/unit`.
 
+> **Nota do orquestrador, 2026-10-11 (não reescreve o laudo).** Tudo que este laudo diz sobre o
+> catálogo foi medido em **132 séries**. Em 2026-10-11 o catálogo passou a ter **134**: F-007
+> acrescentou `ACWI_BRL` e `SP500_BRL` (`fonte=DERIVADO`, `is_total_return` explícito), aceito como
+> **D-d** em `docs/plans/DECISIONS_LOG.md §2.1`. Onde se lê 132, leia 134; `ok` vai de 99 para 101 e o
+> pacote mínimo de 89 para 91. As contagens por status, fonte e item do e-mail **não mudam no resto**,
+> e nenhuma conclusão do laudo depende do total. O número vivo é `N_SERIES_ESPERADAS` em
+> `tests/unit/test_schemas_smoke.py`.
+
 ---
 
 ## A. Rastreabilidade de escopo — os 13 itens do e-mail
