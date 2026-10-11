@@ -27,12 +27,17 @@ from typing import Any
 import pytest
 
 #: Contagem exata do catálogo. Era **132** até 2026-10-10; **F-007** acrescentou as 2 séries
-#: derivadas em BRL (`ACWI_BRL`, `SP500_BRL`, `fonte = DERIVADO`), levando a 134.
-#: ATENÇÃO (orquestrador): o número 132 também é citado em `docs/contracts/CONTRACTS.md §2.1`,
+#: derivadas em BRL (`ACWI_BRL`, `SP500_BRL`, `fonte = DERIVADO`), levando a 134; **F-016**
+#: acrescentou as 4 do vértice de 3 anos (`CURVA_REAL_3A`, `CURVA_NOMINAL_3A`,
+#: `INCLINACAO_REAL_5A_3A`, `INCLINACAO_NOMINAL_5A_3A`, `fonte = DERIVADO`) por **D-i** —
+#: decisão provisória do orquestrador de 2026-10-11, porque CA-025 (inclinação real em >= 95% dos
+#: dias úteis de 2006-2026) **não fecha** com o vértice curto de 1 ano (60,53%) e fecha com o de
+#: 3 anos (95,25%) —, levando a **138**.
+#: ATENÇÃO (orquestrador): o número também é citado em `docs/contracts/CONTRACTS.md §2.1`,
 #: no `README.md` e em `docs/plans/AUDITORIA-HARNESS.md` — arquivos do orquestrador durante a
-#: onda (`AGENTS.md §8/§13`), que ficaram **sem** atualizar de propósito. Outro extrator da
-#: Onda 1 que acrescente série ao catálogo vai mexer nesta mesma linha.
-N_SERIES_ESPERADAS = 134
+#: onda (`AGENTS.md §8/§13`), que ficaram **sem** atualizar de propósito. Outra feature que
+#: acrescente série ao catálogo vai mexer nesta mesma linha.
+N_SERIES_ESPERADAS = 138
 RAIZ = Path(__file__).resolve().parents[2]
 
 

@@ -869,6 +869,72 @@ _TESOURO_E_CURVA: list[dict[str, Any]] = [
         "o vertice de 10 anos NAO existe antes de ~2010 (L5) e retorna NULL + flag.",
     },
     {
+        "series_id": "CURVA_REAL_3A",
+        "nome": "Taxa real (NTN-B) interpolada para o vertice de 3 anos",
+        "item_email": "A6",
+        "fonte": "DERIVADO",
+        "identificador": "interpolacao de TESOURO_TD_PRECOTAXA (Tesouro IPCA+)",
+        "fonte_url": URL_TESOURO,
+        "freq": "D",
+        "unit": "%a.a.",
+        "data_inicio": "2004-12-31",
+        "transformacao_padrao": "interpolacao_para_vertice_fixo",
+        "confianca": "NAO_VERIFICADO",
+        "obs": "Serie construida por nos (D-i, provisoria). O vertice de 3 anos e o que CA-023 "
+        "nomeia ('1, 3 e 5 anos') e o que da suporte a ponta curta REAL: cobre 95,25% das datas "
+        "base de 2006 em diante, contra 60,53% do vertice de 1 ano (a grade da NTN-B nao tem "
+        "vencimento abaixo de 1 ano em 2021 e 2022 inteiros). Flag vertice_extrapolado "
+        "obrigatoria.",
+    },
+    {
+        "series_id": "CURVA_NOMINAL_3A",
+        "nome": "Taxa nominal (LTN/NTN-F) interpolada para o vertice de 3 anos",
+        "item_email": "A6",
+        "fonte": "DERIVADO",
+        "identificador": "interpolacao de TESOURO_TD_PRECOTAXA (Prefixado)",
+        "fonte_url": URL_TESOURO,
+        "freq": "D",
+        "unit": "%a.a.",
+        "data_inicio": "2004-12-31",
+        "transformacao_padrao": "interpolacao_para_vertice_fixo",
+        "confianca": "NAO_VERIFICADO",
+        "obs": "Serie construida por nos (D-i, provisoria). Par nominal do vertice de 3 anos: "
+        "cobre 100% das datas base de 2006 em diante.",
+    },
+    {
+        "series_id": "INCLINACAO_REAL_5A_3A",
+        "nome": "Inclinacao real da curva (NTN-B 5a menos 3a)",
+        "item_email": "A6",
+        "fonte": "DERIVADO",
+        "identificador": "CURVA_REAL_5A - CURVA_REAL_3A",
+        "fonte_url": URL_TESOURO,
+        "freq": "D",
+        "unit": "pp",
+        "data_inicio": "2004-12-31",
+        "transformacao_padrao": "ultimo_dia_util_do_trimestre",
+        "confianca": "NAO_VERIFICADO",
+        "obs": "VARIAVEL PRINCIPAL DE REGIME (PROVISORIA) — D-i de 2026-10-11, aguarda aval do "
+        "Edu. Substitui INCLINACAO_REAL_5A_1A nesse papel porque cobre 95,25% das datas base de "
+        "2006 em diante (CA-025 pede >= 95%) contra 60,53% da 5a-1a, que fica como secundaria. "
+        "Nao e a ETTJ Svensson oficial da ANBIMA: sao taxas do Tesouro Direto (varejo), com "
+        "pequeno spread vs. secundario.",
+    },
+    {
+        "series_id": "INCLINACAO_NOMINAL_5A_3A",
+        "nome": "Inclinacao nominal da curva (5a menos 3a)",
+        "item_email": "A6",
+        "fonte": "DERIVADO",
+        "identificador": "CURVA_NOMINAL_5A - CURVA_NOMINAL_3A",
+        "fonte_url": URL_TESOURO,
+        "freq": "D",
+        "unit": "pp",
+        "data_inicio": "2004-12-31",
+        "transformacao_padrao": "ultimo_dia_util_do_trimestre",
+        "confianca": "NAO_VERIFICADO",
+        "obs": "Serie construida por nos (D-i, provisoria); par nominal da inclinacao 5a-3a. "
+        "Cobre 100% das datas base de 2006 em diante.",
+    },
+    {
         "series_id": "INCLINACAO_REAL_5A_1A",
         "nome": "Inclinacao real da curva (NTN-B 5a menos 1a)",
         "item_email": "A6",

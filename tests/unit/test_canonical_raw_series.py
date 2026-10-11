@@ -30,6 +30,7 @@ pd = pytest.importorskip("pandas")
 from apps.pipeline.canonical.build_raw_series import (  # noqa: E402
     COLUNAS_OBSERVADAS,
     COLUNAS_RAW_SERIES,
+    MODULOS_DO_BUILD,
     NOME_CATALOGO,
     NOME_DUCKDB,
     NOME_RAW_SERIES,
@@ -38,6 +39,7 @@ from apps.pipeline.canonical.build_raw_series import (  # noqa: E402
     TABELAS_FORA_DO_RAW_SERIES,
     FrequenciaNaoNativa,
     ProcedenciaNaoResolvida,
+    caminhos_dos_componentes,
     carregar_processed,
     consolidar,
     construir,
@@ -47,6 +49,7 @@ from apps.pipeline.canonical.build_raw_series import (  # noqa: E402
     validar_frequencia_nativa,
     validar_procedencia,
     validar_sem_mistura_de_fontes,
+    versao_build,
 )
 from apps.pipeline.common import caminho_camada  # noqa: E402
 from apps.pipeline.common.errors import FonteIndisponivel, SerieInconsistente  # noqa: E402
@@ -54,6 +57,8 @@ from apps.pipeline.common.io_layers import Camada  # noqa: E402
 from packages.shared.schemas import load_catalog  # noqa: E402
 
 if TYPE_CHECKING:  # pragma: no cover
+    from collections.abc import Iterator
+
     from packages.shared.schemas import SeriesCatalogEntry
 
 CATALOGO = load_catalog()
@@ -135,6 +140,34 @@ def _gravar_mini_processed(base: Path, quadros: dict[str, pd.DataFrame]) -> Path
         alvo.parent.mkdir(parents=True, exist_ok=True)
         quadro.to_parquet(alvo, index=False)
     return destino
+
+
+@pytest.fixture
+def registros_do_build() -> Iterator[list[str]]:
+    """Mensagens de `pipeline.build_raw_series`, capturadas no próprio logger do módulo.
+
+    Não uso `caplog`: `configurar_logging()` põe `propagate = False` no logger `pipeline`, e um
+    teste anterior que chame o CLI deixaria o `caplog` (que escuta a raiz) cego — exatamente o
+    tipo de evidência silenciosa que `logging_setup.py` existe para evitar.
+    """
+    import logging
+
+    mensagens: list[str] = []
+
+    class _Captura(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            mensagens.append(record.getMessage())
+
+    logger = logging.getLogger("pipeline.build_raw_series")
+    handler = _Captura(level=logging.INFO)
+    nivel_anterior = logger.level
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    try:
+        yield mensagens
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(nivel_anterior)
 
 
 @pytest.fixture
@@ -238,6 +271,70 @@ def test_pk_repetida_com_valor_divergente_falha_ruidosamente() -> None:
     outra = mini_serie(SERIE_M, ["2026-09-30"], [0.91])
     with pytest.raises(SerieInconsistente, match="divergente"):
         consolidar(pd.concat([uma, outra], ignore_index=True))
+
+
+# ── P1-3/P2-1 (QA da Onda 2): o dedup não pode cegar as guardas nem contar errado ───
+
+
+def test_pk_repetida_com_mesmo_value_e_source_divergente_levanta() -> None:
+    """P1-3: o furo medido pelo QA — mesma PK, mesmo `value`, `source` diferente **passava**.
+
+    Duas defesas hoje: `consolidar` mede divergência nas 8 colunas, e
+    `validar_sem_mistura_de_fontes` roda no concatenado, antes de qualquer `drop_duplicates`.
+    O terceiro `assert` mostra por que a ordem importa: sobre o quadro já deduplicado por PK a
+    guarda de CA-077 **passa**, porque a linha que provava a mistura não existe mais.
+    """
+    real = mini_serie(SERIE_D, ["2006-01-02"], [36000.0])
+    enxertada = real.copy()
+    enxertada["source"] = "YAHOO"
+    bruto = pd.concat([real, enxertada], ignore_index=True)
+
+    cego = bruto.drop_duplicates(subset=list(PK_RAW_SERIES), keep="first")
+    validar_sem_mistura_de_fontes(cego)  # evidência apagada: era o cenário Anti-SPEC §10.3.19
+
+    with pytest.raises(SerieInconsistente, match="mais de um `source`"):
+        validar_sem_mistura_de_fontes(bruto)
+    with pytest.raises(SerieInconsistente, match="divergente"):
+        consolidar(bruto)
+
+
+@pytest.mark.parametrize("coluna", ["unit", "freq", "collected_at"])
+def test_pk_repetida_com_qualquer_coluna_divergente_levanta(coluna: str) -> None:
+    """Mesma data, mesmo número, escala/frequência/safra outra é conflito, não repetição."""
+    uma = mini_serie(SERIE_M, ["2026-09-30"], [0.82])
+    outra = uma.copy()
+    outra[coluna] = {"unit": "index", "freq": "Q", "collected_at": pd.Timestamp("2026-10-11")}[
+        coluna
+    ]
+    with pytest.raises(SerieInconsistente, match="divergente"):
+        consolidar(pd.concat([uma, outra], ignore_index=True))
+
+
+def test_pk_repetida_com_value_nulo_contra_preenchido_levanta() -> None:
+    """`value=0.82` vs. `NaN` na mesma PK: o nulo não pode ser absorvido pelo dedup."""
+    preenchida = mini_serie(SERIE_M, ["2026-09-30"], [0.82])
+    vazia = mini_serie(SERIE_M, ["2026-09-30"], [None])
+    with pytest.raises(SerieInconsistente, match="divergente"):
+        consolidar(pd.concat([preenchida, vazia], ignore_index=True))
+
+
+def test_tres_copias_identicas_removem_duas_e_logam_duas(
+    registros_do_build: list[str],
+) -> None:
+    """P2-1: `int(duplicadas.sum()) // 2` logava 1 para 3 cópias. Agora loga as 2 removidas."""
+    uma = mini_serie(SERIE_M, ["2026-09-30"], [0.82])
+    raw = consolidar(pd.concat([uma, uma, uma], ignore_index=True))
+    assert len(raw) == 1
+    assert raw["value"].iloc[0] == 0.82
+    assert [m for m in registros_do_build if "dedup" in m] == [
+        "dedup: 2 linha(s) idêntica(s) na PK removida(s)"
+    ]
+
+
+def test_sem_duplicata_nao_loga_dedup(registros_do_build: list[str]) -> None:
+    """Controle: sem duplicata não há linha de dedup no log (nem `0 linha(s)`)."""
+    consolidar(painel_de_controle())
+    assert [m for m in registros_do_build if "dedup" in m] == []
 
 
 def test_ordenacao_e_deterministica_independente_da_ordem_de_entrada() -> None:
@@ -366,10 +463,10 @@ def test_exigir_serie_presente_nao_levanta() -> None:
 # ── CA-053: catálogo materializado ──────────────────────────────────────────
 
 
-def test_catalogo_materializado_tem_as_134_entradas_e_as_6_colunas_observadas() -> None:
+def test_catalogo_materializado_tem_as_138_entradas_e_as_6_colunas_observadas() -> None:
     """CA-053: o catálogo materializado é o catálogo **inteiro**, não só o que veio."""
     tabela = materializar_catalogo(CATALOGO, consolidar(painel_de_controle()))
-    assert len(tabela) == len(CATALOGO) == 134
+    assert len(tabela) == len(CATALOGO) == 138  # 134 + as 4 de D-i (F-016, vértice de 3 anos)
     for coluna in COLUNAS_OBSERVADAS:
         assert coluna in tabela.columns
     assert int(tabela["presente_no_processed"].sum()) == 3
@@ -402,7 +499,7 @@ def test_catalogo_materializado_nao_herda_janela_declarada_para_serie_ausente() 
     """A guarda `ausente_nao_tem_observacao`: `data_inicio` declarado ≠ observado."""
     tabela = materializar_catalogo(CATALOGO, consolidar(painel_de_controle()))
     ausentes = tabela[~tabela["presente_no_processed"]]
-    assert len(ausentes) == 131
+    assert len(ausentes) == 135  # 131 + as 4 de D-i, que este painel de controle não traz
     assert ausentes["data_inicio_observada"].isna().all()
     assert (ausentes["n_obs"] == 0).all()
     assert (~ausentes["cobre_1t2006"]).all()
@@ -437,11 +534,126 @@ def test_build_completo_grava_os_quatro_artefatos(processed_minimo: Path) -> Non
     assert relatorio["raw_series"]["series"] == 3
     assert relatorio["raw_series"]["sha256"] == _sha256(canonical / NOME_RAW_SERIES)
     assert relatorio["series_catalog"]["sha256"] == _sha256(canonical / NOME_CATALOGO)
-    assert relatorio["series_catalog"]["linhas"] == 134
+    assert relatorio["series_catalog"]["linhas"] == 138  # D-i: 134 + 4 (F-016)
     assert len(relatorio["tabelas_excluidas"]) == 2
     assert len(relatorio["series"]) == 3
     assert len(relatorio["versao_build"]) == 64
+    assert relatorio["linhas_dedup"] == 0
     assert resultado.relatorio == relatorio
+
+
+# ── P1-1 (QA da Onda 2): `versao_build` não pode ser cego ao catálogo ───────
+
+
+def _copiar_componentes(destino: Path) -> list[Path]:
+    """Cópias dos `MODULOS_DO_BUILD` em `tmp_path`, com o mesmo nome de arquivo."""
+    destino.mkdir(parents=True, exist_ok=True)
+    copias: list[Path] = []
+    for origem in caminhos_dos_componentes():
+        copia = destino / origem.name
+        copia.write_bytes(origem.read_bytes())
+        copias.append(copia)
+    return copias
+
+
+def test_versao_build_hasheia_o_conjunto_e_nao_depende_do_caminho(tmp_path: Path) -> None:
+    """Controle do hash de conjunto: cópias byte-idênticas dão a **mesma** versão."""
+    assert len(caminhos_dos_componentes()) == len(MODULOS_DO_BUILD) == 4
+    assert versao_build(_copiar_componentes(tmp_path / "copia")) == versao_build()
+
+
+def test_versao_build_muda_quando_o_catalogo_de_dados_muda(tmp_path: Path) -> None:
+    """P1-1: editar `series_catalog_data.py` mudava o artefato **sem** mudar `versao_build`.
+
+    Era a causa de um materializado publicado obsoleto passar por reproduzível. O catálogo entra
+    no conjunto hasheado, então qualquer edição nele move a versão.
+    """
+    copias = _copiar_componentes(tmp_path / "copia")
+    catalogo = next(c for c in copias if c.name == "series_catalog_data.py")
+    catalogo.write_bytes(catalogo.read_bytes() + b"\n# is_total_return=False no YAHOO_GSPC\n")
+    assert versao_build(copias) != versao_build()
+
+
+@pytest.mark.parametrize("modulo", ["raw_series.py", "series_catalog.py"])
+def test_versao_build_muda_quando_um_schema_do_portao_muda(tmp_path: Path, modulo: str) -> None:
+    """Os dois schemas que servem de portão também determinam o Parquet."""
+    copias = _copiar_componentes(tmp_path / "copia")
+    alvo = next(c for c in copias if c.name == modulo)
+    alvo.write_bytes(alvo.read_bytes() + b"\n# coluna nova\n")
+    assert versao_build(copias) != versao_build()
+
+
+def test_relatorio_carrega_catalogo_sha256_e_os_componentes(processed_minimo: Path) -> None:
+    """O diagnóstico de "artefato velho" tem de estar **no dado**, não só no código."""
+    import hashlib
+
+    resultado = construir(
+        raiz=processed_minimo,
+        raiz_processed=processed_minimo / "data" / "processed",
+        com_duckdb=False,
+    )
+    arquivo_catalogo = next(
+        c for c in caminhos_dos_componentes() if c.name == "series_catalog_data.py"
+    )
+    esperado = hashlib.sha256(arquivo_catalogo.read_bytes()).hexdigest()
+    assert resultado.relatorio["catalogo_sha256"] == esperado
+    assert resultado.relatorio["versao_build_componentes"] == list(MODULOS_DO_BUILD)
+
+
+# ── P1-2 (QA da Onda 2): `calendario` chega ao materializado ────────────────
+
+
+def test_materializado_publica_calendario_do_catalogo(processed_minimo: Path) -> None:
+    """P1-2: `BCB_SGS_432` publica em dia corrido, e o consumidor do Parquet tem de saber.
+
+    Lido **do Parquet gravado**, não do DataFrame em memória: o furo original era `strict=True`
+    deixar a coluna fora do artefato mesmo com o campo presente no catálogo pydantic.
+    """
+    resultado = construir(
+        raiz=processed_minimo,
+        raiz_processed=processed_minimo / "data" / "processed",
+        com_duckdb=False,
+    )
+    tabela = pd.read_parquet(resultado.caminho_catalogo).set_index("series_id")
+    assert "calendario" in tabela.reset_index().columns
+    assert tabela.loc["BCB_SGS_432", "calendario"] == "corrido"
+    assert tabela.loc["BCB_SGS_11", "calendario"] == "dias_uteis"
+    # Série não diária não declara calendário — e nulo continua nulo, não vira a string "None".
+    assert pd.isna(tabela.loc[SERIE_M, "calendario"])
+    assert pd.isna(tabela.loc[SERIE_Q, "calendario"])
+    assert set(tabela["calendario"].dropna().unique()) <= {"dias_uteis", "corrido"}
+    assert _entrada("BCB_SGS_432").calendario == "corrido"
+
+
+# ── P1-3 (QA da Onda 2): o build inteiro recusa a substituição de fonte ─────
+
+
+def test_build_recusa_mesma_pk_com_source_divergente_e_nao_grava(tmp_path: Path) -> None:
+    """O cenário do QA ("BUILD PASSOU: 5 linhas, sources=['B3_API']") agora para o build."""
+    original = mini_serie(SERIE_D, ["2006-01-02", "2006-01-03"], [36000.0, 36100.0])
+    enxertado = original.copy()
+    enxertado["source"] = "YAHOO"
+    _gravar_mini_processed(
+        tmp_path, {"b3/B3_IBOV.parquet": original, "yahoo/B3_IBOV.parquet": enxertado}
+    )
+    with pytest.raises((SerieInconsistente, ProcedenciaNaoResolvida)):
+        construir(raiz=tmp_path, raiz_processed=tmp_path / "data" / "processed", com_duckdb=False)
+    assert not (tmp_path / "data" / "canonical" / NOME_RAW_SERIES).exists()
+
+
+def test_build_remove_duplicata_identica_entre_arquivos_e_registra_no_relatorio(
+    tmp_path: Path,
+) -> None:
+    """P2-2: o dedup deixa rastro **no dado** (`linhas_dedup`), não só no `_log.info`."""
+    serie = mini_serie(SERIE_M, ["2026-08-31", "2026-09-30"], [-0.32, 0.82])
+    _gravar_mini_processed(
+        tmp_path, {"sgs/BCB_SGS_433.parquet": serie, "sgs-reexport/BCB_SGS_433.parquet": serie}
+    )
+    resultado = construir(
+        raiz=tmp_path, raiz_processed=tmp_path / "data" / "processed", com_duckdb=False
+    )
+    assert len(resultado.raw_series) == 2
+    assert resultado.relatorio["linhas_dedup"] == 2
 
 
 def test_build_e_idempotente_mesmo_sha256_em_duas_execucoes(processed_minimo: Path) -> None:

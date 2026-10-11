@@ -8,13 +8,14 @@ O que este módulo faz, e **só** isto:
    `TABELAS_FORA_DO_RAW_SERIES`, cada uma com o motivo no próprio dado).
 2. **Valida a entrada** com `ProcessedSeriesSchema`, arquivo por arquivo: Parquet que não é
    `processed_series` derruba o build em vez de entrar no canônico (CA-057, CA-075).
-3. **Consolida** numa tabela longa: dedup pela PK `(series_id, date, vintage)` — e **levanta** se a
-   mesma PK traz valor divergente, em vez de escolher uma —, ordenação determinística e ordem de
-   coluna do schema.
-4. **Guarda as quatro invariantes** que a camada canônica não pode descobrir a jusante:
-   procedência resolvível no catálogo (CA-055/CA-120), frequência **nativa** igual à declarada
-   (CA-058), uma fonte por série (CA-077) e nenhuma série `a_confirmar` no caminho crítico
-   (CA-054).
+3. **Guarda procedência e fonte única no concatenado**, *antes* de qualquer dedup: procedência
+   resolvível no catálogo (CA-055/CA-120), uma fonte por série (CA-077) e nenhuma série
+   `a_confirmar` no caminho crítico (CA-054). A ordem é parte da garantia — dedup primeiro
+   apagaria a linha que prova a mistura.
+4. **Consolida** numa tabela longa: dedup pela PK `(series_id, date, vintage)` só quando a linha é
+   idêntica nas **8 colunas** — e **levanta** se divergir em qualquer uma, em vez de escolher uma
+   —, ordenação determinística e ordem de coluna do schema. Em seguida valida a frequência
+   **nativa** declarada (CA-058), que é a invariante que precisa do dedup já feito.
 5. **Materializa o catálogo** com o observado (`SeriesCatalogMaterializedSchema`, CA-053).
 6. **Grava** `raw_series.parquet` + `series_catalog.parquet` (portão `RawSeriesSchema` /
    `SeriesCatalogMaterializedSchema` **antes** da escrita), o `relatorio_build.json` e o
@@ -31,7 +32,8 @@ comportamento: a fonte deste build é o disco.
 **Idempotente por construção.** Dois builds sobre o mesmo `data/processed/` produzem Parquet e
 relatório byte-idênticos, porque nada aqui depende do relógio: `collected_at`/`vintage` vêm do
 manifesto do bruto (D-b) e o relatório não carrega hora de geração — carrega `versao_build`
-(`sha256` deste arquivo) e o `collected_at` máximo do dado. O `.duckdb` é a exceção declarada:
+(`sha256` do conjunto `MODULOS_DO_BUILD`: este arquivo + os dois schemas + o catálogo como dado),
+`catalogo_sha256` e o `collected_at` máximo do dado. O `.duckdb` é a exceção declarada:
 é binário derivado, recriado a cada build, e **não** entra na conferência por hash.
 
 Referências: SPEC RF-019/RF-020/RF-026/RF-047 (CA-053..058, CA-075..077, CA-120) ·
@@ -44,6 +46,7 @@ import argparse
 import json
 import sys
 from dataclasses import dataclass, field
+from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -98,6 +101,19 @@ COLUNAS_RAW_SERIES: tuple[str, ...] = (
 
 #: PK lógica de `raw_series` (CONTRACTS.md §1). Também a chave de ordenação.
 PK_RAW_SERIES: tuple[str, ...] = ("series_id", "date", "vintage")
+
+#: Módulo que carrega o catálogo **como dado** — hasheado sozinho em `catalogo_sha256`.
+MODULO_CATALOGO_DADOS = "packages.shared.schemas.series_catalog_data"
+
+#: Os módulos que determinam o conteúdo dos artefatos, **nesta ordem** — base de `versao_build`.
+#: Não é "o pipeline inteiro": é este builder + os dois schemas que ele usa como portão + o dado
+#: do catálogo. Mudar qualquer um muda o Parquet, então tem de mudar a versão (P1-1, Onda 2).
+MODULOS_DO_BUILD: tuple[str, ...] = (
+    "apps.pipeline.canonical.build_raw_series",
+    "packages.shared.schemas.raw_series",
+    "packages.shared.schemas.series_catalog",
+    MODULO_CATALOGO_DADOS,
+)
 
 #: Tabelas de `data/processed/` que **não** são `processed_series` e por quê.
 #: A chave é o sufixo do caminho POSIX relativo a `data/processed/`.
@@ -236,9 +252,15 @@ def carregar_processed(alvos: Sequence[Path]) -> pd.DataFrame:
 def consolidar(quadro: pd.DataFrame) -> pd.DataFrame:
     """Tabela longa final: dedup pela PK, ordenação determinística, ordem de coluna do schema.
 
-    Duplicata **idêntica** na PK é removida (dois extratores podem reexportar o mesmo ponto);
-    duplicata com `value` **divergente** levanta `SerieInconsistente`, porque escolher uma das
-    duas em silêncio é exatamente o erro que CA-068 e o Validation Mode §7 mandam não cometer.
+    Duplicata **idêntica nas 8 colunas** é removida (dois extratores podem reexportar o mesmo
+    ponto); duplicata com qualquer coluna divergente levanta `SerieInconsistente`, porque escolher
+    uma das duas em silêncio é o erro que CA-068 e o Validation Mode §7 mandam não cometer.
+
+    A divergência é medida nas **8 colunas**, não só em `value` (P1-3 do QA da Onda 2): comparar
+    apenas o valor fazia a mesma PK com `source` diferente colapsar em silêncio, cegando
+    `validar_sem_mistura_de_fontes` (CA-077) — é a "substituição de fonte sem rastro" da Anti-SPEC
+    §10.3.19. `unit`, `freq` e `collected_at` entram pela mesma razão: mesma data, mesmo número,
+    procedência ou escala outra é conflito, não repetição.
     """
     faltando = [c for c in COLUNAS_RAW_SERIES if c not in quadro.columns]
     if faltando:
@@ -247,26 +269,34 @@ def consolidar(quadro: pd.DataFrame) -> pd.DataFrame:
 
     saida = quadro.loc[:, list(COLUNAS_RAW_SERIES)].copy()
 
+    antes = len(saida)
     duplicadas = saida.duplicated(subset=list(PK_RAW_SERIES), keep=False)
     if bool(duplicadas.any()):
         candidatas = saida.loc[duplicadas]
-        divergentes = candidatas.groupby(list(PK_RAW_SERIES), dropna=False)["value"].nunique(
-            dropna=False
-        )
+        # `drop_duplicates` trata nulo == nulo, então `value=100` vs. `value=NaN` continua sendo
+        # duas linhas distintas — e portanto conflito, não repetição.
+        distintas = candidatas.drop_duplicates(subset=list(COLUNAS_RAW_SERIES), keep="first")
+        divergentes = distintas.groupby(list(PK_RAW_SERIES), dropna=False).size()
         conflito = divergentes[divergentes > 1]
         if len(conflito) > 0:
             amostra = [
-                f"{a} {pd.Timestamp(b).date()} v={c}" for a, b, c in list(conflito.index)[:5]
+                f"{a} {pd.Timestamp(b).date()} vintage={pd.Timestamp(c).date()}"
+                for a, b, c in list(conflito.index)[:5]
             ]
             msg = (
-                f"{len(conflito)} PK(s) (series_id, date, vintage) com `value` divergente — "
-                f"amostra: {amostra}. Dedup silencioso aqui esconderia revisão de fonte ou bug de "
-                f"extrator; resolva na camada processada."
+                f"{len(conflito)} PK(s) (series_id, date, vintage) com linha divergente em "
+                f"value/source/unit/freq/collected_at — amostra: {amostra}. Dedup silencioso aqui "
+                f"esconderia revisão de fonte, troca de procedência ou bug de extrator; resolva "
+                f"na camada processada."
             )
             raise SerieInconsistente(msg)
-        _log.info("dedup: %d linha(s) idêntica(s) na PK removida(s)", int(duplicadas.sum()) // 2)
 
     saida = saida.drop_duplicates(subset=list(PK_RAW_SERIES), keep="first")
+    removidas = antes - len(saida)
+    if removidas:
+        # Contagem real de linhas removidas: o `// 2` anterior presumia 2 cópias por PK e
+        # subnotificava 3 cópias ou mais (P2-1 do QA da Onda 2).
+        _log.info("dedup: %d linha(s) idêntica(s) na PK removida(s)", removidas)
     saida = saida.sort_values(
         by=list(PK_RAW_SERIES), kind="mergesort", na_position="last"
     ).reset_index(drop=True)
@@ -462,6 +492,10 @@ def materializar_catalogo(
                 "confianca": entrada.confianca.value,
                 "status": entrada.status.value,
                 "is_total_return": entrada.is_total_return,
+                # `calendario` ("dias_uteis" | "corrido" | nulo) chega ao materializado desde
+                # 2026-10-11 (P1-2 do QA da Onda 2): sem ele, F-014 não sabe que 28,6% dos pontos
+                # de `BCB_SGS_432` caem em fim de semana.
+                "calendario": entrada.calendario,
                 "janela_rolante": entrada.janela_rolante,
                 "fonte_instavel": entrada.fonte_instavel,
                 "licenca_restrita": entrada.licenca_restrita,
@@ -505,13 +539,44 @@ def _gravar_parquet_validado(
     return destino, digest, len(corpo)
 
 
-def versao_build() -> str:
-    """`sha256` do código deste build — o `fonte_versao` desta camada (RF-048/CA-121).
+def caminhos_dos_componentes(modulos: Sequence[str] | None = None) -> tuple[Path, ...]:
+    """Os arquivos de `MODULOS_DO_BUILD` em disco, na ordem declarada."""
+    caminhos: list[Path] = []
+    for nome in modulos or MODULOS_DO_BUILD:
+        arquivo = import_module(nome).__file__
+        if arquivo is None:  # pragma: no cover - módulo sem arquivo não existe aqui
+            msg = f"{nome} não tem arquivo em disco para hashear"
+            raise SerieInconsistente(msg)
+        caminhos.append(Path(arquivo))
+    return tuple(caminhos)
 
-    Hash do **arquivo**, não do processo: é o que faz "o relatório mudou porque o código mudou"
-    ser distinguível de "o relatório mudou porque o dado mudou".
+
+def versao_build(componentes: Sequence[Path] | None = None) -> str:
+    """`sha256` do **conjunto** `MODULOS_DO_BUILD` — o `fonte_versao` da camada (RF-048/CA-121).
+
+    Hash de arquivos, não do processo: é o que faz "o relatório mudou porque o código mudou" ser
+    distinguível de "o relatório mudou porque o dado mudou".
+
+    Era o hash **só deste arquivo** até 2026-10-11, e isso tinha custado um artefato publicado
+    obsoleto com `versao_build` idêntico (P1-1 do QA da Onda 2): editar `series_catalog_data.py`
+    muda o `series_catalog.parquet` sem tocar o builder. Agora o nome de cada componente entra no
+    corpo hasheado antes do conteúdo, então o hash não depende do caminho absoluto (o teste pode
+    hashear cópias em `tmp_path`), mas qualquer renomeação conta como mudança.
     """
-    return sha256_de(Path(__file__).read_bytes())
+    caminhos = tuple(componentes) if componentes is not None else caminhos_dos_componentes()
+    corpo = b"".join(c.name.encode("utf-8") + b"\n" + c.read_bytes() for c in caminhos)
+    return sha256_de(corpo)
+
+
+def catalogo_sha256(caminho: Path | None = None) -> str:
+    """`sha256` de `series_catalog_data.py` — o **dado** do catálogo, isolado do resto da versão.
+
+    Vai ao relatório ao lado de `versao_build` para que "o catálogo mudou" seja diagnosticável sem
+    recompor o conjunto: artefato em disco com `catalogo_sha256` diferente do código commitado é
+    materializado obsoleto, não divergência de dado.
+    """
+    alvo = caminho or caminhos_dos_componentes((MODULO_CATALOGO_DADOS,))[0]
+    return sha256_de(alvo.read_bytes())
 
 
 def construir_duckdb(
@@ -575,6 +640,16 @@ def _iso(valor: Any) -> str | None:
     return pd.Timestamp(valor).date().isoformat()
 
 
+def _iso_hora(valor: Any) -> str | None:
+    """ISO **com hora**: `collected_at` carrega hora real, e truncá-la a data mentia sobre a safra.
+
+    P2-7 do QA da Onda 2 — `date`/`vintage` continuam em `_iso` porque são data pura (D-b).
+    """
+    if valor is None or pd.isna(valor):
+        return None
+    return pd.Timestamp(valor).isoformat()
+
+
 def _resumo_por_serie(quadro: pd.DataFrame) -> list[dict[str, Any]]:
     """Uma linha por série no relatório: contagem, janela, nulos e extremos de `value`."""
     resumo: list[dict[str, Any]] = []
@@ -608,6 +683,7 @@ def montar_relatorio(
     hashes: dict[str, dict[str, Any]],
     excluidas: Sequence[TabelaExcluida],
     n_arquivos: int,
+    linhas_dedup: int = 0,
 ) -> dict[str, Any]:
     """`relatorio_build.json` — **sem relógio**, para que dois builds iguais sejam idênticos."""
     valores = raw["value"]
@@ -621,7 +697,12 @@ def montar_relatorio(
     return {
         "feature": "F-013",
         "versao_build": versao_build(),
+        "versao_build_componentes": list(MODULOS_DO_BUILD),
+        "catalogo_sha256": catalogo_sha256(),
         "arquivos_lidos": n_arquivos,
+        # Dedup deixa rastro **no dado**, não só no log (P2-2 do QA da Onda 2): 0 é a afirmação
+        # de que nenhuma linha foi descartada na consolidação.
+        "linhas_dedup": int(linhas_dedup),
         "tabelas_excluidas": [t.como_dict() for t in excluidas],
         "raw_series": {
             "arquivo": NOME_RAW_SERIES,
@@ -629,7 +710,7 @@ def montar_relatorio(
             "series": int(raw["series_id"].nunique()),
             "date_min": _iso(raw["date"].min()),
             "date_max": _iso(raw["date"].max()),
-            "collected_at_max": _iso(raw["collected_at"].max()),
+            "collected_at_max": _iso_hora(raw["collected_at"].max()),
             "vintages": sorted({v for v in raw["vintage"].map(_iso) if v is not None}),
             "n_nulos_value": int(valores.isna().sum()),
             "pct_nulos_value": round(float(valores.isna().mean()) * 100.0, 6),
@@ -675,12 +756,20 @@ def construir(
     """
     alvos, excluidas = descobrir_parquets_de_serie(raiz=raiz, raiz_processed=raiz_processed)
     bruto = carregar_processed(alvos)
-    raw = consolidar(bruto)
-
     catalogo_declarado = load_catalog()
-    validar_procedencia(raw, catalogo_declarado)
+
+    # Procedência e mistura de fontes rodam no **concatenado**, antes do dedup (P1-3 do QA da
+    # Onda 2): são guardas de conjunto (`series_id`/`source`/`unit` distintos por série), e rodá-las
+    # depois de `drop_duplicates` fazia a linha apagada sair da evidência de CA-055/CA-077.
+    validar_procedencia(bruto, catalogo_declarado)
+    validar_sem_mistura_de_fontes(bruto)
+
+    raw = consolidar(bruto)
+    linhas_dedup = len(bruto) - len(raw)
+
+    # Frequência nativa é a única que precisa do dedup feito: antes dele, a cópia idêntica de um
+    # ponto mensal apareceria como "duas observações no mesmo período" (CA-058) sem ser.
     validar_frequencia_nativa(raw, catalogo_declarado)
-    validar_sem_mistura_de_fontes(raw)
 
     catalogo = materializar_catalogo(catalogo_declarado, raw)
 
@@ -700,6 +789,7 @@ def construir(
         },
         excluidas=excluidas,
         n_arquivos=len(alvos),
+        linhas_dedup=linhas_dedup,
     )
 
     caminho_duckdb: Path | None = None

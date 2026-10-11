@@ -280,7 +280,14 @@ class ExtractorConfig(BaseModel):
 
 
 class SeriesCatalogSchema(pa.DataFrameModel):
-    """Forma tabular do catálogo, materializada em `data/canonical/series_catalog.parquet`."""
+    """Forma tabular do catálogo (**20 colunas**), base de `data/canonical/series_catalog.parquet`.
+
+    `calendario` entrou em 2026-10-11 como **acréscimo de coluna** (P1-2 do QA da Onda 2): o campo
+    já existia em `SeriesCatalogEntry`, mas `strict = True` o deixava fora do tabular — e quem
+    consome o materializado (a camada canônica, o alinhamento trimestral, qualquer contagem de
+    dias) não tinha como saber que `BCB_SGS_432` publica em dia corrido. Nenhuma coluna existente
+    mudou de tipo, nome ou nulidade.
+    """
 
     series_id: Series[str] = pa.Field(nullable=False, unique=True)
     nome: Series[str] = pa.Field(nullable=False)
@@ -299,6 +306,10 @@ class SeriesCatalogSchema(pa.DataFrameModel):
     confianca: Series[str] = pa.Field(nullable=False, isin=tuple(c.value for c in Confianca))
     status: Series[str] = pa.Field(nullable=False, isin=tuple(s.value for s in StatusSerie))
     is_total_return: Series[bool] = pa.Field(nullable=True)
+    # `isin` com **lista** de propósito: `isin("corrido")` iteraria a string e aceitaria as letras
+    # (armadilha medida em F-008 e registrada em `calendario.py`). Nulo = calendário não medido, e
+    # só série `freq=D` o declara — a coerência com `freq` é do `SeriesCatalogEntry` (pydantic).
+    calendario: Series[str] = pa.Field(nullable=True, isin=["dias_uteis", "corrido"])
     janela_rolante: Series[bool] = pa.Field(nullable=False)
     fonte_instavel: Series[bool] = pa.Field(nullable=False)
     licenca_restrita: Series[bool] = pa.Field(nullable=False)
@@ -316,8 +327,9 @@ class SeriesCatalogMaterializedSchema(SeriesCatalogSchema):
     """O catálogo **enriquecido com o observado** em `data/processed/` (F-013, RF-047).
 
     **Acréscimo de 2026-10-11, não alteração:** `SeriesCatalogSchema` continua sendo o contrato do
-    catálogo *declarado* (o que a pesquisa mediu) e segue valendo onde é usado hoje. Este subtipo
-    acrescenta as 6 colunas do **medido** — o que a camada processada de fato entregou — porque a
+    catálogo *declarado* (o que a pesquisa mediu, hoje 20 colunas) e segue valendo onde é usado
+    hoje. Este subtipo acrescenta as 6 colunas do **medido** — o que a camada processada de fato
+    entregou, totalizando **26** colunas no artefato — porque a
     pergunta "a série X existe no catálogo?" e a pergunta "a série X existe em disco, com que
     janela e quantos nulos?" são diferentes, e a segunda é o que a camada canônica precisa
     responder sem reabrir 51 Parquets.
@@ -330,7 +342,7 @@ class SeriesCatalogMaterializedSchema(SeriesCatalogSchema):
     | `presente_no_processed` | existe pelo menos uma linha desta série em `raw_series` |
     | `data_inicio_observada` / `data_fim_observada` | `min`/`max` de `date` **medidos** |
     | `n_obs` | linhas em `raw_series` (0 quando ausente) |
-    | `pct_nulos` | % de `value` nulo **dentro da série** (0..100; 0,0 quando ausente) |
+    | `pct_nulos` | % de `value` nulo na série (0..100; 0,0 se ausente), `round(x, 6)` |
     | `cobre_1t2006` | `data_inicio_observada <= LIMIAR_COBERTURA_2006` (**2006-01-31**, PRD §7) |
 
     `cobre_1t2006` é **booleano, não tri-estado**: diferente de

@@ -6,6 +6,7 @@ Espelho legível: `docs/contracts/CONTRACTS.md` (nunca o contrário: primeiro o 
 | Módulo | O que define | SPEC |
 |---|---|---|
 | `raw_series` | `raw_series` / `processed_series` (granularidade nativa) | RF-020 |
+| `alinhado_trimestral` | grade trimestral *long* (último d.u., ffill <= 5 d.u.) | RF-023 |
 | `calendario` | `calendario_dias_uteis` (grade de dias úteis da ANBIMA) | RF-018 |
 | `series_catalog` | `SeriesCatalogEntry`, `ExtractorConfig`, `SeriesCatalogSchema`,
 `SeriesCatalogMaterializedSchema` | RF-019, RF-047 |
@@ -19,6 +20,20 @@ Todo DataFrame que entra ou sai de `data/canonical/` passa por um destes schemas
 
 from __future__ import annotations
 
+from packages.shared.schemas.alinhado_trimestral import (
+    COLUNAS_ALINHADO,
+    GRADE_BANCARIA,
+    GRADE_CIVIL,
+    GRADE_CORRIDO,
+    GRADES_VALIDAS,
+    LIMITE_FFILL_DIAS_UTEIS,
+    MOTIVO_LACUNA_ACIMA_DO_LIMITE,
+    MOTIVO_SEM_OBSERVACAO,
+    MOTIVOS_VALIDOS,
+    PK_ALINHADO,
+    AlinhadoTrimestralSchema,
+    quarters_da_janela,
+)
 from packages.shared.schemas.asset_returns_quarterly import (
     ASSET_IDS_VALIDOS,
     AssetReturnsQuarterlySchema,
@@ -66,13 +81,24 @@ from packages.shared.schemas.series_catalog import (
 
 __all__ = [
     "ASSET_IDS_VALIDOS",
+    "COLUNAS_ALINHADO",
     "COLUNAS_RASTREAVEIS",
     "FEATURES_V3",
     "FONTES_BLOQUEADAS_NO_PACOTE_MINIMO",
     "FONTE_CALENDARIO",
+    "GRADES_VALIDAS",
+    "GRADE_BANCARIA",
+    "GRADE_CIVIL",
+    "GRADE_CORRIDO",
     "K_VIZINHOS_PADRAO",
+    "LIMITE_FFILL_DIAS_UTEIS",
     "LIMIAR_COBERTURA_2006",
+    "MOTIVOS_VALIDOS",
+    "MOTIVO_LACUNA_ACIMA_DO_LIMITE",
+    "MOTIVO_SEM_OBSERVACAO",
     "N_TRIMESTRES_JANELA",
+    "PK_ALINHADO",
+    "AlinhadoTrimestralSchema",
     "AssetReturnsQuarterlySchema",
     "CalendarioDiasUteisSchema",
     "CicloSelic",
@@ -96,5 +122,6 @@ __all__ = [
     "Transformacao",
     "Unidade",
     "load_catalog",
+    "quarters_da_janela",
     "resumo_catalogo",
 ]

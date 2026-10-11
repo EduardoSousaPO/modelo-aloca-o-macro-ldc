@@ -40,8 +40,13 @@ from packages.shared.schemas import (  # noqa: E402
 from packages.shared.schemas.series_catalog import IDENTIFICADOR_A_CONFIRMAR  # noqa: E402
 
 CATALOGO = load_catalog()
-N_SERIES_CATALOGO = 134
-"""O número vivo está em `tests/unit/test_schemas_smoke.py`; aqui é a âncora do materializado."""
+N_SERIES_CATALOGO = 138
+"""O número vivo está em `tests/unit/test_schemas_smoke.py`; aqui é a âncora do materializado.
+
+134 → 138 em 2026-10-11 por **D-i**: F-016 acrescentou `CURVA_REAL_3A`, `CURVA_NOMINAL_3A`,
+`INCLINACAO_REAL_5A_3A` e `INCLINACAO_NOMINAL_5A_3A` (`fonte = DERIVADO`), porque CA-025 não
+fecha com o vértice curto de 1 ano (60,53%) e fecha com o de 3 anos (95,25%).
+"""
 
 
 def _linha(**sobrescreve: Any) -> dict[str, Any]:
@@ -170,7 +175,7 @@ def test_gravacao_valida_devolve_sha256_do_arquivo(tmp_path: Path) -> None:
 
 
 def test_catalogo_valida_e_nenhum_identificador_e_vazio() -> None:
-    """CA-053: 134 entradas, nenhuma com identificador vazio, todas com `confianca`."""
+    """CA-053: as entradas do catálogo, sem identificador vazio e todas com `confianca`."""
     assert len(CATALOGO) == N_SERIES_CATALOGO
     for entrada in CATALOGO:
         assert entrada.identificador.strip() not in {"", "-", "?", "TODO"}
@@ -216,17 +221,21 @@ def catalogo_materializado() -> pd.DataFrame:
 
 
 def test_materializado_de_referencia_e_valido(catalogo_materializado: pd.DataFrame) -> None:
-    """Controle + CA-053 no formato tabular: as 134 entradas passam pelo schema novo."""
+    """Controle + CA-053 no formato tabular: todas as entradas passam pelo schema novo."""
     validado = SeriesCatalogMaterializedSchema.validate(catalogo_materializado, lazy=True)
     assert len(validado) == N_SERIES_CATALOGO
     assert int(validado["presente_no_processed"].sum()) == 1
     assert int(validado["n_obs"].sum()) == 2
 
 
-def test_materializado_herda_as_19_colunas_do_catalogo_declarado(
+def test_materializado_herda_as_20_colunas_do_catalogo_declarado(
     catalogo_materializado: pd.DataFrame,
 ) -> None:
-    """O subtipo **acrescenta**: nenhuma coluna do catálogo declarado desapareceu."""
+    """O subtipo **acrescenta**: nenhuma coluna do catálogo declarado desapareceu.
+
+    20 declaradas desde 2026-10-11, quando `calendario` deixou de ficar fora do tabular (P1-2 do
+    QA da Onda 2) — com as 6 observadas, o artefato tem **26** colunas.
+    """
     declaradas = {
         "series_id",
         "nome",
@@ -243,12 +252,39 @@ def test_materializado_herda_as_19_colunas_do_catalogo_declarado(
         "confianca",
         "status",
         "is_total_return",
+        "calendario",
         "janela_rolante",
         "fonte_instavel",
         "licenca_restrita",
         "obs",
     }
+    assert len(declaradas) == 20
     assert declaradas <= set(catalogo_materializado.columns)
+    assert len(catalogo_materializado.columns) == 26
+
+
+def test_calendario_chega_ao_materializado_com_o_dominio_do_catalogo(
+    catalogo_materializado: pd.DataFrame,
+) -> None:
+    """P1-2: a coluna existe, respeita o domínio e carrega o `corrido` da meta Selic."""
+    validado = SeriesCatalogMaterializedSchema.validate(catalogo_materializado, lazy=True)
+    por_id = validado.set_index("series_id")
+    assert por_id.loc["BCB_SGS_432", "calendario"] == "corrido"
+    assert por_id.loc["BCB_SGS_11", "calendario"] == "dias_uteis"
+    assert set(validado["calendario"].dropna().unique()) <= {"dias_uteis", "corrido"}
+    assert validado["calendario"].isna().any(), "série não diária não declara calendário"
+
+
+def test_calendario_fora_do_dominio_e_rejeitado(catalogo_materializado: pd.DataFrame) -> None:
+    """O negativo: `isin` é **lista**, então "corrido" não se decompõe em letras aceitáveis."""
+    adulterado = catalogo_materializado.copy()
+    adulterado.loc[adulterado.index[0], "calendario"] = "uteis"
+    with pytest.raises(pa.errors.SchemaErrors):
+        SeriesCatalogMaterializedSchema.validate(adulterado, lazy=True)
+    letra = catalogo_materializado.copy()
+    letra.loc[letra.index[0], "calendario"] = "c"
+    with pytest.raises(pa.errors.SchemaErrors):
+        SeriesCatalogMaterializedSchema.validate(letra, lazy=True)
 
 
 def test_serie_ausente_com_janela_observada_e_rejeitada(
