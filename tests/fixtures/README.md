@@ -15,7 +15,9 @@ tests/fixtures/<fonte>/<serie>__erro*.json       # fixture de erro (obrigatória
   hífen, minúsculas, **um diretório de fixture por pasta de `data/raw/`** — assim a fixture fica a um
   `ls` de distância do dado real que ela imita. Em uso hoje: `anbima-ms`, `anbima-ettj` e `common`
   (fixtures da infra de F-001, que não pertencem a uma fonte só). Na Onda 1: `anbima-ima`, `sgs`,
-  `sidra`, `tesouro-direto`, `b3`, `yahoo`, `msci`, `focus`, `fred`, `teva`.
+  `sidra`, `tesouro-direto`, `b3`, `yahoo`, `msci`, `focus`, `fred`, `teva`. Duas pastas **não**
+  são fonte e seguem convenção própria, documentada no README delas: `canonical/` e `processed/`
+  (recortes da nossa própria camada processada — ver abaixo).
 - `<serie>` é o `identificador` na fonte, não o nome bonito: `433`, `t1737_v2266`, `imab`, `ifix`,
   `ms`, `cz`, `^GSPC`, `892400_NETR`.
 - `<data>` é a data de **coleta** em ISO (`2026-10-10`) — a mesma que vai para `collected_at`.
@@ -56,9 +58,19 @@ pytest tests/unit tests/contract -m "not network"            # usa a fixture gra
 pytest tests/contract/test_<fonte>.py -m network             # confere a fixture contra a fonte viva (local)
 ```
 
+## `processed/` — a exceção do Parquet
+
+`tests/fixtures/processed/` não imita uma **fonte**: guarda recortes reais da própria
+`data/processed/`, e é o único diretório daqui com `.parquet`. Existe porque as varreduras de
+camada (`test_processed_layer_conventions.py`, `test_contract_sgs_sidra.py`) são a única trava
+regressível de D-a/D-b/PK e, lendo só `data/` — que não está no git —, **pulavam no CI** (P1-4
+do QA da Onda 1). Regras próprias: ≤ 30 KB por arquivo, recorte 2006-01..2006-06 + os últimos
+3 meses, e procedência linha a linha em `tests/fixtures/processed/README.md`, com o script de
+regeneração.
+
 ## Versionamento
 
-`.gitignore` já abre exceção para `tests/fixtures/**/*.csv|json|xlsx`. **`*.xls` continua ignorado
+`.gitignore` já abre exceção para `tests/fixtures/**/*.csv|json|xlsx|parquet`. **`*.xls` continua ignorado
 globalmente** (linha `*.xls`), e os arquivos da ANBIMA S3 têm essa extensão mesmo sendo XLSX
 (magic `PK\x03\x04`) — grave-os como `.xlsx`, que é o formato real, ou peça a exceção no
 `.gitignore` antes de commitar.

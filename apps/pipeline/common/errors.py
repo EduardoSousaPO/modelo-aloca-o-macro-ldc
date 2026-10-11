@@ -12,6 +12,7 @@ sucesso, e §10.1.1/§10.1.4 proíbem preencher lacuna com valor inventado ou `0
 | `UserAgentObrigatorio` | R4 (Yahoo sem UA → 429; CKAN do BCB → página de erro) | — |
 | `FormatoInesperado` | R11 (`.xls` que é XLSX; `.xls` que é HTML) | — |
 | `ConteudoDivergente` | R8 (janela rolante) + idempotência (CA-121) | §10.4.22 |
+| `ManifestoAusente` | bruto sem `.meta.json` ⇒ `vintage` do relógio (D-b, CA-121) | §10.4.22 |
 | `NumeroNaoReconhecido` | R13 (separador de milhar inconsistente) | §10.1.4 |
 | `DataNaoReconhecida` | R12 (`ms{AAMMDD}`, PTAX `MM-DD-YYYY`, SGS `dd/mm/aaaa`) | — |
 | `FonteIndisponivel` | R5/R22 (rede bloqueada, 502 do SGS) | — |
@@ -65,6 +66,21 @@ class ConteudoDivergente(ErroDeExtracao):
 
     Sobrescrever em silêncio apagaria dado de janela rolante (R8) e quebraria a reprodutibilidade
     por hash (CA-121). Quem chama decide: `sobrescrever_se_diferente=True` ou outro nome.
+    """
+
+
+class ManifestoAusente(ErroDeExtracao):
+    """Bruto arquivado sem `.meta.json` legível: não há de onde tirar `collected_at`/`vintage`.
+
+    D-b (`docs/plans/DECISIONS_LOG.md §2.1`) diz que `collected_at` da camada processada sai do
+    **manifesto do bruto**, e `vintage` é a data desse `collected_at`. O fallback silencioso para
+    `datetime.now()` parecia inofensivo e não é: `vintage` deixa de ser a safra do dado e passa a
+    ser a hora do reprocessamento, então duas rodadas `--offline` sobre o **mesmo** bruto
+    produzem Parquets diferentes — exatamente o que CA-121 / Anti-SPEC §10.4.22 proíbem.
+
+    Recusar é mais barato do que gravar um número plausível e errado: quem tem o bruto sem
+    manifesto ou roda a extração online uma vez (o manifesto nasce aí), ou passa
+    `collected_at=` explicitamente, assumindo a safra por escrito.
     """
 
 

@@ -42,7 +42,7 @@ import argparse
 import io
 import sys
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 import pandas as pd
@@ -56,6 +56,7 @@ from apps.pipeline.common import (
     FormatoDetectado,
     arquivar_bruto,
     caminho_destino_raw,
+    collected_at_do_bruto,
     configurar_logging,
     exigir_contagem_minima,
     exigir_formato,
@@ -63,7 +64,6 @@ from apps.pipeline.common import (
     nome_arquivo_raw,
     normalizar_rotulo,
     obter_logger,
-    obtido_em_arquivado,
     para_data,
     para_float_ptbr,
     sha256_de,
@@ -467,8 +467,13 @@ def extrair_indice_offline(
     raiz: Path | None = None,
     gravar: bool = True,
     caminho: Path | None = None,
+    collected_at: datetime | None = None,
 ) -> ResultadoIndice:
-    """Reprocessa um índice do bruto já arquivado — sem rede, sem reescrever `data/raw/`."""
+    """Reprocessa um índice do bruto já arquivado — sem rede, sem reescrever `data/raw/`.
+
+    `collected_at` só é aceito **explícito**: sem ele e sem manifesto do bruto, recusa
+    (`ManifestoAusente`) em vez de datar o Parquet pelo relógio da rodada (D-b, CA-121).
+    """
     alvo = caminho or _bruto_arquivado(slug, raiz=raiz)
     conteudo = alvo.read_bytes()
     # D-b: `collected_at` vem do manifesto do bruto, não do relógio — é o que faz duas rodadas
@@ -477,7 +482,7 @@ def extrair_indice_offline(
         conteudo,
         slug=slug,
         origem=str(alvo),
-        collected_at=obtido_em_arquivado(alvo) or datetime.now(tz=UTC),
+        collected_at=collected_at_do_bruto(alvo, collected_at=collected_at),
     )
     destino_processed = (
         gravar_processado_parquet(quadro, nome=nome_processado(slug), raiz=raiz) if gravar else None

@@ -23,6 +23,7 @@ from apps.pipeline.common import (
     JANELA_SGS_RECOMENDADA_DIAS,
     ErroDeExtracao,
     FonteIndisponivel,
+    ManifestoAusente,
     RespostaBruta,
     RespostaDeErroComStatus200,
     RespostaTruncada,
@@ -36,14 +37,17 @@ from apps.pipeline.extract.bcb_sgs import (
     SERIES_DIARIAS_DE_CALENDARIO,
     SERIES_PACOTE_MINIMO,
     Freq,
+    calendario_corrido,
     catalogo_sgs,
     config_para,
     deduplicar_por_data,
+    descartar_periodo_aberto,
     extrair_serie,
     fim_do_periodo,
     quadro_de_observacoes,
     validar_continuidade,
 )
+from packages.shared.schemas import SeriesCatalogEntry
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "sgs"
 AGORA = datetime(2026, 10, 10, 20, 30, tzinfo=UTC)
@@ -432,6 +436,140 @@ def test_meta_selic_e_serie_de_calendario_corrido() -> None:
         validar_continuidade(corrida, freq=Freq.DIARIA)
 
 
+def test_p1_2_o_calendario_da_432_vem_do_catalogo_nao_da_constante() -> None:
+    """P1-2 do QA: dia útil × dia corrido é **campo de catálogo**, não detalhe do extrator.
+
+    F-014/F-017 leem o catálogo e o Parquet, nunca `SERIES_DIARIAS_DE_CALENDARIO`. Sem a flag no
+    catálogo, uma contagem de dias úteis sobre `freq='D'` incluiria 2.377 fins de semana
+    legítimos da meta Selic (28,6 % dos 8.319 pontos, medido na extração ao vivo).
+    """
+    por_id = {e.series_id: e for e in catalogo_sgs(todas=True)}
+    assert por_id["BCB_SGS_432"].calendario == "corrido"
+    assert calendario_corrido(por_id["BCB_SGS_432"]) is True
+
+    # As 6 demais diárias do pacote mínimo foram medidas em `data/processed/`: 0 fim de semana e
+    # vão máximo de 5 dias corridos (emenda de feriado) — dia útil, declarado como tal.
+    uteis = (
+        "BCB_SGS_11",
+        "BCB_SGS_1178",
+        "BCB_SGS_12",
+        "BCB_SGS_4389",
+        "BCB_SGS_1",
+        "BCB_SGS_10813",
+    )
+    for series_id in uteis:
+        assert por_id[series_id].calendario == "dias_uteis", series_id
+        assert calendario_corrido(por_id[series_id]) is False, series_id
+
+    # `calendario` descreve grade diária: declarar em série M/Q é erro de contrato, não omissão.
+    assert por_id["BCB_SGS_433"].calendario is None
+    with pytest.raises(ValueError, match="série diária"):
+        SeriesCatalogEntry.model_validate(
+            por_id["BCB_SGS_433"].model_dump() | {"calendario": "corrido"}
+        )
+
+
+def test_fallback_do_calendario_vale_para_serie_sgs_sem_flag_no_catalogo() -> None:
+    """Catálogo calado (`calendario=None`) ⇒ `SERIES_DIARIAS_DE_CALENDARIO` ainda responde.
+
+    O acréscimo do campo não pode fazer série diária nova perder a guarda de continuidade que já
+    tinha: enquanto a constante listar o código, `calendario_corrido` continua dizendo `True`.
+    """
+    sem_flag = catalogo_sgs(["BCB_SGS_432"])[0].model_copy(update={"calendario": None})
+    assert sem_flag.calendario is None
+    assert calendario_corrido(sem_flag) is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P1-1 do QA da Onda 1 — mês/trimestre corrente, ainda aberto
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "fim",
+    [
+        date(2026, 10, 10),  # hoje, como a CLI roda sem flag
+        date(2026, 10, 31),  # último dia civil do mês: aqui o truncamento NÃO salvava
+        date(2026, 12, 31),  # bem depois: nem o truncamento nem o schema salvavam
+    ],
+    ids=["fim=hoje", "fim=fim-do-mes", "fim=dezembro"],
+)
+def test_mes_aberto_do_sgs_e_descartado_por_guarda_qualquer_que_seja_o_fim(
+    tmp_path: Path, fim: date
+) -> None:
+    """A acumulação **parcial** do mês corrente nunca entra, independentemente de `--fim`.
+
+    O bruto real da 4390 (Selic acumulada no mês) coletado em 2026-10-10 traz
+    `01/10/2026 = 0.36`: os 7 dias úteis **decorridos** de outubro. `fim_do_periodo` leva essa
+    linha para `2026-10-31`, que é o fim de um mês que **ainda não encerrou** na data da coleta.
+
+    Antes da guarda, o descarte era efeito colateral: `2026-10-31 > --fim` e `truncar_em` pegava
+    a linha. Com `--fim 2026-10-31` (ou rodando no último dia civil do mês, sem flag) outubro
+    parcial entrava como mês fechado — reprodução do QA em `ONDA-1-QA-A.md §4.4`. A guarda
+    explícita compara o fim do período com a **data da coleta**, então os três `--fim` deste
+    teste dão o mesmo resultado.
+    """
+    bruto = json.loads(fixture("4390__2026-10-10__mes-aberto.json").decode("utf-8"))
+    assert bruto[-1] == {"data": "01/10/2026", "valor": "0.36"}, "a fixture precisa do mês aberto"
+
+    resultado, _ = extrair(
+        "BCB_SGS_4390",
+        "4390__2026-10-10__mes-aberto.json",
+        inicio=date(2004, 1, 1),
+        fim=fim,
+        raiz=tmp_path,
+        gravar=True,
+    )
+    assert resultado.linhas_periodo_aberto == 1, "a guarda conta o descarte, não o esconde"
+    assert resultado.linhas == 273
+    assert resultado.data_max == date(2026, 9, 30)
+    quadro = quadro_do_parquet(resultado.parquet)
+    assert pd.Timestamp("2026-10-31") not in set(quadro["date"]), "outubro parcial no Parquet"
+    assert float(quadro["value"].iloc[-1]) == pytest.approx(1.08, abs=1e-9)
+
+
+def test_periodo_fechado_na_vespera_da_coleta_continua_entrando() -> None:
+    """A guarda é "período encerrado antes da coleta", não "mês anterior ao da coleta".
+
+    Teste negativo da guarda: setembro fechou em 30/09 e a coleta é 10/10 — a linha entra. Se a
+    condição fosse `mês da coleta`, o último mês fechado também cairia e a série perderia o
+    ponto mais recente a cada rodada.
+    """
+    quadro = quadro_de_observacoes(
+        entrada("BCB_SGS_4390"),
+        [{"data": "01/08/2026", "valor": "1.09"}, {"data": "01/09/2026", "valor": "1.08"}],
+        collected_at=AGORA,
+    )
+    limpo, abertas = descartar_periodo_aberto(quadro, freq=Freq.MENSAL, collected_at=AGORA)
+    assert abertas == 0
+    assert list(limpo["date"]) == [pd.Timestamp("2026-08-31"), pd.Timestamp("2026-09-30")]
+
+
+def test_trimestre_aberto_tambem_e_descartado_e_serie_diaria_passa_inteira() -> None:
+    """A guarda vale para `Q` (o PIB publica o trimestre em curso) e **não** toca `D`.
+
+    Série diária passa inalterada de propósito: o período de um dia encerra no próprio dia, e
+    data futura de verdade (meta Selic 432) é assunto de `truncar_em`, que conta e loga à parte.
+    """
+    trimestral = quadro_de_observacoes(
+        entrada("BCB_SGS_22109"),
+        [{"data": "01/07/2026", "valor": "180.0"}, {"data": "01/10/2026", "valor": "181.0"}],
+        collected_at=AGORA,
+    )
+    limpo, abertas = descartar_periodo_aberto(trimestral, freq=Freq.TRIMESTRAL, collected_at=AGORA)
+    assert abertas == 1, "4T2026 termina em 31/12 e a coleta é 10/10"
+    assert list(limpo["date"]) == [pd.Timestamp("2026-09-30")]
+
+    diaria = quadro_de_observacoes(
+        entrada("BCB_SGS_432"),
+        [{"data": "09/10/2026", "valor": "13.75"}, {"data": "10/10/2026", "valor": "13.75"}],
+        collected_at=AGORA,
+    )
+    intacta, abertas_d = descartar_periodo_aberto(diaria, freq=Freq.DIARIA, collected_at=AGORA)
+    assert abertas_d == 0
+    assert len(intacta) == 2
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CA-014 / CA-016 — CDI diário: a série é percentual, não fator
 # ─────────────────────────────────────────────────────────────────────────────
@@ -737,6 +875,25 @@ def test_dc_offline_nunca_parseia_o_manifesto_do_bruto(tmp_path: Path) -> None:
     )
     assert offline.linhas == 273
     assert (offline.data_min, offline.data_max) == (date(2004, 1, 31), date(2026, 9, 30))
+
+
+def test_db_offline_sobre_fatia_sem_manifesto_e_recusado(tmp_path: Path) -> None:
+    """D-b/CA-121: fatia sem `.meta.json` é recusada, não datada pelo relógio da rodada."""
+    primeira, _ = extrair(
+        "BCB_SGS_433", "433__2026-10-10.json", inicio=date(2004, 1, 1), raiz=tmp_path, gravar=True
+    )
+    pasta = tmp_path / "data" / "raw" / "sgs"
+    (pasta / (primeira.fatias[0].arquivo + ".meta.json")).unlink()
+
+    with pytest.raises(ManifestoAusente, match="manifesto legível"):
+        extrair_serie(
+            entrada("BCB_SGS_433"),
+            inicio=date(2004, 1, 1),
+            fim=FIM,
+            offline=True,
+            raiz=tmp_path,
+            gravar=True,
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

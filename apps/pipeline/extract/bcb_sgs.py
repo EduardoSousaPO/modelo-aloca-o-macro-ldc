@@ -40,6 +40,10 @@ Armadilhas que o código abaixo trata, em ordem de risco (`docs/research/fontes-
    reunião do Copom. Truncada em `fim` antes de chegar a `data/processed/` (CA-013).
 6. **User-Agent de browser** — o backend do SGS passou a recusar cliente sem UA; é o default do
    `ClienteHTTP` (`requer_user_agent_browser=True`).
+7. **Mês/trimestre corrente, ainda aberto** — em série `M`/`Q` o SGS já publica o período em
+   curso (4390 traz `01/10/2026 = 0.36`, os 7 dias úteis decorridos de outubro). É acumulação
+   **parcial** com cara de período fechado; `descartar_periodo_aberto` recusa por critério
+   explícito ("fim de período > data de coleta"), não por efeito colateral de `--fim`.
 """
 
 from __future__ import annotations
@@ -50,7 +54,7 @@ import re
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -61,11 +65,13 @@ from apps.pipeline.common import (
     ClienteHTTP,
     ErroDeExtracao,
     FormatoData,
+    ManifestoAusente,
     RespostaBruta,
     RespostaDeErroComStatus200,
     Transporte,
     arquivar_bruto,
     caminho_destino_raw,
+    collected_at_do_bruto,
     exigir_contagem_minima,
     fatiar_janela,
     gravar_processado_parquet,
@@ -112,14 +118,22 @@ DIAS_DE_FIM_DE_SEMANA = 5
 """`weekday() >= 5` é sábado ou domingo — série diária **de mercado** não tem ponto aí."""
 
 SERIES_DIARIAS_DE_CALENDARIO: frozenset[int] = frozenset({432})
-"""Séries `freq=D` que publicam em **dia corrido**, não em dia útil — medido na extração ao vivo.
+"""**Fallback** de `SeriesCatalogEntry.calendario` — a verdade está no catálogo desde 2026-10-11.
+
+Séries `freq=D` que publicam em **dia corrido**, não em dia útil — medido na extração ao vivo.
 
 A meta Selic (432) não é uma cotação: é a taxa *vigente* até a próxima reunião do Copom, então o
 SGS repete o mesmo valor todos os dias, inclusive sábado, domingo e feriado (5 fatias de
 2004-01-01 a 2026-10-10 vieram com vão de exatamente 1 dia em 100% dos pares). Tratá-la como
 série de dia útil acusaria 2.377 "datas em fim de semana" que são dado legítimo — e, pior, o
 contrário (aceitar vão de 12 dias) deixaria passar semana faltando. Para estas, a continuidade
-exigida é mais forte: **nenhum dia corrido ausente**."""
+exigida é mais forte: **nenhum dia corrido ausente**.
+
+Esta constante ficou aqui enquanto a informação era privada do extrator — e era o P1-2 do QA:
+F-014/F-017 leem o **catálogo** e o Parquet, não o módulo de extração, então 28,6 % dos pontos da
+432 (fins de semana) entrariam numa contagem de dias úteis. A distinção agora é campo de catálogo
+(`calendario`); esta constante só responde por série SGS cujo catálogo ainda não declarou nada."""
+
 
 _RE_CODIGO = re.compile(r"bcdata\.sgs\.(\d+)")
 
@@ -186,6 +200,19 @@ def codigo_sgs(entrada: SeriesCatalogEntry) -> int:
     except ValueError as exc:
         msg = f"{entrada.series_id}: identificador {entrada.identificador!r} não é código SGS"
         raise ErroDeExtracao(msg) from exc
+
+
+def calendario_corrido(entrada: SeriesCatalogEntry) -> bool:
+    """A série publica em **dia corrido** (sábado, domingo e feriado inclusive)?
+
+    Lê `SeriesCatalogEntry.calendario` — o catálogo é a fonte de verdade, porque é o que a camada
+    canônica e as features de alinhamento consultam. `SERIES_DIARIAS_DE_CALENDARIO` só entra
+    quando o catálogo cala (`calendario=None`), para que nenhuma série SGS perca a guarda de
+    continuidade que já tinha.
+    """
+    if entrada.calendario is not None:
+        return entrada.calendario == "corrido"
+    return codigo_sgs(entrada) in SERIES_DIARIAS_DE_CALENDARIO
 
 
 def catalogo_sgs(
@@ -310,11 +337,16 @@ def transporte_do_bruto_arquivado(
     bruto já arquivado: é o que permite reconstruir `data/processed/` sem fonte viva e o que
     prova que o parse não depende da rede.
 
-    O `obtida_em` de cada fatia sai do **manifesto daquela fatia** (`obtido_em_arquivado`), não
-    do relógio: é o que faz `--offline` reescrever o manifesto com o mesmo valor e, por
-    consequência, produzir o mesmo Parquet em duas rodadas seguidas (D-b).
+    O `obtida_em` de cada fatia sai do **manifesto daquela fatia** (`collected_at_do_bruto`),
+    nunca do relógio: é o que faz `--offline` reescrever o manifesto com o mesmo valor e, por
+    consequência, produzir o mesmo Parquet em duas rodadas seguidas (D-b). Fatia sem manifesto é
+    **recusada** — e a recusa tem de ser aqui, porque `arquivar_bruto` reescreve o manifesto com
+    o que este transporte declarar: o relógio entraria pela porta da frente e o manifesto
+    recém-criado pareceria legítimo na etapa seguinte (CA-121).
+
+    `agora` é a safra declarada por escrito por quem chama (o `collected_at=` da CLI/do teste) e
+    só é usada quando o manifesto não existe.
     """
-    relogio = agora or datetime.now(tz=UTC)
 
     def _transporte(
         metodo: str,
@@ -344,7 +376,7 @@ def transporte_do_bruto_arquivado(
             status=200,
             conteudo=alvo.read_bytes(),
             cabecalhos={"Content-Type": "application/json"},
-            obtida_em=obtido_em_arquivado(alvo) or relogio,
+            obtida_em=collected_at_do_bruto(alvo, collected_at=agora),
         )
 
     return _transporte
@@ -526,6 +558,50 @@ def truncar_em(quadro: pd.DataFrame, fim: date) -> tuple[pd.DataFrame, int]:
     return quadro.loc[quadro["date"] <= limite].reset_index(drop=True), futuras
 
 
+def descartar_periodo_aberto(
+    quadro: pd.DataFrame,
+    *,
+    freq: Freq,
+    collected_at: datetime,
+) -> tuple[pd.DataFrame, int]:
+    """Recusa observação de **período ainda não encerrado** em série mensal/trimestral.
+
+    O SGS publica o mês corrente **em curso**: em 2026-10-11 a série 4390 (Selic acumulada no
+    mês) já traz `01/10/2026 = 0.36`, que são os 7 dias úteis decorridos de outubro, e a 4189
+    traz `13.65`. São números verdadeiros e **não são o mês de outubro** — tratá-los como mês
+    fechado publica acumulação parcial na mesma coluna que 273 meses completos, o que é o
+    cenário que Anti-SPEC §10.1.1 proíbe (dado que "parece" a série e não é).
+
+    A guarda é explícita por decisão, não por efeito colateral: até 2026-10-11 a linha caía fora
+    só porque `fim_do_periodo(2026-10-01, M) = 2026-10-31` ficava depois de `--fim` e `truncar_em`
+    a pegava. Bastava `--fim 2026-10-31` (ou rodar no último dia civil do mês, sem flag) para
+    outubro parcial entrar como fechado — medido pelo QA da Onda 1 (`ONDA-1-QA-A.md §4.4`).
+    Aqui o critério não depende de `--fim`: **o período encerrou antes da coleta?**
+
+    `date` já é o fim do período (`fim_do_periodo`), e `collected_at` já é a safra do bruto
+    (D-b), então a condição é direta: `date > data da coleta` ⇒ período aberto. Série diária
+    passa inalterada — o período de um dia encerra no próprio dia, e data futura de verdade
+    (meta Selic 432) é assunto de `truncar_em`.
+    """
+    if freq not in (Freq.MENSAL, Freq.TRIMESTRAL) or quadro.empty:
+        return quadro, 0
+    coleta = pd.Timestamp(collected_at).tz_localize(None).normalize()
+    abertos = quadro["date"] > coleta
+    n = int(abertos.sum())
+    if not n:
+        return quadro, 0
+    descartadas = [d.date().isoformat() for d in quadro.loc[abertos, "date"]]
+    _log.info(
+        "%s: periodo_aberto=%d — descartando %s: período não encerrado "
+        "(fim de período > data de coleta %s)",
+        quadro["series_id"].iloc[0],
+        n,
+        descartadas[:5],
+        coleta.date().isoformat(),
+    )
+    return quadro.loc[~abertos].reset_index(drop=True), n
+
+
 def deduplicar_por_data(quadro: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     """Uma observação por data. Fatias contíguas não se sobrepõem, mas o SGS já repetiu borda.
 
@@ -651,7 +727,7 @@ def conferir_canario(quadro: pd.DataFrame, *, config: ExtractorConfig) -> tuple[
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def collected_at_do_bruto(
+def collected_at_das_fatias(
     destino: Path,
     fatias: Sequence[FatiaBruta],
 ) -> datetime | None:
@@ -669,6 +745,32 @@ def collected_at_do_bruto(
     return max(momentos) if momentos else None
 
 
+def exigir_collected_at(
+    momento: datetime | None,
+    *,
+    entrada: SeriesCatalogEntry,
+    fatias: Sequence[FatiaBruta],
+) -> datetime:
+    """`collected_at` do manifesto, ou **recusa** — nunca o relógio da rodada.
+
+    O fallback `or datetime.now(tz=UTC)` que estava aqui tornava `vintage` dependente de *quando*
+    o reprocessamento aconteceu, e com isso duas rodadas `--offline` sobre o mesmo bruto gravavam
+    Parquets diferentes (D-b, CA-121, Anti-SPEC §10.4.22). Fatia arquivada por `arquivar_bruto`
+    sempre tem manifesto; sem manifesto, o bruto foi posto ali à mão, e aí a safra tem de ser
+    declarada por escrito em `collected_at=`.
+    """
+    if momento is not None:
+        return momento
+    arquivos = [f.arquivo for f in fatias]
+    msg = (
+        f"{entrada.series_id}: nenhuma das {len(fatias)} fatia(s) tem manifesto legível "
+        f"({arquivos[:3]}) — sem ele `collected_at`/`vintage` sairiam do relógio desta rodada e o "
+        f"Parquet deixaria de ser reproduzível (D-b, CA-121). Rode uma vez **online** (o "
+        f"manifesto nasce aí) ou passe `collected_at=` explicitamente."
+    )
+    raise ManifestoAusente(msg)
+
+
 @dataclass(frozen=True, slots=True)
 class ResultadoExtracao:
     """Evidência de uma série extraída — é o que vai para a matriz de validação."""
@@ -683,6 +785,9 @@ class ResultadoExtracao:
     pct_nulos: float
     duplicatas_removidas: int
     linhas_futuras_truncadas: int
+    #: Observações de período M/Q ainda **não encerrado** na data da coleta, recusadas pela
+    #: guarda `descartar_periodo_aberto` (P1-1 do QA da Onda 1).
+    linhas_periodo_aberto: int
     canario: tuple[str, float] | None
     fatias: tuple[FatiaBruta, ...]
     parquet: Path | None
@@ -710,11 +815,12 @@ def extrair_serie(
     `gravar=False` roda tudo menos a escrita (é como o teste confere o parse sem tocar `data/`).
     """
     fim = fim or date.today()
-    relogio = collected_at or datetime.now(tz=UTC)
     config = config_para(entrada, inicio=inicio, fim=fim)
     destino_raw = caminho_destino_raw(config, raiz=raiz)
     if offline and transporte is None:
-        transporte = transporte_do_bruto_arquivado(destino_raw, agora=relogio)
+        # `agora=collected_at` (e não um relógio): sem manifesto **e** sem safra declarada, o
+        # transporte offline recusa em vez de datar a fatia pela hora do reprocessamento.
+        transporte = transporte_do_bruto_arquivado(destino_raw, agora=collected_at)
 
     observacoes, fatias = baixar_serie(
         entrada,
@@ -725,16 +831,16 @@ def extrair_serie(
         raiz=raiz,
         sobrescrever_raw=sobrescrever_raw,
     )
-    # D-b: `collected_at` (e portanto `vintage`) sai do manifesto do bruto, não do relógio.
-    agora = collected_at or collected_at_do_bruto(destino_raw, fatias) or relogio
+    # D-b: `collected_at` (e portanto `vintage`) sai do manifesto do bruto, nunca do relógio —
+    # `exigir_collected_at` recusa em vez de cair no `datetime.now()` (CA-121).
+    agora = exigir_collected_at(
+        collected_at or collected_at_das_fatias(destino_raw, fatias), entrada=entrada, fatias=fatias
+    )
     quadro = quadro_de_observacoes(entrada, observacoes, collected_at=agora)
+    quadro, abertas = descartar_periodo_aberto(quadro, freq=entrada.freq, collected_at=agora)
     quadro, truncadas = truncar_em(quadro, fim)
     quadro, duplicadas = deduplicar_por_data(quadro)
-    validar_continuidade(
-        quadro,
-        freq=entrada.freq,
-        calendario_corrido=codigo_sgs(entrada) in SERIES_DIARIAS_DE_CALENDARIO,
-    )
+    validar_continuidade(quadro, freq=entrada.freq, calendario_corrido=calendario_corrido(entrada))
     canario = conferir_canario(quadro, config=config)
 
     destino = None
@@ -754,6 +860,7 @@ def extrair_serie(
         pct_nulos=round(float(quadro["value"].isna().mean()) * 100, 4),
         duplicatas_removidas=duplicadas,
         linhas_futuras_truncadas=truncadas,
+        linhas_periodo_aberto=abertas,
         canario=canario,
         fatias=fatias,
         parquet=destino,
@@ -851,7 +958,8 @@ def _linha(r: ResultadoExtracao) -> str:
         f"{r.series_id:<16} {r.freq:<2} {r.unit:<7} {r.linhas:>6} linhas  "
         f"{r.data_min}..{r.data_max}  nulos={r.pct_nulos:>6.2f}%  "
         f"fatias={len(r.fatias)}  dup={r.duplicatas_removidas}  "
-        f"fut={r.linhas_futuras_truncadas}  1T2006={'sim' if r.cobre_1t2006 else 'NAO'}  "
+        f"fut={r.linhas_futuras_truncadas}  periodo_aberto={r.linhas_periodo_aberto}  "
+        f"1T2006={'sim' if r.cobre_1t2006 else 'NAO'}  "
         f"canario={canario}"
     )
 

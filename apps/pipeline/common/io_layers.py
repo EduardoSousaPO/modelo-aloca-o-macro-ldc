@@ -34,7 +34,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from apps.pipeline.common.errors import ConteudoDivergente, ErroDeExtracao
+from apps.pipeline.common.errors import ConteudoDivergente, ErroDeExtracao, ManifestoAusente
 from apps.pipeline.common.logging_setup import obter_logger
 
 if TYPE_CHECKING:  # pragma: no cover - só para type checker
@@ -312,6 +312,34 @@ def obtido_em_arquivado(alvo: Path) -> datetime | None:
     except ValueError:
         _log.warning("manifesto de %s com obtido_em inválido: %r", Path(alvo).name, bruto)
         return None
+
+
+def collected_at_do_bruto(alvo: Path, *, collected_at: datetime | None = None) -> datetime:
+    """`collected_at` de um bruto arquivado — do manifesto, ou **recusa**.
+
+    É `obtido_em_arquivado` com o fallback fechado. Existe porque o idioma
+    `obtido_em_arquivado(alvo) or datetime.now(tz=UTC)` apareceu em todos os extratores e tem um
+    modo de falha silencioso: bruto sem `.meta.json` (uma amostra de pesquisa copiada à mão, um
+    arquivo recuperado de backup, uma fixture passada por `caminho=`) faz `collected_at` — e
+    portanto `vintage` — sair do **relógio da rodada**. Aí D-b deixa de valer e duas execuções
+    `--offline` sobre o mesmo bruto gravam Parquets diferentes (CA-121, Anti-SPEC §10.4.22).
+
+    `collected_at` explícito tem precedência: é como o teste e o reprocessamento deliberado
+    assumem a safra por escrito, em vez de herdá-la do relógio por omissão.
+    """
+    if collected_at is not None:
+        return collected_at
+    obtido = obtido_em_arquivado(alvo)
+    if obtido is not None:
+        return obtido
+    alvo = Path(alvo)
+    msg = (
+        f"{alvo.name}: bruto sem manifesto legível ({alvo.name}{SUFIXO_MANIFESTO}) — sem ele "
+        f"`collected_at`/`vintage` sairiam do relógio desta rodada e o Parquet deixaria de ser "
+        f"reproduzível (D-b, CA-121). Rode a extração **online** uma vez (o manifesto nasce aí) "
+        f"ou passe `collected_at=` explicitamente."
+    )
+    raise ManifestoAusente(msg)
 
 
 def validadores_condicionais(alvo: Path) -> tuple[str | None, str | None]:

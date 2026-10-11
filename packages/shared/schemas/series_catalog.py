@@ -11,14 +11,19 @@ Regras que este contrato faz valer:
   de `docs/research/fontes-de-dados.md`;
 - toda série carrega `lag_divulgacao_dias`, sem o qual a regra anti-look-ahead (RF-025) não é
   implementável;
-- série de janela rolante, fonte instável ou licença restrita é marcada como tal.
+- série de janela rolante, fonte instável ou licença restrita é marcada como tal;
+- série `freq=D` que publica em **dia corrido** (não em dia útil) declara `calendario="corrido"`.
+  É um acréscimo de 2026-10-11, com default `None`: a informação vivia dentro de
+  `extract/bcb_sgs.py` (`SERIES_DIARIAS_DE_CALENDARIO = {432}`) e quem consome o catálogo — a
+  camada canônica, o alinhamento trimestral, qualquer contagem de dias — não tinha como saber
+  que 28,6 % dos pontos da meta Selic são fim de semana (P1-2 do QA da Onda 1).
 """
 
 from __future__ import annotations
 
 from datetime import date
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 import pandera as pa
 from pandera.typing import Series
@@ -151,6 +156,13 @@ class SeriesCatalogEntry(BaseModel):
     is_total_return: bool | None = Field(
         default=None, description="None = a confirmar (gap G-01 para setoriais da B3)."
     )
+    calendario: Literal["dias_uteis", "corrido"] | None = Field(
+        default=None,
+        description=(
+            "Calendário de publicação de série `freq=D`: 'dias_uteis' (só pregão/dia útil) ou "
+            "'corrido' (todo dia civil, fim de semana e feriado inclusive). None = não medido."
+        ),
+    )
     janela_rolante: bool = Field(
         default=False, description="True = a fonte apaga o passado; nunca usar para backfill."
     )
@@ -182,6 +194,12 @@ class SeriesCatalogEntry(BaseModel):
             raise ValueError(msg)
         if self.data_inicio and self.data_fim and self.data_fim < self.data_inicio:
             msg = f"{self.series_id}: data_fim anterior a data_inicio"
+            raise ValueError(msg)
+        if self.calendario is not None and self.freq is not Freq.DIARIA:
+            msg = (
+                f"{self.series_id}: `calendario` descreve a grade de uma série diária; "
+                f"freq={self.freq.value} não tem dia útil versus dia corrido"
+            )
             raise ValueError(msg)
         return self
 
@@ -292,6 +310,84 @@ class SeriesCatalogSchema(pa.DataFrameModel):
         name = "series_catalog"
         strict = True
         coerce = True
+
+
+class SeriesCatalogMaterializedSchema(SeriesCatalogSchema):
+    """O catálogo **enriquecido com o observado** em `data/processed/` (F-013, RF-047).
+
+    **Acréscimo de 2026-10-11, não alteração:** `SeriesCatalogSchema` continua sendo o contrato do
+    catálogo *declarado* (o que a pesquisa mediu) e segue valendo onde é usado hoje. Este subtipo
+    acrescenta as 6 colunas do **medido** — o que a camada processada de fato entregou — porque a
+    pergunta "a série X existe no catálogo?" e a pergunta "a série X existe em disco, com que
+    janela e quantos nulos?" são diferentes, e a segunda é o que a camada canônica precisa
+    responder sem reabrir 51 Parquets.
+
+    Materializado em `data/canonical/series_catalog.parquet` por
+    `apps/pipeline/canonical/build_raw_series.py`.
+
+    | Coluna | Semântica |
+    |---|---|
+    | `presente_no_processed` | existe pelo menos uma linha desta série em `raw_series` |
+    | `data_inicio_observada` / `data_fim_observada` | `min`/`max` de `date` **medidos** |
+    | `n_obs` | linhas em `raw_series` (0 quando ausente) |
+    | `pct_nulos` | % de `value` nulo **dentro da série** (0..100; 0,0 quando ausente) |
+    | `cobre_1t2006` | `data_inicio_observada <= LIMIAR_COBERTURA_2006` (**2006-01-31**, PRD §7) |
+
+    `cobre_1t2006` é **booleano, não tri-estado**: diferente de
+    `SeriesCatalogEntry.cobre_2006`, que devolve `None` para "início não medido", aqui o início é
+    sempre medido ou a série está ausente — e série ausente é `False` por construção, com
+    `presente_no_processed = False` ao lado para que ninguém confunda "não cobre" com "não veio".
+    """
+
+    presente_no_processed: Series[bool] = pa.Field(nullable=False)
+    data_inicio_observada: Series[pa.DateTime] = pa.Field(nullable=True)
+    data_fim_observada: Series[pa.DateTime] = pa.Field(nullable=True)
+    n_obs: Series[int] = pa.Field(nullable=False, ge=0)
+    pct_nulos: Series[float] = pa.Field(nullable=False, ge=0.0, le=100.0)
+    cobre_1t2006: Series[bool] = pa.Field(nullable=False)
+
+    class Config:
+        """Configuração do schema."""
+
+        name = "series_catalog_materialized"
+        strict = True
+        coerce = True
+
+    @pa.dataframe_check(name="ausente_nao_tem_observacao")
+    def _ausente_nao_tem_observacao(cls, df: object) -> bool:  # noqa: N805
+        """Série ausente de `raw_series` não pode carregar janela nem contagem observada.
+
+        É a guarda contra o modo de falha mais fácil desta tabela: herdar `data_inicio` do
+        **declarado** e publicá-lo como se fosse medido (Anti-SPEC §10.1.1/§10.1.2).
+        """
+        ausentes = ~df["presente_no_processed"]  # type: ignore[index]
+        if not bool(ausentes.any()):
+            return True
+        recorte = df.loc[ausentes]  # type: ignore[union-attr]
+        return bool(
+            (recorte["n_obs"] == 0).all()
+            and (recorte["pct_nulos"] == 0.0).all()
+            and recorte["data_inicio_observada"].isna().all()
+            and recorte["data_fim_observada"].isna().all()
+            and (~recorte["cobre_1t2006"]).all()
+        )
+
+    @pa.dataframe_check(name="cobre_1t2006_derivado_do_observado")
+    def _cobre_1t2006_consistente(cls, df: object) -> bool:  # noqa: N805
+        """`cobre_1t2006` é **derivado** de `data_inicio_observada`, nunca digitado à mão."""
+        import pandas as pd  # local: nenhum módulo de schema importa pandas no topo
+
+        inicio = df["data_inicio_observada"]  # type: ignore[index]
+        esperado = inicio.notna() & (inicio <= pd.Timestamp(LIMIAR_COBERTURA_2006))
+        return bool((df["cobre_1t2006"] == esperado).all())  # type: ignore[index]
+
+    @pa.dataframe_check(name="janela_observada_coerente")
+    def _janela_observada_coerente(cls, df: object) -> bool:  # noqa: N805
+        """`data_fim_observada >= data_inicio_observada` onde as duas existem."""
+        inicio = df["data_inicio_observada"]  # type: ignore[index]
+        fim = df["data_fim_observada"]  # type: ignore[index]
+        ambos = inicio.notna() & fim.notna()
+        return bool((fim[ambos] >= inicio[ambos]).all())
 
 
 def load_catalog(entradas: list[dict[str, Any]] | None = None) -> tuple[SeriesCatalogEntry, ...]:

@@ -66,6 +66,7 @@ from apps.pipeline.common import (
     arquivar_bruto,
     cabecalhos_de_browser,
     caminho_destino_raw,
+    collected_at_do_bruto,
     gravar_processado_parquet,
     ler_texto,
     obter_logger,
@@ -420,11 +421,16 @@ def _arquivar_ano(
 
 
 def _ler_ano_arquivado(destino: Path, ano: int) -> tuple[bytes, datetime] | None:
+    """`(bytes, obtido_em)` do `<ano>.json` arquivado, ou `None` se o ano não foi baixado.
+
+    `collected_at_do_bruto` **recusa** bruto sem manifesto em vez de cair no relógio da rodada:
+    sem isso, um `<ano>.json` posto ali à mão datava a série pela hora do reprocessamento e
+    quebrava a idempotência de `--offline` (D-b, CA-121).
+    """
     alvo = destino / nome_arquivo_ano(ano)
     if not alvo.is_file():
         return None
-    obtido_em = obtido_em_arquivado(alvo) or datetime.now(tz=UTC)
-    return alvo.read_bytes(), obtido_em
+    return alvo.read_bytes(), collected_at_do_bruto(alvo)
 
 
 def extrair_indice(

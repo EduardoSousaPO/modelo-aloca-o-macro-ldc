@@ -21,9 +21,14 @@ GET https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados
 | `12__2026-10-10__2006.json` | 12 — CDI %/dia | 01/01/2006 → 31/12/2006 | 249 | 10.210 | **CA-014/CA-016**: 249 d.u. de 2006 acumulam `15,0271 %` com `prod(1+v/100)` |
 | `1__2026-10-10.json` | 1 — PTAX venda | 01/01/2026 → 10/10/2026 | 194 | 7.567 | **CA-043**: 09/10/2026 = `4.9892`; só dia útil |
 | `432__2026-10-10__data-futura.json` | 432 — meta Selic | 01/10/2026 → 31/12/2026 | 35 | 1.331 | **CA-013**: última linha é **04/11/2026**, data futura (meta vigente até o próximo Copom) |
+| `4390__2026-10-10__mes-aberto.json` | 4390 — Selic acumulada no mês | 01/01/2004 → 10/10/2026 | 274 | 10.139 | **mês parcial (P1-1 do QA da Onda 1)**: a última linha é `01/10/2026 = 0.36`, os 7 dias úteis **decorridos** de outubro — mês ainda **aberto**. Trava a guarda `descartar_periodo_aberto`, que recusa a linha mesmo com `--fim 2026-12-31` |
 
-> `433__2026-10-10.json` e `24364__2026-10-10.json` são cópias byte-idênticas das fatias
-> arquivadas em `data/raw/sgs/` na execução ao vivo de 2026-10-10 — mesmo `sha256` do manifesto.
+> `433__2026-10-10.json`, `24364__2026-10-10.json` e `4390__2026-10-10__mes-aberto.json` são
+> cópias byte-idênticas das fatias arquivadas em `data/raw/sgs/` na execução ao vivo de
+> 2026-10-10 — mesmo `sha256` do manifesto. A da 4390 é
+> `data/raw/sgs/4390_2004-01-01__2026-10-10.json`, `sha256 =
+> 8a3448e6a44a8926cb51f25722295647de8236276fbc81ff4ec9b7582f82ed5b`, coletada
+> `2026-10-11T00:01:27Z` (campo `obtido_em` do manifesto).
 
 ## Caminhos de erro (obrigatórios por extrator — `tests/fixtures/README.md`)
 

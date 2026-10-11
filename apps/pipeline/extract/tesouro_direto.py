@@ -66,7 +66,7 @@ import argparse
 import io
 import sys
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -82,6 +82,7 @@ from apps.pipeline.common import (
     RespostaDeErroComStatus200,
     arquivar_bruto,
     caminho_destino_raw,
+    collected_at_do_bruto,
     configurar_logging,
     detectar_formato,
     exigir_contagem_minima,
@@ -90,7 +91,6 @@ from apps.pipeline.common import (
     nome_arquivo_raw,
     normalizar_rotulo,
     obter_logger,
-    obtido_em_arquivado,
     para_data,
     para_float_ptbr,
     sha256_de,
@@ -541,6 +541,11 @@ def caminho_bruto_mais_recente(*, raiz: Path | None = None) -> Path:
     `data/raw/tesouro-direto/` (é dado real da fonte, com procedência em
     `docs/research/fontes-de-dados.md §PROCEDÊNCIA`), avisando no log. Sem nenhum dos dois,
     levanta: `--offline` não tem licença para inventar série.
+
+    Devolver o caminho **não** significa que ele serve: `td.csv` não tem `.meta.json`, e
+    `extrair` recusa bruto sem manifesto (`ManifestoAusente`) porque `collected_at`/`vintage`
+    sairiam do relógio da rodada. Quem quiser reprocessar a amostra assume a safra por escrito,
+    em `collected_at=`.
     """
     arquivados = arquivos_arquivados(raiz=raiz)
     if arquivados:
@@ -697,8 +702,10 @@ def extrair(
         )
 
     # D-b: `collected_at` (e portanto `vintage`) sai do manifesto do bruto arquivado, não do
-    # relógio desta rodada — é o que faz `--offline` reproduzir o mesmo Parquet.
-    agora = collected_at or obtido_em_arquivado(bruto.caminho) or datetime.now(tz=UTC)
+    # relógio desta rodada — é o que faz `--offline` reproduzir o mesmo Parquet. Bruto sem
+    # manifesto é **recusado** (`ManifestoAusente`): era o P1 de F-005 no QA da Onda 1, alcançável
+    # porque `caminho_bruto_mais_recente` aceita a amostra `td.csv`, que não tem manifesto.
+    agora = collected_at_do_bruto(bruto.caminho, collected_at=collected_at)
 
     painel = parse_painel(bruto.conteudo)
     exigir_contagem_minima(

@@ -58,7 +58,7 @@ import argparse
 import json
 import sys
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 import pandas as pd
@@ -71,13 +71,13 @@ from apps.pipeline.common import (
     FormatoData,
     arquivar_bruto,
     caminho_destino_raw,
+    collected_at_do_bruto,
     configurar_logging,
     exigir_contagem_minima,
     gravar_processado_parquet,
     ler_texto,
     nome_arquivo_raw,
     obter_logger,
-    obtido_em_arquivado,
     para_data,
     para_float_ponto_decimal,
     sha256_de,
@@ -728,8 +728,13 @@ def extrair_serie_offline(
     raiz: Path | None = None,
     gravar: bool = True,
     caminho: Path | None = None,
+    collected_at: datetime | None = None,
 ) -> ResultadoSerie:
-    """Reprocessa uma série do bruto já arquivado — sem rede, sem reescrever `data/raw/`."""
+    """Reprocessa uma série do bruto já arquivado — sem rede, sem reescrever `data/raw/`.
+
+    `collected_at` só é aceito **explícito**: sem ele e sem manifesto do bruto, recusa
+    (`ManifestoAusente`) em vez de datar o Parquet pelo relógio da rodada (D-b, CA-121).
+    """
     alvo = caminho or _bruto_arquivado(series_id, raiz=raiz)
     conteudo = alvo.read_bytes()
     # D-b: `collected_at` sai do manifesto do bruto, não do relógio — duas rodadas `--offline`
@@ -738,7 +743,7 @@ def extrair_serie_offline(
         conteudo,
         series_id=series_id,
         origem=str(alvo),
-        collected_at=obtido_em_arquivado(alvo) or datetime.now(tz=UTC),
+        collected_at=collected_at_do_bruto(alvo, collected_at=collected_at),
     )
     destino = (
         gravar_processado_parquet(quadro, nome=nome_processado(series_id), raiz=raiz)

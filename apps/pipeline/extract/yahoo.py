@@ -73,6 +73,7 @@ from apps.pipeline.common import (
     SerieInconsistente,
     arquivar_bruto,
     caminho_destino_raw,
+    collected_at_do_bruto,
     configurar_logging,
     exigir_contagem_minima,
     exigir_formato,
@@ -80,7 +81,6 @@ from apps.pipeline.common import (
     ler_texto,
     nome_arquivo_raw,
     obter_logger,
-    obtido_em_arquivado,
     para_float_ponto_decimal,
     sha256_de,
 )
@@ -434,7 +434,11 @@ def parse_chart(
 
     datas = datas_de_pregao(timestamps, gmtoffset=meta.get("gmtoffset", 0))
     # Ausência é `None`, nunca `0` (Anti-SPEC §10.1.4): o `DX-Y.NYB` traz ~17% de fechamentos
-    # nulos (feriado da praça com timestamp presente) e o `BRL=X` ~8%.
+    # nulos e o `BRL=X` ~8%. **Não** são feriados: medido nas 1.210 linhas nulas do `YAHOO_DXY`,
+    # 1.188 (98,2%) são DOMINGO e as 22 restantes se espalham em segunda/terça/quinta/sexta — o
+    # Yahoo emite o timestamp da semana de futuros, inclusive o dia sem sessão. A convenção
+    # aqui é registrar o nulo em vez de omitir a linha (F-006 omite, CA-037); quem for agregar
+    # precisa descartar `value.isna()`, nunca interpretá-lo como 0 nem como pregão.
     valores = [para_float_ponto_decimal(v, origem=origem) for v in fechamento]
 
     quadro = pd.DataFrame(
@@ -814,8 +818,13 @@ def extrair_ticker_offline(
     com_brl: bool = True,
     caminho: Path | None = None,
     minimo: int | None | object = DO_CONTRATO,
+    collected_at: datetime | None = None,
 ) -> ResultadoSerie:
-    """Reprocessa um ticker do bruto já arquivado — sem rede, sem reescrever `data/raw/`."""
+    """Reprocessa um ticker do bruto já arquivado — sem rede, sem reescrever `data/raw/`.
+
+    `collected_at` só é aceito **explícito**: sem ele e sem manifesto do bruto, recusa
+    (`ManifestoAusente`) em vez de datar o Parquet pelo relógio da rodada (D-b, CA-121).
+    """
     alvo = caminho or _bruto_arquivado(chave, raiz=raiz)
     conteudo = alvo.read_bytes()
     # D-b: `collected_at` (e portanto `vintage`) sai do manifesto do bruto, não do relógio.
@@ -823,7 +832,7 @@ def extrair_ticker_offline(
         conteudo,
         chave=chave,
         origem=str(alvo),
-        collected_at=obtido_em_arquivado(alvo) or datetime.now(tz=UTC),
+        collected_at=collected_at_do_bruto(alvo, collected_at=collected_at),
         minimo=minimo,
     )
     canario = conferir_canario(quadro, chave=chave, origem=str(alvo))

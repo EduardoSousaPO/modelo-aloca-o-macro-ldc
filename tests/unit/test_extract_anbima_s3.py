@@ -23,6 +23,7 @@ from apps.pipeline.common import (
     ConteudoDivergente,
     FormatoDetectado,
     FormatoInesperado,
+    ManifestoAusente,
     RespostaBruta,
     RespostaTruncada,
     caminho_processed,
@@ -499,12 +500,34 @@ def test_revisao_retroativa_do_mesmo_retrato_nao_sobrescreve(
 def test_offline_reprocessa_o_bruto_sem_tocar_a_rede(
     dir_ima: Path, tmp_path: Path, piso_de_recorte: None
 ) -> None:
-    """`--offline` relê o arquivo arquivado; nenhum transporte é construído."""
-    resultado = extrair_indice_offline("IRFM", raiz=tmp_path, caminho=dir_ima / FIXTURAS["IRFM"])
+    """`--offline` relê o arquivo arquivado; nenhum transporte é construído.
+
+    A fixture é um bruto **sem** manifesto (ela não passou por `arquivar_bruto`), então a safra
+    tem de ser declarada: `collected_at=COLETA`. Sem isso o reprocessamento é recusado — é a
+    guarda do P1 de F-005, verificada no teste logo abaixo.
+    """
+    resultado = extrair_indice_offline(
+        "IRFM", raiz=tmp_path, caminho=dir_ima / FIXTURAS["IRFM"], collected_at=COLETA
+    )
     assert resultado.data_inicio == date(2000, 2, 1)
     assert resultado.raw_idempotente is True
     assert resultado.caminho_processed is not None
     assert resultado.caminho_processed.is_file()
+
+
+def test_offline_sobre_bruto_sem_manifesto_e_recusado(
+    dir_ima: Path, tmp_path: Path, piso_de_recorte: None
+) -> None:
+    """D-b/CA-121: sem manifesto e sem `collected_at=`, recusa — nunca o relógio da rodada.
+
+    O fallback `obtido_em_arquivado(...) or datetime.now(tz=UTC)` era comum aos 8 extratores e
+    foi o P1 de F-005 no QA da Onda 1: `vintage` deixava de ser a safra do dado e passava a ser
+    a hora do reprocessamento, então duas rodadas `--offline` sobre o **mesmo** bruto gravavam
+    Parquets diferentes.
+    """
+    with pytest.raises(ManifestoAusente, match="sem manifesto"):
+        extrair_indice_offline("IRFM", raiz=tmp_path, caminho=dir_ima / FIXTURAS["IRFM"])
+    assert not (tmp_path / "data" / "processed").exists(), "nada pode ser gravado na recusa"
 
 
 def test_offline_acha_o_bruto_arquivado_pela_convencao_de_nome(
@@ -514,7 +537,7 @@ def test_offline_acha_o_bruto_arquivado_pela_convencao_de_nome(
     destino = tmp_path / "data" / "raw" / "anbima-ima"
     destino.mkdir(parents=True)
     (destino / "IRFM__2026-10-09.xlsx").write_bytes((dir_ima / FIXTURAS["IRFM"]).read_bytes())
-    resultado = extrair_indice_offline("IRFM", raiz=tmp_path, gravar=False)
+    resultado = extrair_indice_offline("IRFM", raiz=tmp_path, gravar=False, collected_at=COLETA)
     assert resultado.caminho_raw is not None
     assert resultado.caminho_raw.name == "IRFM__2026-10-09.xlsx"
     assert resultado.data_fim == date(2026, 10, 9)

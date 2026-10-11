@@ -16,7 +16,7 @@ import pandas as pd
 import pytest
 from pandera.errors import SchemaErrors
 
-from apps.pipeline.common.errors import ConteudoDivergente
+from apps.pipeline.common.errors import ConteudoDivergente, ManifestoAusente
 from apps.pipeline.common.io_layers import (
     MARCADORES_DA_RAIZ,
     SUFIXO_MANIFESTO,
@@ -27,6 +27,7 @@ from apps.pipeline.common.io_layers import (
     caminho_destino_raw,
     caminho_processed,
     caminho_raw,
+    collected_at_do_bruto,
     gravar_processado_parquet,
     ler_manifesto,
     nome_arquivo_raw,
@@ -299,6 +300,51 @@ def test_ler_manifesto_de_arquivo_sem_manifesto_e_none(tmp_path: Path) -> None:
     """Primeira execução: não há manifesto, e isso não é erro."""
     assert ler_manifesto(tmp_path / "inexistente.json") is None
     assert validadores_condicionais(tmp_path / "inexistente.json") == (None, None)
+
+
+def test_collected_at_do_bruto_sai_do_manifesto(tmp_path: Path) -> None:
+    """D-b: a safra da camada processada é o `obtido_em` do manifesto, sempre."""
+    coleta = datetime(2026, 10, 10, 23, 49, tzinfo=UTC)
+    resultado = arquivar_bruto(
+        b"[]",
+        destino=tmp_path / "data" / "raw" / "sgs",
+        nome="433__2026-10-10.json",
+        obtido_em=coleta,
+    )
+    assert collected_at_do_bruto(resultado.caminho) == coleta
+
+
+def test_collected_at_do_bruto_sem_manifesto_recusa_em_vez_de_usar_o_relogio(
+    tmp_path: Path,
+) -> None:
+    """Bruto posto à mão não tem safra — e inventar uma quebra a idempotência (CA-121).
+
+    Era o P1 de F-005 no QA da Onda 1: `obtido_em_arquivado(...) or datetime.now(tz=UTC)` fazia
+    `vintage` virar a hora do reprocessamento, então duas rodadas `--offline` sobre o **mesmo**
+    bruto gravavam Parquets diferentes (Anti-SPEC §10.4.22).
+    """
+    orfao = tmp_path / "td.csv"
+    orfao.write_bytes(b"a;b\n1;2\n")
+    assert ler_manifesto(orfao) is None
+
+    with pytest.raises(ManifestoAusente, match="bruto sem manifesto legível"):
+        collected_at_do_bruto(orfao)
+
+    # A saída é declarar a safra por escrito, não afrouxar a guarda.
+    declarada = datetime(2026, 10, 10, 23, 0, tzinfo=UTC)
+    assert collected_at_do_bruto(orfao, collected_at=declarada) == declarada
+
+
+def test_collected_at_explicito_tem_precedencia_sobre_o_manifesto(tmp_path: Path) -> None:
+    """Reprocessamento deliberado assume a safra; o manifesto é o default, não uma trava."""
+    resultado = arquivar_bruto(
+        b"[]",
+        destino=tmp_path / "data" / "raw" / "sgs",
+        nome="433__2026-10-10.json",
+        obtido_em=datetime(2026, 10, 10, 23, 49, tzinfo=UTC),
+    )
+    declarada = datetime(2026, 1, 2, 12, 0, tzinfo=UTC)
+    assert collected_at_do_bruto(resultado.caminho, collected_at=declarada) == declarada
 
 
 def test_corpo_vazio_e_arquivavel_porque_ausencia_pode_ser_normal(tmp_path: Path) -> None:

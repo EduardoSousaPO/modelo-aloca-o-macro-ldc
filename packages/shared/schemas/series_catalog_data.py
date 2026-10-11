@@ -256,6 +256,7 @@ _BCB_SGS: list[dict[str, Any]] = [
         "D",
         "%/dia",
         transformacao_padrao="acumulacao_geometrica_no_trimestre",
+        calendario="dias_uteis",
         obs="Primeiro ponto medido 03/01/2005 = 0.064826; inicio real anterior, nao medido. "
         "Serie diaria: fatiar em blocos <= 10 anos (o SGS devolve erro com HTTP 200).",
     ),
@@ -266,6 +267,7 @@ _BCB_SGS: list[dict[str, Any]] = [
         "D",
         "%a.a.",
         transformacao_padrao="ultimo_dia_util_do_trimestre",
+        calendario="dias_uteis",
         obs="09/10/2026 = 13.65. Use esta para Selic over em % a.a.",
     ),
     _sgs(
@@ -275,7 +277,10 @@ _BCB_SGS: list[dict[str, Any]] = [
         "D",
         "%a.a.",
         transformacao_padrao="ultimo_dia_util_do_trimestre",
-        obs="2006 = 18.00. ATENCAO: ultimo ponto vem com DATA FUTURA (meta vigente): truncar.",
+        calendario="corrido",
+        obs="2006 = 18.00. ATENCAO: ultimo ponto vem com DATA FUTURA (meta vigente): truncar. "
+        "Publica em DIA CORRIDO (nao e cotacao, e a meta vigente): 2.377 dos 8.319 pontos "
+        "(28,6%) caem em fim de semana — ver calendario='corrido'.",
     ),
     _sgs(
         4390,
@@ -302,6 +307,7 @@ _BCB_SGS: list[dict[str, Any]] = [
         "D",
         "%/dia",
         transformacao_padrao="acumulacao_geometrica_no_trimestre",
+        calendario="dias_uteis",
         obs="Primeiro ponto medido 03/01/2005 = 0.064893. VALOR E PERCENTUAL, NAO FATOR: "
         "prod(1+v/100) em 2006 (249 d.u.) = 15,0271% — valor-canario do pipeline.",
     ),
@@ -312,6 +318,7 @@ _BCB_SGS: list[dict[str, Any]] = [
         "D",
         "%a.a.",
         transformacao_padrao="ultimo_dia_util_do_trimestre",
+        calendario="dias_uteis",
         obs="08/10/2026 = 13.65. Converter para fator diario introduz erro de arredondamento: "
         "prefira a serie 12.",
     ),
@@ -386,6 +393,7 @@ _BCB_SGS: list[dict[str, Any]] = [
         "D",
         "BRL",
         transformacao_padrao="ultimo_dia_util_do_trimestre",
+        calendario="dias_uteis",
         obs="09/10/2026 = 4.9892 (valor-canario). Fonte primaria do USDBRL (nao FRED/Yahoo).",
     ),
     _sgs(
@@ -395,6 +403,7 @@ _BCB_SGS: list[dict[str, Any]] = [
         "D",
         "BRL",
         transformacao_padrao="ultimo_dia_util_do_trimestre",
+        calendario="dias_uteis",
         obs="09/10/2026 = 4.9886.",
     ),
     # --- fiscal e commodities ---------------------------------------------------------------
@@ -1203,6 +1212,7 @@ _INTERNACIONAL: list[dict[str, Any]] = [
         "S&P 500 (indice de preco)",
         "C1",
         "1927-12-30",
+        is_total_return=False,
         obs="Rota recomendada para S&P 500 (o FRED 'SP500' tem so 10 anos). Para retorno total "
         "preferir ^SP500TR ou MSCI USA; nunca misturar price e total return (RN-08).",
     ),

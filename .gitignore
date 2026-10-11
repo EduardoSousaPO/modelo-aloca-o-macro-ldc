@@ -78,6 +78,11 @@ data/canonical/*
 !tests/fixtures/**/*.csv
 !tests/fixtures/**/*.json
 !tests/fixtures/**/*.xlsx
+# `tests/fixtures/processed/` guarda recortes reais de `data/processed/` (<= 20 KB cada) para que
+# as varreduras de camada (D-a, D-b, PK) rodem no CI, onde `data/` não existe. Fixture de Parquet
+# é a única exceção à regra "nenhum .parquet no git" e tem procedência em
+# tests/fixtures/processed/README.md.
+!tests/fixtures/**/*.parquet
 
 # ─────────────────────────────────────────────
 # Segredos / credenciais

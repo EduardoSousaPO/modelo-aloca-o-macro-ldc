@@ -24,6 +24,7 @@ import pytest
 from apps.pipeline.common import (
     ErroDeExtracao,
     FormatoInesperado,
+    ManifestoAusente,
     RespostaBruta,
     RespostaDeErroComStatus200,
     RespostaTruncada,
@@ -526,6 +527,59 @@ def test_offline_sem_bruto_arquivado_levanta(tmp_path: Path) -> None:
     """`--offline` numa máquina limpa não tem licença para inventar série."""
     with pytest.raises(ErroDeExtracao, match="sem bruto arquivado"):
         td.extrair(offline=True, raiz=tmp_path, collected_at=COLETA)
+
+
+def test_p1_offline_sobre_bruto_orfao_e_recusado(csv_real: bytes, tmp_path: Path) -> None:
+    """P1 de F-005: bruto **sem manifesto** é recusado, não datado pelo relógio da rodada.
+
+    O caminho era alcançável de verdade, não hipotético: `caminho_bruto_mais_recente` aceita de
+    propósito a amostra `data/raw/tesouro-direto/td.csv` deixada pela pesquisa — que existe na
+    máquina e **não** tem `.meta.json`. Com o fallback antigo
+    (`obtido_em_arquivado(...) or datetime.now(tz=UTC)`), `collected_at` saía do relógio **com
+    microssegundos** e `vintage` deixava de ser a safra do dado: duas rodadas `--offline` sobre o
+    mesmo bruto gravavam Parquets diferentes (D-b, CA-121, Anti-SPEC §10.4.22).
+
+    Reprodução do QA em `ONDA-1-QA-B.md §6 (P1-1)`, agora como regressão: um `td.csv` órfão em
+    `tmp_path`, nenhum `precotaxatesourodireto__*.csv` arquivado.
+    """
+    orfao = caminho_destino_raw(td.CONFIG, raiz=tmp_path)
+    orfao.mkdir(parents=True)
+    (orfao / "td.csv").write_bytes(csv_real)
+    assert not list(orfao.glob("*.meta.json")), "o cenário é justamente o bruto sem manifesto"
+
+    with pytest.raises(ManifestoAusente, match="bruto sem manifesto"):
+        td.extrair(offline=True, raiz=tmp_path, minimo_linhas=150, exigir_cobertura=False)
+
+    assert not caminho_processed("", raiz=tmp_path).exists(), (
+        "a recusa não pode deixar rastro em data/processed/"
+    )
+
+
+def test_bruto_orfao_e_reprocessavel_com_collected_at_declarado(
+    csv_real: bytes, tmp_path: Path
+) -> None:
+    """A recusa não é um beco sem saída: quem assume a safra por escrito reprocessa.
+
+    É a diferença entre "o extrator inventou uma data" e "o operador declarou uma data" — e o
+    Parquet continua byte-determinístico, porque `collected_at` passou a ser dado de entrada.
+    """
+    orfao = caminho_destino_raw(td.CONFIG, raiz=tmp_path)
+    orfao.mkdir(parents=True)
+    (orfao / "td.csv").write_bytes(csv_real)
+
+    hashes = set()
+    for _ in range(2):
+        resultado = td.extrair(
+            offline=True,
+            raiz=tmp_path,
+            collected_at=COLETA,
+            minimo_linhas=150,
+            exigir_cobertura=False,
+        )
+        quadro = pd.read_parquet(resultado.caminho_processado)
+        assert (quadro["vintage"] == pd.Timestamp(COLETA.date())).all()
+        hashes.add(sha256_de(resultado.caminho_processado.read_bytes()))
+    assert len(hashes) == 1, "duas rodadas sobre o mesmo bruto têm de dar o mesmo Parquet"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

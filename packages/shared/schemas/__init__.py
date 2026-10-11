@@ -7,7 +7,8 @@ Espelho legível: `docs/contracts/CONTRACTS.md` (nunca o contrário: primeiro o 
 |---|---|---|
 | `raw_series` | `raw_series` / `processed_series` (granularidade nativa) | RF-020 |
 | `calendario` | `calendario_dias_uteis` (grade de dias úteis da ANBIMA) | RF-018 |
-| `series_catalog` | `SeriesCatalogEntry`, `ExtractorConfig`, `SeriesCatalogSchema` | RF-019 |
+| `series_catalog` | `SeriesCatalogEntry`, `ExtractorConfig`, `SeriesCatalogSchema`,
+`SeriesCatalogMaterializedSchema` | RF-019, RF-047 |
 | `series_catalog_data` | o catálogo **como dado** (uma entrada por série) | RF-019 |
 | `macro_quarterly` | `macro_quarterly` (83 trimestres) + procedência | RF-021, RF-047 |
 | `asset_returns_quarterly` | retornos por ativo + métricas por regime | RF-022, RF-032 |
@@ -54,6 +55,7 @@ from packages.shared.schemas.series_catalog import (
     Fonte,
     Freq,
     SeriesCatalogEntry,
+    SeriesCatalogMaterializedSchema,
     SeriesCatalogSchema,
     StatusSerie,
     Transformacao,
@@ -88,6 +90,7 @@ __all__ = [
     "RegimeV1",
     "RegimesSchema",
     "SeriesCatalogEntry",
+    "SeriesCatalogMaterializedSchema",
     "SeriesCatalogSchema",
     "StatusSerie",
     "Transformacao",
