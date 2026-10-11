@@ -14,6 +14,7 @@ Espelho legível: `docs/contracts/CONTRACTS.md` (nunca o contrário: primeiro o 
 | `macro_quarterly` | `macro_quarterly` (83 tri.) + procedência `revised`/`asof` | RF-021, RF-025 |
 | `asset_returns_quarterly` | retornos por ativo + métricas por regime | RF-022, RF-032 |
 | `regimes` | `regimes` e `regime_neighbors` (V1/V2/V3) | RF-027..031 |
+| `internacional` | `internacional_por_regime` e `internacional_pesos` (F-026) | RF-038, RF-039 |
 
 Todo DataFrame que entra ou sai de `data/canonical/` passa por um destes schemas (`AGENTS.md §19`).
 """
@@ -47,6 +48,36 @@ from packages.shared.schemas.asset_returns_quarterly import (
 from packages.shared.schemas.calendario import (
     FONTE_CALENDARIO,
     CalendarioDiasUteisSchema,
+)
+from packages.shared.schemas.internacional import (
+    ATIVO_CAMBIO,
+    ATIVO_INTERNACIONAL_ALTERNATIVO,
+    ATIVO_INTERNACIONAL_REPRESENTATIVO,
+    ATIVOS_DA_TABELA_POR_REGIME,
+    ATIVOS_SEM_FONTE,
+    BANDA_TATICA_MAX,
+    BANDA_TATICA_MIN,
+    BLOQUEIO_ANTI_SPEC_VARIANCIA_MINIMA,
+    CAP_POR_ATIVO,
+    CARTEIRA_VARIANCIA_MINIMA,
+    ESCOPO_EXPANDING,
+    ESCOPO_POR_REGIME,
+    ESCOPOS_PESOS,
+    LENTES_INTERNACIONAL,
+    LIMIAR_QUEDA_INCLINACAO_DP,
+    LIMIAR_USDBRL_VAR_TRI_PCT,
+    MIN_OBS_DESVIO_EXPANDING,
+    PISO_ESTRUTURAL_MAX,
+    PISO_ESTRUTURAL_MIN,
+    PK_PESOS,
+    PK_POR_REGIME,
+    RAMO_EMBI_FORA,
+    SELO_NAO_RECOMENDACAO,
+    SEM_CAP,
+    SERIE_INCLINACAO_DO_STRESS,
+    TOLERANCIA_SOMA_PESOS,
+    InternacionalPesosSchema,
+    InternacionalPorRegimeSchema,
 )
 from packages.shared.schemas.macro_quarterly import (
     COLUNAS_RASTREAVEIS,
@@ -99,6 +130,34 @@ from packages.shared.schemas.series_catalog import (
 )
 
 __all__ = [
+    "ATIVOS_DA_TABELA_POR_REGIME",
+    "ATIVOS_SEM_FONTE",
+    "ATIVO_CAMBIO",
+    "ATIVO_INTERNACIONAL_ALTERNATIVO",
+    "ATIVO_INTERNACIONAL_REPRESENTATIVO",
+    "BANDA_TATICA_MAX",
+    "BANDA_TATICA_MIN",
+    "BLOQUEIO_ANTI_SPEC_VARIANCIA_MINIMA",
+    "CAP_POR_ATIVO",
+    "CARTEIRA_VARIANCIA_MINIMA",
+    "ESCOPOS_PESOS",
+    "ESCOPO_EXPANDING",
+    "ESCOPO_POR_REGIME",
+    "LENTES_INTERNACIONAL",
+    "LIMIAR_QUEDA_INCLINACAO_DP",
+    "LIMIAR_USDBRL_VAR_TRI_PCT",
+    "MIN_OBS_DESVIO_EXPANDING",
+    "PISO_ESTRUTURAL_MAX",
+    "PISO_ESTRUTURAL_MIN",
+    "PK_PESOS",
+    "PK_POR_REGIME",
+    "RAMO_EMBI_FORA",
+    "SELO_NAO_RECOMENDACAO",
+    "SEM_CAP",
+    "SERIE_INCLINACAO_DO_STRESS",
+    "TOLERANCIA_SOMA_PESOS",
+    "InternacionalPesosSchema",
+    "InternacionalPorRegimeSchema",
     "ASSET_IDS_VALIDOS",
     "ATIVOS_ACOES_B3",
     "ATIVOS_FII",
