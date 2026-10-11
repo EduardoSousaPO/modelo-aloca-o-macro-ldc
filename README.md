@@ -23,7 +23,10 @@ série conferidos na fonte + linha em `docs/wiki/log.md`).
 
 ## Estado atual (2026-10-11)
 
-**Ondas 0 a 3 completas e aprovadas no QA; Onda 4 (métricas regime × ativo, heatmap, ranking, timeline, internacional, limitações e o orquestrador de um comando) IMPLEMENTADA, com o QA rodado e as mudanças aplicadas. Falta: F-027 (notebook, em curso) e F-031 (pacote do Comitê, classe D).**
+**FECHAMENTO FINAL — o pacote mínimo está implementado de ponta a ponta.** Ondas 0 a 3 aprovadas em QA independente; Onda 4 implementada com o QA rodado e aplicado; **F-027** (caderno de entrega) e **F-031** (pacote do Comitê, classe D) implementadas e **aguardando QA independente**. **O pacote está montado, verificado e selado — e NÃO SAI:** `ADR-001` em `Proposta` ⇒ `especificacao_congelada = False` (CA-090) ⇒ passo 2 dos 8 do gate reprovado (`AGENTS.md §14`). **Nada está em implementação; os próximos 10 passos são humanos** — tabela em [`TODO.md §4`](TODO.md), roteiro de 30 minutos em [`docs/product/GUIA-REVISAO-EDU.md`](docs/product/GUIA-REVISAO-EDU.md), gate executável em [`docs/wiki/runbooks/entrega-comite.md`](docs/wiki/runbooks/entrega-comite.md).
+
+> ⛔ **Enquanto ADR-001 estiver em `Proposta`, nada sai — nem um número por WhatsApp.** Não existe
+> classe A/B para publicação (Anti-SPEC §10.3.18).
 
 - Documentação completa: escopo → pesquisa → PRD → SPEC/Anti-SPEC → contratos → TODO (40 features) → PLAN.
 - Contratos de dados em `packages/shared/schemas/` (**9** módulos pandera/pydantic + catálogo de
@@ -63,6 +66,33 @@ série conferidos na fonte + linha em `docs/wiki/log.md`).
   `max abs dif = 0,0`; os 3 × P1 eram `verify` estourando em Parquet corrompido, o orquestrador sem
   as etapas de F-026/F-024 e o não publicável viajando no dataset congelado — **todos corrigidos**.
   **F-020 (V2) e F-030 foram cortadas da v1**, com justificativa escrita no `TODO.md`.
+- **F-027 — o caderno de entrega, sem uma linha de cálculo:**
+  `apps/analysis/notebooks/entrega_comite_2026-10-14.ipynb`, **34 células** em **11 seções**, na
+  ordem em que a reunião precisa delas. A regra de `AGENTS.md §19` é **executável** aqui: teste de
+  AST reprova `def`/`lambda`/`class`, **todo** operador aritmético e **29** métodos de agregação do
+  pandas — o caderno abre arquivo, recorta e formata chamando função pública de `apps/`, e **nenhum
+  número está digitado nele**. Executado por `nbconvert` em cópia: **19/19** células com saída, 0
+  erros, HTML de ~2,0 MiB; **3 gerações → mesmo `sha256`**. 35 testes.
+- **F-031 — o pacote do Comitê (classe D), montado e selado:**
+  `apps/analysis/entrega/montar_pacote.py` **prepara e não publica** — copia artefato, converte
+  formato e hasheia, sem calcular um único número. **41 arquivos + `HASHES.txt`**, 10,9 MB soltos /
+  **3,7 MB** no `.zip` com `sha256` **idêntico em 3 montagens** (CA-121): 10 tabelas em Parquet
+  (**cópia byte a byte**, nunca reserializado) e CSV pt-BR, 5 figuras em PNG e SVG, as 2 tabelas do
+  Comitê, o caderno (`.ipynb` + HTML), a página de limitações, o texto das substituições de fonte
+  (CA-117) e um XLSX de **8 abas** sem **nenhuma** fórmula. Smoke de **93 checagens — 86 `OK`, 0
+  `FALHA`, 7 `INFO`, `rc 0`**. O selo de "não publicável" é **lido do ADR em disco** com falha
+  fechada: aceitar o ADR-001 derruba o selo de todo artefato com **zero linha de código**. 55 testes.
+
+  ```bash
+  python -m apps.analysis.entrega.montar_pacote --smoke     # monta + as 93 checagens
+  python -m apps.analysis.entrega.montar_pacote --so-smoke  # confere o pacote em disco
+  ```
+
+  **O pacote não é artefato do manifesto** (**D-ag**): `inventariar()` ignora o prefixo
+  `entrega/pacote_comite_`, porque ele é cópia de artefato já manifestado, montado **depois** do
+  `freeze` e reconstruível por um comando (CA-114) — conferido: `verify` com o pacote em disco dá
+  **`VERIFY OK`**, agregado inalterado. **A ordem do gate continua** `run --offline` → `verify` →
+  `freeze --tag` → `montar_pacote --smoke`, porque o pacote **copia** o `MANIFEST.json`.
 - **Um comando reconstrói a camada canônica inteira** (F-029):
 
   ```bash
@@ -99,8 +129,8 @@ série conferidos na fonte + linha em `docs/wiki/log.md`).
   serem escritos (agregado `f9214b8e…`, `verify` rc 0). O passo de `tests/integration` fica
   comentado e nomeado: a pasta está **vazia** e `pytest` nela sairia com código 5.
 - **8 decisões de Edu/Alexandre bloqueiam a publicação** (não o desenvolvimento) — ver abaixo; e as
-  decisões provisórias das Ondas 1-4 (**D-a..D-af**, com **D-h..D-m**, **D-s/D-t/D-u** e, da Onda
-  4, **D-aa (c)** e a ratificação de **D6** à espera de aval) estão tabuladas em
+  decisões provisórias das Ondas 1-4 e do fechamento final (**D-a..D-ag**, com **D-h..D-m**,
+  **D-s/D-t/D-u**, **D-aa (c)** e a ratificação de **D6** à espera de aval) estão tabuladas em
   [`TODO.md §4`](TODO.md). Quatro delas mudam o que se pode afirmar:
   **D-m** (a V1 classifica **67** dos 83 trimestres, não 83, porque o IBC-Br começa em 2003 — a
   crise de 2008 fica fora do eixo de crescimento), **D-o** (unidade: `macro_quarterly` em por cento,
@@ -191,6 +221,9 @@ ele não existe.
 | 8 | [`docs/decisions/adr/`](docs/decisions/adr/) | decisões arquiteturais (ADR-001..006 em Proposta; ADR-007 Aceita) |
 | 9 | [`docs/plans/DECISIONS_LOG.md`](docs/plans/DECISIONS_LOG.md) | substituições de fonte e decisões operacionais |
 | 10 | [`docs/wiki/index.md`](docs/wiki/index.md) | memória sintetizada — **primeira leitura de qualquer agente** |
+| 11 | [`docs/product/LIMITACOES-COMITE.md`](docs/product/LIMITACOES-COMITE.md) | o que o número sustenta e o que não sustenta — **o documento que vai à reunião** |
+| 12 | [`docs/product/GUIA-REVISAO-EDU.md`](docs/product/GUIA-REVISAO-EDU.md) | **como revisar em 30 minutos** e o que fazer para destravar o envio |
+| 13 | [`docs/wiki/runbooks/entrega-comite.md`](docs/wiki/runbooks/entrega-comite.md) | o gate classe D: 8 passos, checklist de 19 caixas, rollback de 7 passos |
 
 Contrato com agentes de IA: [`AGENTS.md`](AGENTS.md) (papéis, A/B/C/D, autonomia/pausa, Validation Mode)
 e [`CLAUDE.md`](CLAUDE.md) (convenções Python, camadas de dados, o que nunca fazer).
@@ -206,12 +239,26 @@ Detalhe em [`docs/plans/PLAN.md`](docs/plans/PLAN.md); uma onda só começa com 
 | **2** | dom/seg 11-12/10 | camada canônica — `raw_series`, alinhamento trimestral, curva, retornos, `macro_quarterly` (**classe C**) · **fechada e aprovada no QA** |
 | **3** | ter 13/10 | anti-look-ahead/`asof` + regimes V1 (quadrantes) + V3 (vizinhos) (**classe C**) · **fechada e aprovada no QA: F-018, F-019, F-021** · **F-020 (V2) cortada da v1** |
 | **4** | ter 13/10 | métricas regime × ativo, heatmap, timeline, ranking, internacional, limitações, orquestrador · **implementada; QA rodado** — **marco de revisão humana do Edu** |
-| **5** | qua 14/10 | notebook de entrega (**F-027, em curso**) e **pacote do Comitê (F-031, classe D)** |
+| **5** | dom 11/10 | notebook de entrega (**F-027**) e **pacote do Comitê (F-031, classe D)** · **implementadas; QA pendente** — o pacote está montado e selado, **envio bloqueado por ADR-001** |
+| **humano** | ter 13/10 | **revisão do Edu** (30 min, [`GUIA-REVISAO-EDU.md`](docs/product/GUIA-REVISAO-EDU.md)) → aceite dos ADRs → checklist de 19 caixas → `freeze` + tag → QA independente → **envio** |
 
 Ciclo por feature: pegar o item do `TODO.md` → confirmar classe e Definition of Ready → checar contra o
 e-mail de escopo → teste falhando sobre fixture gravada → implementar → CI no nível da classe → PR com
 matriz de validação e **evidência de dados** (linhas, min/max de data, % de nulos, 3 valores conferidos na
 fonte; classe C: diff numérico vs. a versão anterior do canônico) → merge → `TODO.md` + `docs/wiki/log.md`.
+
+## Como revisar o que está pronto (Edu, 30 minutos)
+
+1. **`docs/product/LIMITACOES-COMITE.md`** — o aviso do topo (§0) e as **12 decisões** da §7.
+2. `data/canonical/figuras/timeline_regimes_revised.png` — a história dos 83 trimestres.
+3. `data/canonical/tabelas/ranking_regime_atual.md` — "em que regime estamos", respondida 3 vezes.
+4. `data/canonical/figuras/heatmap_v1_revised.svg` — o entregável visual (**o SVG**, que tem tooltip).
+5. `data/canonical/entrega/entrega_comite_2026-10-14.html` — o caderno executado, de cabo a rabo.
+
+Depois: a **checklist de 19 caixas** em `docs/wiki/runbooks/entrega-comite.md §2` e os comandos na
+ordem (`run --offline` → `verify` → `freeze --tag` → `montar_pacote --smoke` → `git tag -a`).
+**O roteiro completo, com o custo de discordar de cada decisão e as URLs dos 3 canários, está em
+[`docs/product/GUIA-REVISAO-EDU.md`](docs/product/GUIA-REVISAO-EDU.md).**
 
 ## Decisões pendentes (gate de publicação)
 
@@ -234,10 +281,22 @@ fonte; classe C: diff numérico vs. a versão anterior do canônico) → merge �
 | **L2** | autorizar FII segmentado via Teva (2019+, provedor privado sem licença explícita) | ADR-005 |
 | **L4** | contratar o ANBIMA Feed (≈R$ 686–8.238/mês) ou aceitar a curva via Tesouro Direto | ADR-004 |
 
-**Não bloqueado** (desenvolvimento): extração, camada canônica, figuras e tabelas — F-001 a F-011,
-F-013 a F-019, F-021 a F-026, F-028, F-029. **Bloqueado de verdade:** a **publicação** (F-031,
-classe D) e qualquer número de `internacional_pesos.parquet`, que exige ADR-003 aceito **e**
-autorização escrita sobre a Anti-SPEC.
+**Não bloqueado** (desenvolvimento): extração, camada canônica, figuras, tabelas, caderno e a
+**montagem** do pacote — F-001 a F-011, F-013 a F-019, F-021 a F-029, F-031. **Bloqueado de
+verdade:** o **ENVIO** (F-031 é classe D e o passo 2 do gate está reprovado) e qualquer número de
+`internacional_pesos.parquet`, que exige ADR-003 aceito **e** autorização escrita sobre a Anti-SPEC.
+
+**Para destravar:** em cada ADR de `docs/decisions/adr/`, trocar `- **Status:** **Proposta** — …`
+por `- **Status:** **Aceita** — Edu em <data>`. O gate é lido do disco com falha fechada, então um
+rebuild refaz as 83 linhas e o selo cai sozinho de todo artefato — **zero linha de código**. Só o
+**ADR-001** bloqueia a publicação; os outros cinco são o aceite formal do que já está construído.
+
+**O que ficou em dívida, nomeado** (`TODO.md §6`): o gerador do caderno de F-027 **não está
+versionado** · `lag_adjusted` é a 4ª coluna `bool` `nullable=False` e a única sem guarda de
+não-nulidade (D-ac cobriu as outras 3) · o **tempo a frio** do pipeline (RNF-008/CA-119) **não foi
+medido** (exige `data/` vazio **e** rede; o trecho offline gasta 0,7-0,8 min) · **`tests/integration/`
+está vazia** e o passo correspondente do job N2 fica comentado e nomeado, porque `pytest` em pasta
+sem teste sai com código 5.
 
 ## Licença
 

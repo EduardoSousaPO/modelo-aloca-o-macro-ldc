@@ -69,7 +69,7 @@ IPCA caindo de 11% para 7% não é pior que `RECUPERACAO` com IPCA a 7,17%.
 Nenhum valor sai do relógio. `Figure` instanciada direta (sem `pyplot`, sem estado global),
 backend `Agg`, `svg.hashsalt` fixo, `metadata={"Date": None}` no SVG e `Software` fixo no PNG. Duas
 rodadas no mesmo checkout produzem SVG e Parquet byte-idênticos; o PNG é verificado na prática
-(ver `docs/wiki/context/F-025.md`).
+(ver `docs/wiki/modules/analysis.md`; o pack de F-025 foi apagado no fechamento final).
 
 **Nota de contrato:** `data/canonical/figuras/` é artefato **derivado de figura**, não tabela
 canônica — por isso o Parquet de dados plotados não tem schema em `packages/shared/schemas/`

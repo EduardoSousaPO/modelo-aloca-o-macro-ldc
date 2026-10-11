@@ -1,8 +1,9 @@
 # Módulo `analysis` — figuras e tabelas do Comitê (**classe B**)
 
-> Verdade: `apps/analysis/**` + `docs/specs/SPEC.md` RF-033..RF-037 + **ADR-002** + a skill
-> `dataviz`. **Estado (2026-10-11): F-023 (heatmap), F-024 (ranking + concordância) e F-025
-> (timeline) implementadas e materializadas**; F-027 (notebook) em curso.
+> Verdade: `apps/analysis/**` + `docs/specs/SPEC.md` RF-033..RF-037 e RF-041..RF-045 + **ADR-002**
+> + a skill `dataviz`. **Estado (2026-10-11): a camada está COMPLETA** — F-023 (heatmap), F-024
+> (ranking + concordância), F-025 (timeline), **F-027 (caderno de entrega)** e **F-031 (pacote ao
+> Comitê, classe D)** implementadas e materializadas. F-027 e F-031 aguardam QA independente.
 > **Gate FECHADO:** ADR-001 em `Proposta` ⇒ `especificacao_congelada = False` ⇒ **toda figura e toda
 > tabela nasce com a marca `ESPECIFICAÇÃO NÃO CONGELADA — não publicável`** (CA-090). Desenvolver é
 > liberado; publicar, não.
@@ -22,6 +23,8 @@ número está errado na figura, o bug é da feature dona**, não daqui.
 | `figuras/heatmap_regime_ativo.py` (F-023) | heatmap regime × ativo, 3 vistas | `figuras/heatmap_{v1_revised,v1_asof,horizonte_cruzado}.{png,svg}` + `heatmap_dados.parquet` (**322 × 32**) |
 | `figuras/timeline_regimes.py` (F-025) | timeline dos 83 trimestres sobre IBOV e Selic | `figuras/timeline_regimes_{revised,asof}.{png,svg}` + `timeline_regimes_dados.parquet` (**166 × 14**) |
 | `tabelas/ranking_regime_atual.py` (F-024) | "em que regime estamos?" × 3 + ranking + concordância | `tabelas/ranking_regime_atual.{parquet,csv,md}` (**72**) + `concordancia_lentes.{parquet,csv,md}` |
+| `notebooks/entrega_comite_2026-10-14.ipynb` (F-027) | o **caderno** do Comitê: 11 seções, 34 células, **zero cálculo** | `entrega/entrega_comite_2026-10-14.html` (executado, ~2,0 MiB) + `entrega/_executado.ipynb` |
+| `entrega/montar_pacote.py` (F-031) | o **pacote** classe D: copia, converte formato e hasheia — **não publica** | `entrega/pacote_comite_2026-10-14/` (**41 arquivos + `HASHES.txt`**) + o `.zip` determinístico |
 
 ```bash
 python -m apps.pipeline run --offline                              # tudo, nas etapas 12 e 13
@@ -29,6 +32,9 @@ python -m apps.analysis.figuras.heatmap_regime_ativo               # as 3 vistas
 python -m apps.analysis.figuras.heatmap_regime_ativo --vista v1_revised
 python -m apps.analysis.figuras.timeline_regimes --materializacao asof
 python -m apps.analysis.tabelas.ranking_regime_atual
+python -m apps.analysis.entrega.montar_pacote --smoke         # monta + 93 checagens, rc != 0 se falhar
+python -m apps.analysis.entrega.montar_pacote --so-smoke      # confere o pacote em disco
+python -m apps.analysis.entrega.montar_pacote --limpar        # apaga o pacote
 ```
 
 > `figuras` e `tabelas` são descobertas por `pkgutil` em `run.py`: submódulo que expõe
@@ -151,7 +157,103 @@ ativos. Sobre as 61 referências comparáveis, a concordância V1 × V3 tem **me
 A página de F-024 **não escolhe** a lente: traz as três com peso igual e diz que escolher é **D1**,
 do Edu.
 
-**Features:** **F-023** · **F-024** · **F-025** (implementadas) · **F-027** (notebook, em curso) ·
-**F-031** (pacote ao Comitê, classe D).
+## O caderno (F-027) — a regra "sem cálculo" é um teste, não um pedido de revisão
+
+`apps/analysis/notebooks/entrega_comite_2026-10-14.ipynb`: **34 células** (15 markdown + 19 de
+código), **11 seções** na ordem em que a reunião precisa delas — gate e `DATASET_SHA256`, pedido do
+e-mail × entregue, as 4 camadas de dado com amostras e os 3 canários, os regimes (timeline,
+distribuição, indeterminados, defasagem), os "momentos semelhantes" de 2026Q3 com `n` e erro-padrão,
+o mapa de calor, "em que regime estamos" respondida **três** vezes, o internacional, as limitações,
+as 12 decisões e como reproduzir.
+
+**O caderno não calcula.** Ele abre arquivo (`pd.read_parquet`, `json.loads`), recorta (`loc`,
+`head`, `isin`), formata chamando função pública de `apps/` (`pct`, `pp`, `num` passados ao
+`Styler.format`) e mostra. É `CLAUDE.md §3` / `AGENTS.md §19`, e aqui é **executável** — teste de AST
+em `tests/unit/test_notebook_entrega.py` (35 testes) reprova:
+
+1. `def`, `async def`, `lambda`, `class`;
+2. **todo operador aritmético** (`+ - * / // % ** @` e as formas compostas). Comparação (`==`, `<`)
+   e combinação booleana de máscara (`&`, `|`, `~`) passam: **recortar linha não é calcular**.
+   Consequência prática: `Path / "x"` é `ast.Div` e por isso o caminho sai de
+   `caminho_canonical("figuras/…")`; e percentual é `Styler.format({"media": pct})`, nunca `x 100`;
+3. **29** métodos de agregação/transformação do pandas (`sum`, `mean`, `corr`, `groupby`, `apply`,
+   `rolling`, `pct_change`, `quantile`, `resample`, …);
+4. escrita em `data/` (`to_parquet`, `to_csv`, `write_text`, `write_bytes`, `mkdir`, `savefig`);
+5. relógio e aleatoriedade (`datetime.now`, `time.time`, `random`, `uuid`, `os.environ`, `getenv`) e
+   `metadata.execution` nas células — relógio dentro de arquivo versionado;
+6. output sujo (`execution_count` diferente de 0) e **CRLF** (o `nbconvert` no Windows grava CRLF:
+   conteúdo idêntico, `sha256` diferente — é o problema de **D-v**).
+
+**Toda célula tem `id` explícito.** Sem isso o `nbformat` sorteia um novo a cada gravação, o arquivo
+muda de bytes sem mudar de conteúdo e o diff do `.ipynb` deixa de servir para revisão. Com os `id`
+fixos: **3 gerações -> mesmo `sha256`**. **O gerador do caderno não está versionado** (dívida em
+`TODO.md §6`): manutenção é direto no `.ipynb` (JSON legível), **mantendo o `id`**, com
+`nbconvert --clear-output` antes do commit. Ver `apps/analysis/notebooks/README.md`.
+
+**Export** — `python -m nbconvert`, **não** `jupyter nbconvert`: nesta máquina o despachante
+`jupyter` resolve pelo `PATH` e cai num Python 3.12 global que levanta
+`ModuleNotFoundError: notebook.services` antes de converter nada. E o kernel roda com o **diretório
+do notebook** como `cwd`, por isso a cópia executada vive dentro da árvore do repositório. O
+procedimento está em `apps/analysis/notebooks/README.md` e em `wiki/context/F-027.md §14`.
+
+## O pacote (F-031) — prepara, não publica
+
+`apps/analysis/entrega/montar_pacote.py` **copia artefato, converte formato e hasheia**. Não envia,
+não roda `freeze`, não cria `git tag`, não reconstrói o canônico e **não calcula um único número**:
+se um número está errado, o bug é da feature dona (F-015..F-029). **41 arquivos + `HASHES.txt`**,
+10,9 MB soltos / 3,7 MB no `.zip`, em `data/canonical/entrega/pacote_comite_2026-10-14/`. Conteúdo:
+**10** tabelas em Parquet e CSV pt-BR, 5 figuras em PNG e SVG, as 2 tabelas do Comitê em `.md` e
+`.csv`, o caderno (`.ipynb` + HTML executado), `README-COMITE.md`, `LIMITACOES-COMITE.md`,
+`SUBSTITUICOES-DE-FONTE.md` (CA-117), `PACOTE-COMITE.xlsx` de **8 abas** e `MANIFEST.json`.
+
+Cinco coisas que quem mexer aqui precisa saber:
+
+1. **O selo do gate é lido do ADR em disco, sempre**, por `status_adr_001()` de F-019 — a mesma
+   função das figuras e das tabelas —, com **falha fechada** (ADR ausente ou ilegível ⇒
+   `DESCONHECIDO` ⇒ **não** congelado). O dia em que o Edu virar o `Status` para `Aceita`, o selo cai
+   sozinho do README, do XLSX e do `HASHES.txt`: **zero linha de código.**
+2. **Parquet entra por cópia byte a byte, nunca reserializado.** `read_parquet` + `to_parquet`
+   produziria **outros bytes** e o `sha256` deixaria de bater com o `MANIFEST.json` — a amarra do
+   dataset congelado morreria em silêncio. O CSV é derivado; o Parquet é cópia.
+3. **Duas convenções de CSV convivem, declaradas.** `dados/*.csv` sai em pt-BR (`;`, vírgula
+   decimal, UTF-8 **com BOM**, LF) — o que o Excel pt-BR abre sem assistente de importação.
+   `tabelas/*.csv` vem de F-024 com `,`, ponto decimal e **sem** BOM, e é **copiado byte a byte**:
+   reescrevê-lo criaria uma segunda versão da mesma tabela. As duas estão no README e na aba
+   `Leia-me`.
+4. **Duas fontes de relógio no XLSX, as duas neutralizadas.** O `zipfile` grava a hora corrente em
+   cada entrada **e** o `openpyxl` **sobrescreve** `wb.properties.modified` com o UTC do `save()`,
+   ignorando o valor fixado pelo chamador (medido: duas montagens no mesmo minuto diferindo em 1 s).
+   `_rezipar_deterministico` corrige as duas. Sem isso CA-121 cai. **Nenhuma célula começa com `=`**
+   — há teste que varre as 8 abas: o arquivo descreve um dataset congelado, não recalcula ao abrir.
+5. **Nulo legítimo entra com contagem travada**, não com exceção genérica: `ret_tri` nulo em
+   exatamente **23** linhas (o primeiro trimestre de cada série; o CDI não tem âncora porque é taxa
+   acumulada) e `regime_v1` nulo em exatamente **16** (todas `INDETERMINADO`). Painel que mudar faz
+   o smoke **reprovar** em vez de calar.
+
+**O que não entra, e por quê:** `internacional_pesos.parquet`, porque o `MANIFEST.json` o marca
+`publicavel: false` (**D-af**) — o módulo **recusa montar** se a lista de inclusão contrariar o
+manifesto, e **a lista não vence o manifesto**. Também fora, por omissão: `raw_series`,
+`alinhado_trimestral`, `series_catalog`, os `*_provenance`, `regime_neighbors` da V1, `ldc.duckdb` e
+os `relatorio_*.json`.
+
+**O pacote não é artefato do manifesto (`D-ag`).** Ele vive dentro de `data/canonical/`, que o
+`verify` cobre recursivamente, mas `inventariar()` ignora o prefixo `entrega/pacote_comite_`: o
+pacote é **cópia** de artefato já manifestado, montado depois do `freeze` e reconstruível por um
+comando (CA-114). **A ordem do gate continua** `run --offline` -> `verify` -> `freeze --tag` ->
+`montar_pacote --smoke`, porque o pacote **copia** o `MANIFEST.json` e precisa dele já congelado. E
+o `DATASET_SHA256` que o HTML do caderno imprime é, por construção, o da rodada **anterior** à
+inclusão do próprio HTML — **a versão que vale é a de `MANIFEST.json`/`HASHES.txt`**.
+
+## Publicar é classe D, e o gate está FECHADO
+
+Nada desta camada vai ao Comitê sem os 8 passos de `AGENTS.md §14`. Hoje o passo 2 está **reprovado**
+(ADR-001 em `Proposta`), e isso vale também para "só esse número do heatmap no WhatsApp": **não
+existe classe A/B para publicação** (Anti-SPEC §10.3.18). O gate executável é
+`docs/wiki/runbooks/entrega-comite.md`; o roteiro humano de 30 minutos é
+`docs/product/GUIA-REVISAO-EDU.md`.
+
+**Features:** **F-023** · **F-024** · **F-025** · **F-027** · **F-031** — todas implementadas;
+F-027 e F-031 **aguardam QA independente**.
 **Ver também:** `modules/regimes.md` (as métricas e as lentes) · `modules/canonical.md` (o comando
-único e o `MANIFEST.json`) · `modules/internacional.md` (F-026) · `ADR-002` (métrica do heatmap).
+único e o `MANIFEST.json`) · `modules/internacional.md` (F-026) · `ADR-002` (métrica do heatmap) ·
+`runbooks/entrega-comite.md` (o gate) · `docs/product/GUIA-REVISAO-EDU.md` (a revisão do Edu).

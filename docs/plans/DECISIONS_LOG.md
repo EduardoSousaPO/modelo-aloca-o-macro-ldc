@@ -899,6 +899,42 @@ S-09, S-10, S-11, S-12**) são operacionais e podem ser aceitas por e-mail, sem 
   `test_manifesto_marca_o_nao_publicavel_e_frozen_o_lista`
   — ref: `qa/ONDA-4-QA.md §5` (P1-3), F-026 §8, CONTRACTS §6a.2, AGENTS §9/§14
 
+### 2.3 (parte 5) — fechamento final: F-027, F-031 e a amarra do hash (2026-10-11)
+
+- [2026-10-11] [entrega/reprodutibilidade] **D-ag · o pacote de entrega não é artefato do
+  manifesto, e o hash que vale é o do `MANIFEST.json`/`HASHES.txt` — ACEITA pelo orquestrador.**
+  Uma decisão com **duas metades**, porque as duas são a mesma coisa: *um hash não contém a si
+  mesmo*.
+  **(a) `inventariar()` ignora o prefixo `entrega/pacote_comite_`** (o diretório e o `.zip`), na
+  mesma classe de `NAO_SAO_ARTEFATO` — **1 linha** em `apps/pipeline/run.py` + a constante
+  `PREFIXO_PACOTE_DE_ENTREGA` com o motivo escrito. **Motivo medido em F-031 §5:** com o pacote em
+  disco, `verify` reprovava os **42** arquivos como *"nao listado no manifesto"* **e** acusava
+  agregado divergente (`fc233118…` esperado × `34c53a90…` obtido), e um `freeze` novo passaria a
+  incluir o **próprio pacote** no `DATASET_SHA256` — circular. O pacote é **cópia byte a byte** de
+  artefato que já está no manifesto (decisão (b) de F-031), montada **depois** do `freeze` e
+  reconstruível por **um** comando, que é exatamente o que CA-114 garante: não é artefato novo, é
+  uma vista do dataset congelado. A exclusão é do **prefixo do pacote**, não da pasta `entrega/`:
+  `entrega/entrega_comite_2026-10-14.html` (o HTML executado do caderno de F-027) **continua**
+  artefato, porque é **insumo** do pacote. **Conferido:** `montar_pacote` → `verify` →
+  **`VERIFY OK`, 48 artefatos, agregado `fc233118…` inalterado, rc 0**. Travado por
+  `test_verify_ignora_o_pacote_de_entrega_e_mantem_o_agregado` e
+  `test_o_html_executado_do_caderno_continua_artefato`. Consequência: o `--limpar` de F-031 deixa de
+  ser **obrigatório** antes de `verify`/`freeze` e passa a ser conveniência; a ordem
+  `run --offline → verify → freeze --tag → montar_pacote --smoke` **continua** valendo, porque o
+  pacote **copia** o `MANIFEST.json` e precisa dele já congelado.
+  **(b) O `DATASET_SHA256` que o HTML do caderno imprime é, por construção, o da rodada anterior à
+  inclusão do próprio HTML** (F-031 §6): hoje o HTML cita `a7952e18…` e o manifesto diz
+  `fc233118…`. O HTML executado **é** artefato de `data/canonical/`, logo entra no agregado; exigir
+  que ele cite o agregado que o contém seria exigir que um hash contenha a si mesmo. **Isto não é
+  defeito e não se corrige** — declara-se: **a versão que vale é o `DATASET_SHA256` de
+  `MANIFEST.json`/`HASHES.txt`**, e é o que o `README-COMITE.md`, a aba `Leia-me` do XLSX e o
+  `GUIA-REVISAO-EDU.md` dizem por extenso. O smoke de F-031 registra a divergência como **`INFO`**
+  com a explicação no próprio texto, nunca como `FALHA`. **Alternativa recusada:** tirar o HTML do
+  manifesto para "fechar" a igualdade — isso deixaria **2,1 MB de artefato publicado fora da
+  proteção do `verify`**, que é o oposto da decisão (c) de F-029
+  — ref: F-031 §5 e §6, F-027 §9, `run.py` (`PREFIXO_PACOTE_DE_ENTREGA`),
+  `runbooks/entrega-comite.md §1/§5`, CA-114, CA-121, D-ad (c), D-af
+
 ---
 
 ## 3. Regras deste log
@@ -923,6 +959,6 @@ S-09, S-10, S-11, S-12**) são operacionais e podem ser aceitas por e-mail, sem 
 ---
 
 *Documento vivo e deliberadamente pequeno — a §2.2 (achados de fonte) é a parte que mais cresce e a
-primeira a enxugar. Quando o Edu avaliar D-a..D-af, o que virar permanente sobe para `CONTRACTS.md` /
+primeira a enxugar. Quando o Edu avaliar D-a..D-ag, o que virar permanente sobe para `CONTRACTS.md` /
 ADR e sai daqui; o que virar óbvio se apaga. Nunca apague a linha original de uma decisão avaliada:
 troque o marcador por `ACEITA — <quem> em <data>`.*

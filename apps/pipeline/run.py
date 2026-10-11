@@ -87,6 +87,16 @@ VERSAO_DO_MANIFESTO = 1
 #: dois arquivos que este módulo escreve (incluí-los faria o manifesto hashear a si mesmo).
 NAO_SAO_ARTEFATO: frozenset[str] = frozenset({".gitkeep", NOME_MANIFESTO, NOME_FROZEN})
 
+#: Prefixo do **pacote de entrega** de F-031 (`data/canonical/entrega/pacote_comite_<data>/` e o
+#: `.zip` de mesmo nome). Mesma classe de `NAO_SAO_ARTEFATO`, e pela mesma razão: o pacote é uma
+#: **cópia** de artefatos que já estão no manifesto, montada *depois* do `freeze` e reconstruível
+#: por um comando (CA-114). Sem esta exclusão (**D-ag**, 2026-10-11, medido em F-031 §5) o `verify`
+#: reprovava os 42 arquivos do pacote como "nao listado no manifesto" **e** acusava agregado
+#: divergente — e um `freeze` novo passaria a incluir o próprio pacote no `DATASET_SHA256`, que é
+#: circular. O HTML executado do caderno (`entrega/entrega_comite_*.html`) **continua** artefato:
+#: ele é insumo do pacote, não cópia dele.
+PREFIXO_PACOTE_DE_ENTREGA = "entrega/pacote_comite_"
+
 #: Artefatos **derivados e descartáveis** cujos bytes não são reprodutíveis. Entram no manifesto
 #: com `determinista: false`, ficam fora do agregado e o `verify` só os reporta. Ver decisão 3.
 NAO_DETERMINISTICOS: frozenset[str] = frozenset({"ldc.duckdb"})
@@ -665,6 +675,9 @@ def inventariar(*, raiz: Path | None = None) -> tuple[Artefato, ...]:
     artefato publicado que não está no manifesto é artefato que o `verify` não protege. O nome no
     manifesto é o caminho relativo em POSIX (`figuras/timeline_regimes_dados.parquet`), então a
     ordem do agregado é estável entre Windows e Linux.
+
+    **Uma** exclusão além de `NAO_SAO_ARTEFATO`: o pacote de entrega de F-031
+    (`PREFIXO_PACOTE_DE_ENTREGA`), que é cópia de artefato já manifestado — ver **D-ag**.
     """
     pasta = caminho_camada(Camada.CANONICAL, raiz=raiz)
     if not pasta.is_dir():
@@ -678,6 +691,8 @@ def inventariar(*, raiz: Path | None = None) -> tuple[Artefato, ...]:
         if not caminho.is_file() or caminho.name in NAO_SAO_ARTEFATO:
             continue
         relativo = caminho.relative_to(pasta).as_posix()
+        if relativo.startswith(PREFIXO_PACOTE_DE_ENTREGA):
+            continue
         corpo = caminho.read_bytes()
         perfil = _perfil_do_parquet(caminho) if caminho.suffix == ".parquet" else {}
         achados.append(

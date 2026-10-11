@@ -6,18 +6,17 @@
 > **v3.2 — Feedback Hardened + Project Wiki:** cada feature B/C/D traz o **Feature Contract inline**
 > (DoR + escopo + arquivos + CAs + testes + matriz). Features A podem ter apenas a descrição mínima.
 
-**Última revisão:** 2026-10-11 (fechamento da **Onda 3, parte 1**: F-018, F-019, F-021 + os P1 dos
-dois QAs da Onda 2)
-**Fase:** **Onda 3 — regimes (classe C)**, parte 1 fechada. Ondas 0, 1 e 2 **aprovadas** no QA
-(F-013..F-017 e F-010 com QA independente, 0 × P0) · **40 features mapeadas** · publicação segue
-travada por ADR-001
+**Última revisão:** 2026-10-11 (**fechamento final**: F-027 notebook + F-031 pacote de entrega +
+**D-ag**; o pacote está montado, selado e **não sai**)
+**Fase:** **pacote mínimo implementado de ponta a ponta.** Ondas 0, 1, 2 e 3 **aprovadas** no QA
+independente; Onda 4 implementada com o QA rodado e aplicado; **F-027 e F-031 implementadas, QA
+pendente** · **40 features mapeadas** · **publicação BLOQUEADA por ADR-001 (`Proposta`)**
 **Tipo:** ferramenta interna (dados / quant — não SaaS, não web, roda local)
-**Foco atual:** §1 Em andamento = **F-018, F-019, F-021** implementadas e aguardando QA/revisão
-numérica independente. `data/canonical/` tem **20** artefatos: 62 séries, 278.439 linhas, catálogo
-de 138 séries, as **duas** materializações de `macro_quarterly` e as **duas** lentes de regime
-(V1 e V3)
-**Próximo:** **F-022** (métricas regime × ativo — a junção em `RegimesSchema`, D-r) e a **Onda 4**
-(F-020 V2, F-023 heatmap, F-024 ranking, F-028 limitações)
+**Foco atual:** **nada em implementação.** O que falta é **humano**: o Edu aceitar os ADRs, rodar o
+checklist de 19 caixas e enviar (§4, tabela "O que só o Edu pode fazer"). Guia de leitura de 30
+minutos para a terça 13/10: [`docs/product/GUIA-REVISAO-EDU.md`](docs/product/GUIA-REVISAO-EDU.md)
+**Próximo:** QA independente de F-027/F-031 (Prompt 3, subagente distinto) → gate de `AGENTS.md §14`
+→ envio. Depois do Comitê: o backlog pós-Comitê de §2 (F-020, F-033..F-040)
 
 ---
 
@@ -62,13 +61,28 @@ qualquer mudança na camada canônica — ver `AGENTS.md §2`.
 
 > Máximo 2 itens simultâneos. Se tiver mais, você está dispersando.
 
-**ONDA 4 IMPLEMENTADA, QA pendente — fechamento de 2026-10-11.** A Onda 3 parte 1 (F-018, F-019,
-F-021) teve **QA independente com revisão numérica** (`docs/plans/qa/ONDA-3-QA.md`): **0 × P0** e
-**0 divergência numérica** em 5 colunas × 83 × 2 materializações, 83 × 2 rótulos, `rho` + 16
-distâncias e 24 médias de ativo — os **5 P1 eram de declaração** e estão aplicados em **D-y**. A
-Onda 4 (F-022..F-029, menos F-027) está **implementada**, com o QA da Onda 4
-(`docs/plans/qa/ONDA-4-QA.md`) já rodado sobre um snapshot: **0 × P0**, **120 células × 17 métricas
-reconferidas com dif 0,0**, e os **3 P1 + 6 P2** aplicados neste fechamento.
+### ONDAS 0–4 IMPLEMENTADAS · PACOTE MONTADO E SELADO · ENVIO **BLOQUEADO** POR ADR-001 · PRÓXIMOS PASSOS = HUMANOS
+
+**Fechamento final de 2026-10-11.** O pacote mínimo (`F-001`..`F-032`) está **implementado de ponta
+a ponta**: extração → camada canônica → regimes → métricas → figuras e tabelas → página de
+limitações → orquestrador de um comando → **caderno de entrega (F-027)** → **pacote ao Comitê
+(F-031)**. **Um comando reconstrói tudo** (13 etapas, `--offline`, sem rede), `verify` confere os 48
+artefatos e **o pacote de 41 arquivos + `HASHES.txt` está montado, verificado e selado como não
+publicável.**
+
+**O que falta não é código.** `ADR-001` está em **`Proposta`** em disco ⇒
+`especificacao_congelada = False` (CA-090) ⇒ **passo 2 dos 8 do gate reprovado** (`AGENTS.md §14`)
+⇒ **nada sai — nem o pacote completo, nem um número por WhatsApp** (Anti-SPEC §10.3.18). Os
+próximos passos são **todos humanos** e estão tabulados em **§4, "O que só o Edu pode fazer"**, com
+o comando e o arquivo de cada um. Roteiro de 30 minutos para a terça 13/10:
+[`docs/product/GUIA-REVISAO-EDU.md`](docs/product/GUIA-REVISAO-EDU.md).
+
+**QA das ondas anteriores, para contexto.** Onda 3 parte 1 (F-018, F-019, F-021):
+`docs/plans/qa/ONDA-3-QA.md`, **0 × P0** e **0 divergência numérica** em 5 colunas × 83 × 2
+materializações, 83 × 2 rótulos, `rho` + 16 distâncias e 24 médias de ativo — os **5 P1 eram de
+declaração**, aplicados em **D-y**. Onda 4 (F-022..F-029): `docs/plans/qa/ONDA-4-QA.md`, **0 × P0**,
+**120 células × 17 métricas reconferidas com dif 0,0**, **3 P1 + 6 P2** aplicados. **F-027 e F-031
+ainda não passaram por QA independente** — é o item 9 da tabela de §4.
 
 | Feature | O que entregou | Estado |
 |---|---|---|
@@ -79,6 +93,8 @@ reconferidas com dif 0,0**, e os **3 P1 + 6 P2** aplicados neste fechamento.
 | **F-026** | `internacional_por_regime.parquet` **54 × 18**, `internacional_pesos.parquet` **624 × 13**, `relatorio_internacional.json` | mudanças aplicadas · **D-ab** (D6-a..d) e **D-af** (não publicável no manifesto) |
 | **F-028** | `docs/product/LIMITACOES-COMITE.md`, **8 blocos**, 249 linhas | **QA APROVADO** · §3.1 acrescentada com os achados de F-026 |
 | **F-029** | `python -m apps.pipeline run\|verify\|freeze`, **13** etapas, `MANIFEST.json` + `FROZEN.txt` | mudanças aplicadas · **P1-1** (`verify` em Parquet ilegível), **P1-2** (etapas `internacional` e `tabelas`), **D-af** |
+| **F-027** | `apps/analysis/notebooks/entrega_comite_2026-10-14.ipynb` — **34 células** (15 md + 19 código), **11 seções**, zero cálculo (teste de AST) + o HTML executado (**2,0 MiB**) | **implementada — QA pendente** · 35 testes · divergências de path ratificadas abaixo |
+| **F-031** | `apps/analysis/entrega/montar_pacote.py` — pacote de **41 arquivos + `HASHES.txt`**, **10,9 MB** soltos / **3,7 MB** no `.zip`, XLSX de 8 abas, smoke de **93 checagens** `rc 0` | **implementada — QA pendente** · 55 testes · **ENVIO BLOQUEADO** (ADR-001 em `Proposta`) · **D-ag** aplicada |
 | **F-030** | — | **CORTADA da v1**: canários, fixtures e a primitiva de cache condicional já existem distribuídos pelas features de extração (justificativa no bloco F-030) |
 
 **Os 8 P1 dos dois QAs foram absorvidos neste fechamento.** Onda 3: `CONTRACTS §5.2a` reescrita com
@@ -136,39 +152,32 @@ reprovava negação legítima das outras) · `n = 20` do contrato de F-028 corri
 > das 96 células com `max abs dif = 6,94e-18`.
 
 Os **10** `relatorio_*.json` carregam `versao_build` conferido contra o código em disco. Decisões:
-**D-a..D-h** (Onda 1), **D-i..D-q** (Onda 2), **D-r..D-x** (Onda 3), **D-y..D-af** (Onda 4) — todas
-em `DECISIONS_LOG §2.3`, provisórias onde mudam número, com o que precisa de ratificação do Edu
-tabulado em **§4**.
+**D-a..D-h** (Onda 1), **D-i..D-q** (Onda 2), **D-r..D-x** (Onda 3), **D-y..D-af** (Onda 4) e
+**D-ag** (fechamento final) — todas em `DECISIONS_LOG §2.1/§2.3`, provisórias onde mudam número,
+com o que precisa de ratificação do Edu tabulado em **§4**.
 
-**Próximo passo:** **F-027** (notebook de entrega, em curso em paralelo) e **F-031** (pacote ao
-Comitê, **classe D** — exige os 8 itens de `AGENTS.md §14`, entre eles ADR-001/002/003 **Aceitos** e
-revisão humana registrada). F-031 **lê o campo `publicavel` do `MANIFEST.json`** (D-af) e
-**não** inclui `internacional_pesos.parquet`.
+**O pacote de entrega não entra no manifesto (`D-ag`, aplicada neste fechamento).**
+`inventariar()` ignora o prefixo `entrega/pacote_comite_` (diretório e `.zip`), na mesma classe de
+`NAO_SAO_ARTEFATO`: o pacote é **cópia byte a byte** de artefato já manifestado, montada depois do
+`freeze` e reconstruível por um comando (CA-114). Antes disso, `verify` com o pacote em disco
+reprovava 42 arquivos e acusava agregado divergente, e um `freeze` novo incluiria o próprio pacote
+no `DATASET_SHA256` — circular. **Conferido:** `montar_pacote` → `verify` → **`VERIFY OK`, 48
+artefatos, agregado `fc233118…` inalterado, `rc 0`**. O HTML executado do caderno
+(`entrega/entrega_comite_2026-10-14.html`) **continua** artefato. A 2ª metade de **D-ag**: o
+`DATASET_SHA256` que o HTML imprime é, por construção, o da rodada **anterior** à inclusão do
+próprio HTML (`a7952e18…` × `fc233118…`) — **a versão que vale é a de `MANIFEST.json`/`HASHES.txt`**,
+e é isso que o README do pacote, a aba `Leia-me` do XLSX e o guia do Edu dizem.
 
-**Consolidação da Onda 1 — o que mudou depois dos 7 relatórios** (decisões D-a..D-h, todas
-registradas em `docs/plans/DECISIONS_LOG.md §2.1` como **provisórias, aval de Edu pendente**):
+**Próximo passo: humano.** Ver **§4, "O que só o Edu pode fazer"** (10 itens, cada um com o comando
+ou o arquivo) e o roteiro de 30 minutos em
+[`docs/product/GUIA-REVISAO-EDU.md`](docs/product/GUIA-REVISAO-EDU.md). F-031 **lê o campo
+`publicavel` do `MANIFEST.json`** (D-af) e **não** inclui `internacional_pesos.parquet`.
 
-| # | Decisão | Onde pegou |
-|---|---|---|
-| D-a | `date` de série **mensal/trimestral** = **fim de período** civil | F-003 corrigido (`fim_do_periodo`); F-004 já era assim |
-| D-b | `vintage` = **data (sem hora) do `collected_at` do manifesto do bruto**, uniforme | F-002, F-003, F-004, F-005, F-006, F-007 |
-| D-c | glob do `--offline` filtra `*.meta.json` em **todo** extrator | F-002, F-005, F-008 (defensivo); F-003/F-006 não usam glob; F-004/F-007 já filtravam |
-| D-d | catálogo **132 → 134** (`ACWI_BRL`, `SP500_BRL`, `fonte=DERIVADO`) aceito | `CONTRACTS.md §2.1`, `README.md`, `AUDITORIA-HARNESS.md` |
-| D-e | CA-004/CA-005 da SPEC não fecham no dado real → proposta registrada, **SPEC intocada** | §4 deste arquivo |
-| D-f | formato HTML da fonte do calendário **ratificado** + schema migrado para `packages/shared/schemas/calendario.py` | F-008 |
-| D-g | `converter_para_brl`/`carregar_ptax` → `apps/pipeline/transform/cambio.py` | F-007 |
-| D-h | B3 ⊂ ANBIMA em 69 datas (todo 4T precisa 1 d.u. de ffill) | DoR de **F-014** |
-
-**Evidência da consolidação:** `ruff check` e `ruff format --check` limpos e **535 testes unitários
-verdes** sem rede; 2 rodadas `--offline` de todos os 8 extratores com **hash idêntico** nos 53
-Parquets; 51 Parquets de `processed_series` com as 8 colunas, `vintage` em formato data uniforme, M/Q
-em fim de período e PK única; SGS 433 × SIDRA `t/1737 v/63` passam a casar por `date` em **273 meses**
-com `max|dif| = 0`, e SGS 22109 × SIDRA `t/1621 v/584` em **90 trimestres** com `max|dif| = 0`
-(antes, 0 linhas casavam por `date`). Os dois últimos deixaram de ser script de sessão e viraram
-teste: **`tests/unit/test_contract_sgs_sidra.py`** (reconciliação entre fontes) e
-**`tests/unit/test_processed_layer_conventions.py`** (varredura de toda série em `data/processed/`).
-Os dois **pulam** quando `data/processed/` está vazio, porque `data/` é reconstruível e fica fora do
-git — é o que permite ao QA rodá-los sem rede e ao CI N1 ignorá-los.
+**Consolidação da Onda 1 (D-a..D-h)** — as 8 convenções da camada processada, a evidência das 2
+rodadas com hash idêntico nos 53 Parquets e as duas reconciliações que viraram teste
+(`test_contract_sgs_sidra.py`, `test_processed_layer_conventions.py`, `max |dif| = 0` nos dois) estão
+em `DECISIONS_LOG §2.1`, em `§3 Concluído` e em `wiki/log-archive-2026-10.md`. Saíram de §1 neste
+fechamento: **§1 é "em andamento"**, e não há mais nada em andamento.
 
 ---
 
@@ -178,8 +187,9 @@ git — é o que permite ao QA rodá-los sem rede e ao CI N1 ignorá-los.
 > SIDRA, Tesouro Direto, API B3, Yahoo/MSCI), depois a camada canônica, depois regimes V1, depois
 > heatmap/notebook, depois a entrega. Cada feature cita **RFs** e **item do e-mail** (A1..A7, B1..B5, C1).
 >
-> **Fronteira:** `F-001` … `F-032` = **PACOTE MÍNIMO** (comprometido para o Comitê).
-> `F-033` … `F-040` = **PACOTE ESTENDIDO** (fase 2, semanas seguintes).
+> **Fronteira:** `F-001` … `F-032` = **PACOTE MÍNIMO** (comprometido para o Comitê — **todo
+> implementado em 2026-10-11**, menos **F-020** e **F-030**, que saíram com justificativa escrita).
+> `F-020`, `F-030` e `F-033` … `F-040` = **BACKLOG PÓS-COMITÊ** (fase 2, uma linha cada, no fim de §2).
 
 ### 2.0 Regras comuns a TODO Feature Contract (herdadas, não repetidas em cada item)
 
@@ -912,7 +922,14 @@ diff **vs. a régua anterior do IBC-Br** (7 quadrantes, D-s). A reconstrução i
 
 ---
 
-### [ ] F-020 — Camada `ciclo_selic` (V2) como corte secundário — **classe C**
+### [–] F-020 — Camada `ciclo_selic` (V2) como corte secundário — **classe C** — **FORA da v1 → backlog pós-Comitê**
+
+> **Saiu do caminho crítico em 2026-10-11.** A V2 é `should`, nunca célula única de decisão
+> (ADR-001), e o ciclo Selic **já está medido** (34 `CORTE` / 23 `ALTA` / 26 `NEUTRO`, com os 7
+> movimentos de exatamente 25 pb = **5 cortes + 2 altas**, **D-t**) — o que falta é a *tabela* V2 e
+> o cruzamento `v1 + "_" + ciclo`, que abriria **12 estados com 5 a 15 observações** e poria metade
+> das células em alerta de `n` baixo. O Feature Contract abaixo fica escrito e válido; entra na
+> fase 2 (resumo de 1 linha no **backlog pós-Comitê**).
 
 - **Risco:** **C** · **CI alvo:** N2 · **Branch:** `feat/regimes-v2` · prioridade **`should`**
 - **Cobre:** RF-028, RF-030 · e-mail: **A4**
@@ -1208,7 +1225,7 @@ job N2 do `ci.yml`). Saídas: `internacional_por_regime.parquet` (**54 × 18**),
 
 ---
 
-### [ ] F-027 — Notebook de entrega (reprodutível, sem lógica de negócio)
+### [~] F-027 — Notebook de entrega (reprodutível, sem lógica de negócio) — **implementada — QA pendente**
 
 - **Risco:** B · **CI alvo:** N1 · **Branch:** `feat/notebook-entrega`
 - **Cobre:** RF-041 · e-mail: entregável
@@ -1221,15 +1238,39 @@ job N2 do `ci.yml`). Saídas: `internacional_por_regime.parquet` (**54 × 18**),
 **importando** de `apps/pipeline/`, com outputs limpos no commit.
 **Excluído:** qualquer definição de cálculo dentro do notebook (seria violação do `AGENTS.md §19`).
 
-**Arquivos:** `apps/analysis/notebooks/comite_2026_10_14.ipynb`, `tests/unit/test_notebook_imports.py`.
+**Arquivos (contrato escrito):** `apps/analysis/notebooks/comite_2026_10_14.ipynb`,
+`tests/unit/test_notebook_imports.py`.
 
-| Teste | Tipo | Cobre CA |
-|---|---|---|
-| notebook não define cálculo de retorno/regime/alinhamento | unit (AST) | CA-110 |
-| outputs limpos no commit | unit | CA-111 |
-| roda ponta a ponta sobre o canônico de fixtures | integration | CA-111 |
+**Arquivos (reais, implementados em 2026-10-11):**
+
+| Arquivo | O que é |
+|---|---|
+| `apps/analysis/notebooks/entrega_comite_2026-10-14.ipynb` | o entregável — **34 células** (15 md + 19 código), **11 seções**, 45.644 bytes, outputs limpos, LF, `id` explícito em cada célula (3 gerações → mesmo `sha256`) |
+| `apps/analysis/notebooks/README.md` | contrato da pasta: como abrir, como exportar, o que o teste reprova |
+| `tests/unit/test_notebook_entrega.py` | **35 testes** em 7 blocos (32 estáticos + 3 de acervo, padrão `Acervo`) |
+| `data/canonical/entrega/entrega_comite_2026-10-14.html` | a saída **executada** (19/19 células, 0 erros, ~2,0 MiB) — camada de dado, **não versionada** |
+
+| Teste | Tipo | Cobre CA | Estado |
+|---|---|---|---|
+| notebook não define cálculo de retorno/regime/alinhamento | unit (AST) | CA-110 | ✅ reprova `def`/`lambda`/`class`, **todo** operador aritmético e **29** métodos de agregação do pandas |
+| outputs limpos no commit | unit | CA-111 | ✅ + `execution_count` zerado + LF + sem `metadata.execution` |
+| roda ponta a ponta sobre o canônico | ~~integration~~ **unit (acervo)** | CA-111 | ✅ `nbconvert` em cópia, 19/19 com saída, 0 erros |
+| gate lido do disco, nunca digitado | unit | CA-090 | ✅ se ADR-001 virar `Aceita`, um teste de acervo **falha de propósito** |
 
 **Anti-SPEC específica:** base + `AGENTS.md §19` (notebook sem lógica de negócio).
+
+**Divergências de contrato — RATIFICADAS (mesma classe de `D-x`, 1 linha cada):**
+
+| # | Contrato escrito | Real | Por quê |
+|---|---|---|---|
+| a | `.../comite_2026_10_14.ipynb` | `.../entrega_comite_2026-10-14.ipynb` | o prefixo diz para que serve e a data em ISO-8601 bate com `AGENTS §19` |
+| b | `test_notebook_imports.py` | `test_notebook_entrega.py` | não é teste de import: 35 testes, 1 deles olha imports |
+| c | — | `apps/analysis/notebooks/README.md` | contrato da pasta, no padrão dos `__init__.py` de `figuras/`/`tabelas/` |
+| d | o notebook "calcula métricas e gera as figuras" | o notebook **lê** figura e tabela já materializadas | `savefig` dentro do caderno escreveria em `data/` fora do pipeline (Anti-SPEC §10.4.22). CA-110 pede "importa, não define" |
+| e | teste `integration` | `tests/unit` (padrão `Acervo`) | `tests/integration/` está vazia e o job N2 não a chama (**D-ad**); pôr ali faria o N1 deixar de cobrir a feature |
+
+**Pendências desta feature:** QA independente · qual lente abre a seção 6 (= **D1**, do Edu; hoje as
+3 saem com peso igual) · o **gerador do caderno não está versionado** (dívida em §6).
 
 ---
 
@@ -1363,7 +1404,7 @@ reconciliação ANBIMA S3 × SGS 12461-12469 na data de corte 22/05/2023.
 
 ---
 
-### [ ] F-031 — Pacote de entrega ao Comitê — **classe D**
+### [~] F-031 — Pacote de entrega ao Comitê — **classe D** — **implementada — QA pendente · ENVIO BLOQUEADO**
 
 - **Risco:** **D** · **CI alvo:** N3 · **Branch:** `feat/entrega-comite`
 - **Cobre:** RF-043, RF-044, RF-045 · e-mail: entregável final
@@ -1380,63 +1421,85 @@ publicável); [ ] revisão humana do número pelo Edu agendada; [ ] 3 valores co
 `README` do pacote com versão + hash; comunicação escrita das substituições e das séries sem 20 anos.
 **Excluído:** qualquer recomendação de alocação assinada pela LDC; material de distribuição; backtest.
 
-**Arquivos:** `apps/pipeline/deliver/pacote.py`, `docs/plans/infra-ops.md`,
+**Arquivos (contrato escrito):** `apps/pipeline/deliver/pacote.py`, `docs/plans/infra-ops.md`,
 `docs/wiki/runbooks/fechar-relatorio-comite.md`, `docs/wiki/log.md`, `docs/wiki/features/F-031.md`,
 `tests/e2e/test_pacote_entrega.py`.
 
-| Teste | Tipo | Cobre CA |
-|---|---|---|
-| pacote tem as 4 tabelas nos 2 formatos + figuras + 1-páginas | e2e | CA-113 |
-| nenhum arquivo do pacote foi editado à mão (hash do script) | e2e | CA-114 |
-| sem revisão/hash/log/rollback → `BLOQUEADO` | e2e negativo | CA-115, CA-116 |
-| acompanha o texto de substituições de fonte | unit | CA-117 |
-| reprodutibilidade: rodar 2x → mesmo hash | e2e | CA-121 |
+**Arquivos (reais, implementados em 2026-10-11):**
+
+| Arquivo | O que é |
+|---|---|
+| `apps/analysis/entrega/__init__.py` | contrato da pasta: **prepara, não publica** |
+| `apps/analysis/entrega/montar_pacote.py` | montagem + smoke + CLI (`--smoke`, `--so-smoke`, `--limpar`, `--saida`) |
+| `tests/unit/test_montar_pacote.py` | **55 testes** em 7 blocos (43 sintéticos + 12 de acervo) |
+| `docs/wiki/runbooks/entrega-comite.md` | os 8 passos do gate + o **checklist de 19 caixas** do Edu + o rollback de 7 passos |
+| `docs/product/GUIA-REVISAO-EDU.md` | o roteiro de 30 min do Edu (fechamento final) |
+| `docs/plans/infra-ops.md` §1 | operação D-1, dataset congelado e rollback canônico (já existia) |
+| `data/canonical/entrega/pacote_comite_2026-10-14/` + `.zip` | a saída: **41 arquivos + `HASHES.txt`**, 10.881.236 bytes soltos, `.zip` de 3.722.460 bytes — camada de dado, **não versionada** |
+
+**Conteúdo do pacote:** raiz (`README-COMITE.md`, `LIMITACOES-COMITE.md`,
+`SUBSTITUICOES-DE-FONTE.md`, `PACOTE-COMITE.xlsx` de **8 abas**, `MANIFEST.json`, `HASHES.txt`) ·
+`dados/` **10** tabelas em Parquet (cópia byte a byte) **e** CSV pt-BR · `figuras/` 2 timelines +
+3 heatmaps em PNG e SVG · `tabelas/` ranking e concordância em `.md` e `.csv` · `notebook/` `.ipynb`
+limpo + HTML executado. **Fora:** `internacional_pesos.parquet` (`publicavel: false`, **D-af** —
+o módulo **recusa montar** se a lista de inclusão contrariar o manifesto).
+
+| Teste | Tipo | Cobre CA | Estado |
+|---|---|---|---|
+| pacote tem as tabelas nos 2 formatos + figuras + 1-páginas | ~~e2e~~ **unit (acervo)** | CA-113 | ✅ 10 tabelas (> as 4 pedidas) |
+| nenhum arquivo do pacote foi editado à mão (hash do script) | unit | CA-114 | ✅ `HASHES.txt` fecha arquivo por arquivo; o texto vive no gerador |
+| sem revisão/hash/log/rollback → `BLOQUEADO` | unit negativo | CA-115, CA-116 | ✅ gate **lido do ADR em disco**, com falha fechada; testado nos dois estados em `tmp_path` |
+| acompanha o texto de substituições de fonte | unit | CA-117 | ✅ `SUBSTITUICOES-DE-FONTE.md` **dentro** do pacote |
+| reprodutibilidade: rodar 2x → mesmo hash | unit (acervo) | CA-121 | ✅ **3 montagens** → `sha256` do `.zip` idêntico (`6cdadff0…`) |
+| nenhuma célula do XLSX começa com `=` | unit | CA-113 | ✅ varre as 8 abas |
+
+**Evidência medida:** smoke de **93 checagens — 86 `OK`, 0 `FALHA`, 7 `INFO`, `rc 0`** ·
+`verify` com o pacote em disco → **`VERIFY OK`** desde **D-ag** ·
+`DATASET_SHA256 = fc233118…`.
 
 **Anti-SPEC específica:** §10.3.18 (nada ao Comitê fora da classe D), §10.3.16 (sem backtest),
 §10.2.10 (descritivo), §10.3.19 (substituição declarada).
 **Rollback (obrigatório em D):** 1) não enviar; 2) se já enviado, e-mail de correção citando versão e
 hash do dataset substituído; 3) marcar a versão como revogada em `wiki/log.md`; 4) reconstruir do
 `raw/` arquivado; 5) rodar o diff numérico vs. a versão enviada e comunicar cada divergência.
+**Escrito por extenso** em `docs/plans/infra-ops.md §1.6` e `runbooks/entrega-comite.md §3` (7 passos).
+
+**Divergências de contrato — RATIFICADAS (mesma classe de `D-x`, 1 linha cada):**
+
+| # | Contrato escrito | Real | Por quê |
+|---|---|---|---|
+| a | `apps/pipeline/deliver/pacote.py` | `apps/analysis/entrega/montar_pacote.py` | é camada de **apresentação**: não calcula nada e não escreve no canônico fora da pasta de entrega — a mesma leitura que pôs F-023/F-024/F-025 em `apps/analysis/` (**D-x**) |
+| b | `runbooks/fechar-relatorio-comite.md` | `runbooks/entrega-comite.md` | cobre o **gate inteiro** (8 passos + checklist + rollback), não só "fechar o relatório" |
+| c | `tests/e2e/test_pacote_entrega.py` | `tests/unit/test_montar_pacote.py` | não toca rede e não reconstrói o canônico: 43 dos 55 rodam sobre fixture sintética em `tmp_path`. Em `tests/e2e` o **N1 deixaria de cobrir a feature de publicação** |
+| d | — | `SUBSTITUICOES-DE-FONTE.md` dentro do pacote | **CA-117** exige que o texto **acompanhe** o pacote: link para `DECISIONS_LOG.md` não acompanha |
+| e | — | `--limpar` | mitigação da interação com F-029; desde **D-ag** é conveniência, não obrigação |
+| f | — | `docs/product/GUIA-REVISAO-EDU.md` | o checklist existia, faltava a **ordem de leitura**: o Edu tem 30 min na terça, não o runbook inteiro |
+
+**Pendências desta feature — todas humanas:** ver **§4, "O que só o Edu pode fazer"**. Nada de código
+falta. **O que o executor NÃO fez, de propósito:** não rodou `freeze`, não criou `git tag`, não
+enviou nada, não conferiu valor na **fonte original**, não abriu o XLSX no Excel (não existe nesta
+máquina).
 
 ---
 
-## PACOTE ESTENDIDO — fase 2 (depois de 2026-10-14)
+## BACKLOG PÓS-COMITÊ — fase 2 (depois de 2026-10-14)
 
-> Não comprometido com o Comitê. Entram só depois de o pacote mínimo estar entregue e conferido.
-> Feature Contract completo é escrito ao mover para "Em andamento".
+> Nada aqui está comprometido com o Comitê. **Uma linha por item**, que é o que cabe antes da
+> entrega; o Feature Contract completo é escrito ao mover para §1. Os dois primeiros saíram do
+> pacote mínimo nesta semana, com justificativa escrita no bloco de cada um, acima.
 
-### [ ] F-033 — V1b: eixos vs. Focus (surpresa em vez de tendência) — **classe C**
-Cobre RF-027 (variante), decisão **D2**. Requer Focus por data de coleta (F-010) e muda o rótulo dos 83
-trimestres → nasce como **lente paralela**, nunca sobrescrevendo V1. CI N2.
-
-### [ ] F-034 — Dupla materialização `asof` × `revised` com relatório de divergência — **classe C**
-Cobre RF-025 (completo), decisão **D4**. Na v1 só o percentual é reportado (F-018); aqui vira relatório
-por trimestre, com a classificação lado a lado. CI N2.
-
-### [ ] F-035 — Variância mínima por regime (Ledoit-Wolf) + fronteira eficiente — **classe C**
-Cobre RF-038 (aprofundamento). Conjunto pequeno (CDI, IMA-B, IBOV, IFIX, SP500_BRL), long-only, cap de
-40% por ativo, **com sensibilidade reportada**. Atenção: continua **proibido** apresentar como backtest
-ou previsão (Anti-SPEC §10.3.16). CI N2.
-
-### [ ] F-036 — Risco-país: splice EMBI+ × ICE BofA (ou cupom cambial DDI/FRC) — **classe B**
-Cobre lacuna **L8**. EMBI+ morre em 30/07/2024; perna B (`BAMLEMRLCRPILAOAS`) tem janela rolante de 3
-anos → **arquivar diariamente desde já**. Série emendada = quebra metodológica em 2024, declarada. CI N1.
-
-### [ ] F-037 — Termos de troca (IC-Br / Funcex) como feature de regime — **classe B**
-Completa a 6ª feature da V3 com fonte própria em vez de proxy. Hoje `termos_troca_yoy` pode entrar nulo
-ou via IC-Br (SGS 27574). CI N1.
-
-### [ ] F-038 — Construção própria de FII por segmento (COTAHIST + CVM) — **classe C**
-Cobre **L2** sem depender da Teva; estende a segmentação para 2016+. Classificador pelo **balanço**
-(`inf_mensal_fii_ativo_passivo`), imune à quebra de taxonomia da Res. CVM 175. Esforço alto. CI N2.
-
-### [ ] F-039 — Validação independente: clustering (GMM/k-means) e HMM mensal — **classe C**
-Cobre a hipótese H-01: se os clusters reproduzirem a V1, a lente ganha credibilidade; se virarem
-"antes/depois de 2016", **isso** é a mensagem. HMM com dados mensais (240 obs). CI N2.
-
-### [ ] F-040 — Atualização trimestral do regime corrente (uso recorrente) — **classe B**
-Transforma o projeto em ativo reutilizável: rodar a cada fechamento de trimestre, com diff vs. o
-trimestre anterior. Sem dashboard hospedado (fora de escopo). CI N1.
+| Feature | Classe · CI | Em uma linha |
+|---|---|---|
+| **F-020** — V2 `ciclo_selic` como corte secundário | C · N2 | **saiu da v1:** o ciclo já está medido (34/23/26, **D-t**); falta a tabela V2 e o cruzamento `v1 + ciclo`, que abriria **12 estados com 5 a 15 observações** |
+| **F-030** — testes de contrato com canário + cache condicional | B · N1/N2 | **cortada da v1:** os 3 canários, as fixtures por fonte, os 28 testes `network` e a primitiva de cache **já existem** distribuídos; falta só a *política* de revalidação e a reconciliação ANBIMA S3 × SGS de 22/05/2023 |
+| **F-033** — V1b: eixos vs. Focus (surpresa, não tendência) | C · N2 | RF-027 variante / **D2**: nasce como **lente paralela**, nunca sobrescrevendo a V1, e muda o rótulo dos 83 trimestres |
+| **F-034** — dupla materialização `asof` × `revised` com relatório | C · N2 | RF-025 completo / **D4**: hoje só o percentual de divergência é reportado (F-018); aqui vira relatório por trimestre, classificação lado a lado |
+| **F-035** — variância mínima por regime (Ledoit-Wolf) + fronteira | C · N2 | RF-038: é onde `internacional_pesos.parquet` (hoje `publicavel: false`, **D-af**) passa a ser publicável — long-only, cap de 40%, sensibilidade reportada, **nunca** como backtest (§10.3.16) |
+| **F-036** — risco-país: splice EMBI+ × ICE BofA | B · N1 | lacuna **L8**: EMBI+ morre em 30/07/2024 e a perna B tem janela rolante de 3 anos ⇒ **arquivar diariamente desde já**; emenda = quebra metodológica declarada |
+| **F-037** — termos de troca (IC-Br / Funcex) como feature | B · N1 | completa a 6ª feature da V3 com fonte própria em vez de proxy (hoje `termos_troca_yoy` entra nulo ou via SGS 27574) |
+| **F-038** — FII por segmento próprio (COTAHIST + CVM) | C · N2 | cobre **L2** sem depender da Teva e estende a segmentação para 2016+, classificando pelo **balanço** (imune à Res. CVM 175). Esforço alto |
+| **F-039** — validação independente: clustering (GMM/k-means) + HMM | C · N2 | testa **H-01**: cluster que reproduz a V1 dá credibilidade à lente; cluster que vira "antes/depois de 2016" **é** a mensagem |
+| **F-040** — atualização trimestral do regime corrente | B · N1 | transforma o projeto em ativo reutilizável: rodar a cada fechamento de trimestre com diff vs. o anterior. Sem dashboard hospedado |
 
 ---
 
@@ -1558,6 +1621,31 @@ permanente em `docs/wiki/modules/canonical.md` e `modules/focus.md`.
 ---
 
 ## 4. Bloqueios
+
+### ⛔ O que só o Edu pode fazer (2026-10-11 — a lista final, em ordem)
+
+> **Nenhum item desta tabela é código.** O pacote está montado, verificado e selado; o que falta é
+> decisão e ato humano. Roteiro de leitura de 30 minutos para a terça 13/10:
+> [`docs/product/GUIA-REVISAO-EDU.md`](docs/product/GUIA-REVISAO-EDU.md). Gate formal:
+> `AGENTS.md §14` + `docs/wiki/runbooks/entrega-comite.md`.
+>
+> **Enquanto ADR-001 estiver em `Proposta`, nada sai — nem um número por WhatsApp**
+> (Anti-SPEC §10.3.18: não existe classe A/B para publicação).
+
+| # | O que só o Edu pode fazer | Comando / arquivo |
+|---|---|---|
+| **1** | **Responder D1 e D3 e aceitar o ADR-001** — o **gate duro**. Sem isso nada mais importa. D1 também decide qual lente abre a seção 6 do caderno e a página de F-024 | `docs/decisions/adr/ADR-001-lente-de-regime-oficial.md` → trocar `Status: Proposta` por `Status: Aceita` |
+| **2** | **Aceitar ADR-002..006** (D5 métrica do heatmap · D6 forma do internacional · D12/L1/L2 setoriais e FII · L4 curva do Tesouro · alinhamento e retorno) | `docs/decisions/adr/ADR-00{2,3,4,5,6}-*.md` → `Status: Aceita` em cada um |
+| **3** | **Responder as 12 decisões** da §7 da página de limitações (**D1, D3, D5, D6, D12, L1, L2, L4, D-i, D-s, D-t, D-u**) — ou dizer "aceito as recomendações", que destrava as 12 de uma vez | `docs/product/LIMITACOES-COMITE.md §7` (também na aba `Decisões` do XLSX e na seção 9 do caderno) |
+| **4** | **Rodar o checklist de 19 caixas** — os 14 de `infra-ops §1.4` + 3 canários + 2 de leitura. Item **18**: a timeline conta uma história que você reconhece? Item **19**: as 12 decisões estão respondidas? | `docs/wiki/runbooks/entrega-comite.md §2` |
+| **5** | **Conferir os 3 canários na FONTE VIVA**, não no Parquet: IBOV 01/02/2006 = **38.484,84** · IMA-B 16/09/2003 = **723,070317** · MSCI ACWI NETR 31/01/2006 = **121,3858**. Hoje os três estão conferidos só contra `raw_series.parquet` | B3 `/indexStatisticsProxy` · repositório público da ANBIMA · `app2.msci.com` end-of-day — URLs no guia |
+| **6** | **Abrir o `PACOTE-COMITE.xlsx` no Excel de verdade** — "abre sem aviso de arquivo corrompido" é caixa humana: não há Excel nem LibreOffice nesta máquina (item 1 de `infra-ops §1.5`) | `data/canonical/entrega/pacote_comite_2026-10-14/PACOTE-COMITE.xlsx` |
+| **7** | **Congelar o dataset** | `uv run python -m apps.pipeline freeze --tag comite-2026-10-14` |
+| **8** | **Criar a tag git** — `freeze` **não executa git** de propósito (D-ad (e)); a tag é ato humano. Correção pós-envio gera tag **nova**, nunca `git tag -f` | `git tag -a comite-2026-10-14 -m "...DATASET_SHA256=<hash>"` + `git tag -n comite-2026-10-14` |
+| **9** | **Pedir o QA independente (Prompt 3) de F-027 e F-031** a um subagente **distinto** do que implementou | `docs/plans/prompts-cheatsheet.md` → Prompt 3; saída em `docs/plans/qa/` |
+| **10** | **Enviar** — e **só então** a linha `[RELEASE]` com versão, hash e tag, + o resumo permanente da feature | `docs/wiki/log.md` + `docs/wiki/features/F-031.md` |
+
+**Marcou as 19 do item 4?** O gate está cumprido e o envio é seu. **Falta uma?** Não envia.
 
 ### Estado em 2026-10-10 (noite) — execução autorizada, publicação ainda travada
 
@@ -1820,7 +1908,7 @@ implementadas com o padrão provisório, mas **não publicadas** sem ADR aceito.
 | **2** | **`regime_v1_neighbor` anulável** | `RegimeNeighborsSchema` | custa **4 dos 8** vizinhos de `2026Q3` (Jaccard **0,33** contra a lente completa) — perde 2006-2009 inteiro, a crise inclusive, **sem a tabela dizer que perdeu**. É por isso que F-022/F-024 leem `regime_neighbors_v3.parquet` | **D-u** |
 | **3** | **`erro_padrao_excesso`** | `RegimeAssetMetricsSchema` | a coluna publicada é o erro-padrão do retorno **nominal** (`desvio(ret_tri)/√n`); F-021 publica o do **excesso** (`INDX`: 2,54 pp × 2,60 pp). Lida ao lado de `excesso_cdi`, a coluna atual é confundida com a do excesso | **D-aa (b)** |
 | **4** | **`materializacao` + `horizonte`** | `RegimeAssetMetricsSchema` | colapsariam as **3** tabelas `regime_asset_metrics*` em 1 e dariam uma PK honesta; hoje a PK `(lente, regime, asset_id)` colide entre as três leituras, e é por isso que são 3 arquivos | F-022 §3 |
-| **5** | **`lag_adjusted` sem guarda de nulo** | `RegimesSchema` | é a **4ª** coluna `bool` + `nullable=False` do schema e a única que **D-ac não cobriu**: D-ac fechou as 3 nomeadas pelo achado de F-022 §8.3. Mesmo modo de falha — `None → False` na coerção, "não é `asof`" afirmado sem dado | F-022 §8.3, **D-ac** |
+| **5** | **`lag_adjusted` sem guarda de não-nulidade** ⚠️ **a mais próxima de virar número errado** | `RegimesSchema` | é a **4ª** coluna `bool` + `nullable=False` do schema e a **única** que **D-ac não cobriu** (D-ac fechou as 3 nomeadas pelo achado de F-022 §8.3). Mesmo modo de falha, medido nas outras três: sob `coerce=True` o pandera **não recusa `None`** — ele coage para `False`, e a linha passa a **afirmar** "este trimestre não é defasado" sem que exista dado para isso. Fecha com `parser` (roda antes da coerção) + `check`, copiando D-ac: **1 bloco, 1 teste** | F-022 §8.3, **D-ac** |
 | **6** | **`catalogo_sha256` não normaliza fim de linha** | `build_raw_series.py` | resíduo de **D-v (b)**: `versao_build` passou a normalizar `\r\n → \n` antes do `sha256`, mas este hash diagnóstico de **um** arquivo não — então ele difere entre checkout CRLF (Windows) e LF (CI) sem que uma célula mude | **D-v (b)** |
 | **7** | **`especificacao_congelada` não existe em `RegimeAssetMetricsSchema`** | idem | o gate de CA-090 não viaja com a linha: é propagado no relatório e no log. Hoje não é problema porque F-023/F-024 leem o relatório também — passa a ser se alguém consumir o Parquet direto | F-022 §8.2 |
 | **8** | **`data/canonical/{figuras,tabelas}/*.parquet` sem schema pandera** | — | são artefatos **derivados de figura/tabela**, não tabela canônica; o contrato de colunas é `COLUNAS_DADOS_PLOTADOS` / `COLUNAS_RANKING`, travado por teste. Se virarem insumo de modelo, migram para classe C com schema próprio | F-023, F-024, F-025 |
@@ -1832,6 +1920,25 @@ implementadas com o padrão provisório, mas **não publicadas** sem ADR aceito.
 
 ### Dívidas operacionais (não são contrato)
 
+> **As 4 que o fechamento final de 2026-10-11 deixa nomeadas**, para não desaparecerem com os
+> context packs: o **gerador do notebook não versionado** (abaixo), **`lag_adjusted` sem guarda de
+> não-nulidade** (item **5** da tabela acima — é contrato, mas é a que mais perto está de virar
+> número errado), o **tempo a frio não medido** e **`tests/integration/` vazia** (as duas últimas,
+> abaixo).
+
+- **O gerador do caderno de F-027 não está versionado.** As 34 células de
+  `apps/analysis/notebooks/entrega_comite_2026-10-14.ipynb` foram montadas uma por uma com
+  `nbformat`, com **`id` explícito em cada célula** — sem o `id` fixo o `nbformat` sorteia um novo a
+  cada gravação, o arquivo muda de bytes sem mudar de conteúdo e o diff do `.ipynb` deixa de servir
+  para revisão (com os `id` fixos, 3 gerações seguidas dão o mesmo `sha256`). **O script que gera
+  ficou no scratchpad da sessão:** o contrato de F-027 não previa arquivo para ele, `scripts/` na
+  raiz é proibido (Anti-SPEC §10.4.29) e criar o arquivo seria sair da lista do briefing.
+  **Manutenção hoje:** direto no `.ipynb`, que é JSON legível — editar o `source`, **manter o
+  `id`**, `ruff format`, `nbconvert --clear-output` antes do commit (documentado em
+  `apps/analysis/notebooks/README.md`). **Proposta:** promover a
+  `apps/analysis/notebooks/_gerar_entrega.py` num item próprio — 1 arquivo, zero lógica de negócio,
+  com teste de que gerar duas vezes dá o mesmo `sha256`. **Risco de não fazer:** quem precisar
+  regerar o caderno do zero reescreve o gerador, e o `sha256` muda sem o conteúdo mudar.
 - **Cache condicional por fonte** — a primitiva existe em `apps/pipeline/common/http.py` e os
   manifestos gravam `ETag`/`Last-Modified` onde a fonte os serve, mas **nenhum** extrator liga a
   revalidação (`cache_condicional=False` em todos). A *política* era F-030, que foi **cortada da

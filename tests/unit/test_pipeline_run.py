@@ -31,6 +31,7 @@ from apps.pipeline.run import (
     NAO_DETERMINISTICOS,
     NOME_FROZEN,
     NOME_MANIFESTO,
+    PREFIXO_PACOTE_DE_ENTREGA,
     Contexto,
     ErroDeOrquestracao,
     Etapa,
@@ -404,6 +405,49 @@ def test_verify_reprova_artefato_novo_nao_listado(tmp_path: Path) -> None:
     resultado = verificar(raiz=tmp_path)
     assert not resultado.ok
     assert any(d.arquivo == "intruso.json" for d in resultado.graves)
+
+
+def test_verify_ignora_o_pacote_de_entrega_e_mantem_o_agregado(tmp_path: Path) -> None:
+    """**D-ag:** pacote de F-031 em disco ⇒ `verify` rc 0 e agregado **inalterado**.
+
+    Antes desta exclusão (medido em F-031 §5, 2026-10-11) o pacote fazia o `verify` reprovar os
+    42 arquivos como *"nao listado no manifesto"* **e** acusar agregado divergente — e um `freeze`
+    novo incluiria o próprio pacote no `DATASET_SHA256`, que é circular. O pacote é **cópia** de
+    artefato já manifestado e reconstruível por um comando (CA-114), então ele não é artefato.
+    """
+    pasta = _canonical_de_teste(tmp_path)
+    gravar_manifesto(montar_manifesto(raiz=tmp_path), destino=pasta / NOME_MANIFESTO)
+    agregado_antes = hash_agregado(inventariar(raiz=tmp_path))
+
+    # o pacote como F-031 o monta: um diretório com subpastas + o .zip de mesmo nome
+    pacote = pasta / "entrega" / "pacote_comite_2026-10-14"
+    (pacote / "dados").mkdir(parents=True)
+    (pacote / "README-COMITE.md").write_text("# Pacote\n", encoding="utf-8")
+    (pacote / "HASHES.txt").write_text("0" * 64 + "  README-COMITE.md\n", encoding="utf-8")
+    (pacote / "dados" / "macro_quarterly.parquet").write_bytes(b"copia-byte-a-byte")
+    (pasta / "entrega" / "pacote_comite_2026-10-14.zip").write_bytes(b"PK\x03\x04zip")
+
+    nomes = {a.arquivo for a in inventariar(raiz=tmp_path)}
+    assert not any(n.startswith(PREFIXO_PACOTE_DE_ENTREGA) for n in nomes)
+    assert hash_agregado(inventariar(raiz=tmp_path)) == agregado_antes
+
+    resultado = verificar(raiz=tmp_path)
+    assert resultado.ok, [(d.arquivo, d.situacao) for d in resultado.graves]
+    assert resultado.agregado_esperado == resultado.agregado_obtido == agregado_antes
+    assert main(["verify", "--raiz", str(tmp_path)]) == 0
+
+
+def test_o_html_executado_do_caderno_continua_artefato(tmp_path: Path) -> None:
+    """A exclusão é do **prefixo do pacote**, não da pasta `entrega/`.
+
+    `entrega/entrega_comite_*.html` é o HTML executado de F-027: insumo do pacote, publicado em
+    `data/canonical/` e protegido pelo `verify` como qualquer outro artefato.
+    """
+    pasta = _canonical_de_teste(tmp_path)
+    (pasta / "entrega").mkdir()
+    (pasta / "entrega" / "entrega_comite_2026-10-14.html").write_text("<html/>", encoding="utf-8")
+    nomes = {a.arquivo for a in inventariar(raiz=tmp_path)}
+    assert "entrega/entrega_comite_2026-10-14.html" in nomes
 
 
 def test_verify_nao_reprova_o_derivado_nao_deterministico(tmp_path: Path) -> None:

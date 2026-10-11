@@ -5,7 +5,7 @@
 > **Fonte de verdade:** `docs/specs/SPEC.md` + `packages/shared/schemas/`.
 > Esta página existe para que qualquer agente entenda a topologia em < 5 min sem ler todo o SPEC.
 
-**Última revisão:** 2026-10-11 (**fechamento da Onda 4**: F-022..F-026, F-028 e F-029 entregues; a camada `apps/analysis/` existe)
+**Última revisão:** 2026-10-11 (**fechamento final**: F-027 caderno + F-031 pacote de entrega + **D-ag**; a camada `apps/analysis/` está completa)
 **Versão do SPEC refletida:** **v1.0** (52 RFs → 128 CAs + Anti-SPEC §10, sagrada)
 **Status do código (2026-10-11, pós-Onda 4):** contratos escritos
 (`packages/shared/schemas/`, **9** módulos + catálogo de **138** séries, com
@@ -16,13 +16,16 @@ extratores), `jobs/` (job diário), `transform/cambio.py`; **camada canônica co
 `apps/pipeline/canonical/` com `build_raw_series.py` (F-013), `alinhamento.py` (F-014), `curva.py`
 (F-016), `macro_quarterly.py` (F-015), `retornos.py` (F-017), `asof.py` (F-018), `regimes_v1.py`
 (F-019), `regimes_v3.py` (F-021), **`metricas_regime.py` (F-022)** e **`internacional.py` (F-026)**;
-o **orquestrador** em **`apps/pipeline/run.py`** + `__main__.py` (F-029); e a **camada de análise**,
-que deixou de estar vazia — **`apps/analysis/`** com `_linguagem.py` (a guarda única de linguagem
-descritiva), `figuras/_comum.py`, `figuras/heatmap_regime_ativo.py` (F-023),
-`figuras/timeline_regimes.py` (F-025) e `tabelas/ranking_regime_atual.py` (F-024).
-**Nota de caminho (D-x, estendida na Onda 4):** `apps/pipeline/analysis/` **não existe** — as
-features de cálculo moram em `canonical/` e as de apresentação em `apps/analysis/`; são **7**
-divergências de path, todas de path e não de escopo, listadas no `TODO.md §4` para ratificação.
+o **orquestrador** em **`apps/pipeline/run.py`** + `__main__.py` (F-029); e a **camada de análise
+completa** — **`apps/analysis/`** com `_linguagem.py` (a guarda única de linguagem descritiva),
+`figuras/_comum.py`, `figuras/heatmap_regime_ativo.py` (F-023), `figuras/timeline_regimes.py`
+(F-025), `tabelas/ranking_regime_atual.py` (F-024), **`notebooks/entrega_comite_2026-10-14.ipynb`
+(F-027)** e **`entrega/montar_pacote.py` (F-031)**. A camada de entrega é a **última** do fluxo e a
+única **classe D**: ela copia artefato, converte formato e hasheia — **não calcula e não publica**.
+**Nota de caminho (D-x, estendida no fechamento final):** `apps/pipeline/analysis/` e
+`apps/pipeline/deliver/` **não existem** — as features de cálculo moram em `canonical/` e as de
+apresentação e entrega em `apps/analysis/`; são **7 + 11** divergências, todas de **path e não de
+escopo**, listadas no bloco de cada feature no `TODO.md` e ratificadas em `§4`.
 
 `data/processed/` tem **69** Parquets e `data/canonical/`, **48** artefatos conferidos pelo
 `MANIFEST.json` (**47** determinísticos + o `ldc.duckdb`, fora do agregado por decisão declarada).
@@ -32,8 +35,13 @@ regimes_v1_asof → regimes_v3 → metricas_regime → internacional → figuras
 `python -m apps.pipeline verify` → `rc != 0` se um byte divergir; `freeze --tag` congela.
 **Rebuild final: 2 execuções byte-idênticas, `verify` rc 0,
 `DATASET_SHA256 = fc2331183b9355e6424f223085fd501683678d73fc50a9cf2b570376750f17ef`.**
+O **pacote de entrega** vive em `data/canonical/entrega/pacote_comite_<data>/`, dentro da árvore que
+o `verify` protege, mas **não é artefato do manifesto** (**D-ag**): `inventariar()` ignora o prefixo
+`entrega/pacote_comite_`, porque o pacote é **cópia** de artefato já manifestado, montado depois do
+`freeze` e reconstruível por um comando (CA-114). O HTML executado do caderno
+(`entrega/entrega_comite_*.html`) **continua** artefato.
 
-Ondas 0 a **3 fechadas e aprovadas** (`docs/plans/qa/ONDA-0-QA.md`, `ONDA-1-QA-{A,B}.md`, `ONDA-2-QA-{A,B}.md`, `ONDA-3-QA.md`, **0 × P0** e **0 divergência numérica**); **Onda 4 implementada, com o QA (`ONDA-4-QA.md`) rodado e as mudanças aplicadas** — F-022..F-026, F-028 e F-029; **F-020 (V2) e F-030 cortadas da v1**. As convenções (`date` em fim de período, `vintage` do manifesto, grade bancária única de D-h, vértice de 3 anos de D-i, prazo em dias corridos de D-j, Focus fora de `raw_series` de D-k, `USDBRL` no universo de D-l, unidade por cento × fração de D-o, **IBC-Br pela média do trimestre de D-s**, **ciclo Selic com desigualdade não estrita de D-t**, **eixo da V3 em `focus_pib_ano` de D-u**) estão em `docs/plans/DECISIONS_LOG.md §2.1/§2.3`, ainda **provisórias**. ⚠️ **Gate de publicação fechado:** ADR-001 em `Proposta` ⇒ `especificacao_congelada = False` nas 83 linhas de F-019/F-021 ⇒ nenhum número de regime é publicável (CA-090).
+Ondas 0 a **3 fechadas e aprovadas** (`docs/plans/qa/ONDA-0-QA.md`, `ONDA-1-QA-{A,B}.md`, `ONDA-2-QA-{A,B}.md`, `ONDA-3-QA.md`, **0 × P0** e **0 divergência numérica**); **Onda 4 implementada, com o QA (`ONDA-4-QA.md`) rodado e as mudanças aplicadas** — F-022..F-026, F-028 e F-029; **F-027 e F-031 implementadas, aguardando QA independente**; **F-020 (V2) e F-030 cortadas da v1** (backlog pós-Comitê). As convenções (`date` em fim de período, `vintage` do manifesto, grade bancária única de D-h, vértice de 3 anos de D-i, prazo em dias corridos de D-j, Focus fora de `raw_series` de D-k, `USDBRL` no universo de D-l, unidade por cento × fração de D-o, **IBC-Br pela média do trimestre de D-s**, **ciclo Selic com desigualdade não estrita de D-t**, **eixo da V3 em `focus_pib_ano` de D-u**) estão em `docs/plans/DECISIONS_LOG.md §2.1/§2.3`, ainda **provisórias**. ⛔ **Gate de publicação FECHADO:** ADR-001 em `Proposta` ⇒ `especificacao_congelada = False` nas 83 linhas de F-019/F-021 ⇒ **nenhum número de regime é publicável** (CA-090), e o pacote de F-031 está montado e **selado como não publicável**. O que falta é **humano**: `TODO.md §4` ("O que só o Edu pode fazer") + `docs/product/GUIA-REVISAO-EDU.md` (roteiro de 30 min) + `docs/wiki/runbooks/entrega-comite.md` (os 8 passos do gate).
 
 ---
 
@@ -53,9 +61,16 @@ Ondas 0 a **3 fechadas e aprovadas** (`docs/plans/qa/ONDA-0-QA.md`, `ONDA-1-QA-{
   Teva GCS     FII por segmento       ─┤        │                 │           regime_neighbors        │
   Yahoo        ^GSPC·^VIX·^TNX        ─┤        │                 │           series_catalog          │
   MSCI         892400 NETR            ─┤        └─ pandera ───────┴─ pandera ──────┘                  ▼
-  FRED         DGS10·VIXCLS·DFF       ─┤           (packages/shared/schemas/)              Comitê (classe D)
-  Ipeadata     GM366_IBVSP366 · …     ─┘
+  FRED         DGS10·VIXCLS·DFF       ─┤           (packages/shared/schemas/)         apps/analysis/entrega
+  Ipeadata     GM366_IBVSP366 · …     ─┘                                                      │
+                                                                                              ▼
+                                                                                      Comitê (classe D)
+                                                                                      └─ GATE FECHADO
 ```
+
+A última seta é a **única classe D** e **a única que uma pessoa percorre**: `apps/analysis/entrega/`
+monta o pacote e o **sela**; quem envia é o Edu, depois dos 8 passos de `AGENTS.md §14`. Hoje o
+passo 2 está **reprovado** (ADR-001 em `Proposta`) e **nada sai**.
 
 Fluxo **unidirecional**. Cada seta é um comando reprodutível: rodar duas vezes a partir do mesmo `raw/`
 produz o mesmo **hash** (RF-048). Nada volta para a esquerda. Persistência: **Parquet por camada**,
@@ -70,11 +85,12 @@ produz o mesmo **hash** (RF-048). Nada volta para a esquerda. Persistência: **P
 | HTTP | requests / httpx | **UA de browser sempre**, retry com backoff, cache por `ETag` |
 | Contratos | pydantic ≥ 2.7 (catálogo/config) + pandera ≥ 0.20 (DataFrame) | fonte de verdade em `packages/shared/schemas/` |
 | Armazenamento | Parquet (fonte) + DuckDB (consulta) | ADR-006; `data/` **não versionado** e reconstruível |
-| Análise | Jupyter | notebook **sem lógica de negócio** — importa de `apps/pipeline/` |
+| Análise | matplotlib (`Figure` direto, backend `Agg`, **sem `pyplot`**) + Jupyter | notebook **sem lógica de negócio** — regra **executável** por teste de AST (F-027) |
+| Entrega | openpyxl (XLSX, zero fórmula) + `zipfile` re-zipado determinístico | `apps/analysis/entrega/` — copia, converte e hasheia; **não calcula, não publica** (F-031) |
 | Qualidade | pytest + ruff (line-length 100) | N1 lint+unit · N2 +integration/contract+build canônico · N3 +e2e+hash |
 | Execução | local (Windows, máquina do Edu) | **sem** servidor, deploy, auth, cloud |
 
-## 3. Módulos (previstos; `common/`, `extract/`, `jobs/` e `canonical/` implementados)
+## 3. Módulos (`common/`, `extract/`, `jobs/`, `canonical/`, `run.py` e `apps/analysis/` implementados)
 
 | Módulo | Responsabilidade | Classe | Features |
 |---|---|---|---|
@@ -96,17 +112,20 @@ produz o mesmo **hash** (RF-048). Nada volta para a esquerda. Persistência: **P
 | `canonical/internacional` | `stress_flag`, correlações por regime, faixa de D6 | **C** | **F-026** |
 | `analysis/figuras/{_comum,heatmap_regime_ativo,timeline_regimes}` | heatmap e timeline, determinísticos | B | **F-023**, **F-025** |
 | `analysis/tabelas/ranking_regime_atual` | "em que regime estamos?" × 3 + concordância | B | **F-024** |
-| `analysis/_linguagem` | a guarda **única** de linguagem descritiva (§10.2.10) | B | F-023/024/025 |
+| `analysis/_linguagem` | a guarda **única** de linguagem descritiva (§10.2.10) | B | F-023/024/025/027/031 |
+| `analysis/notebooks/entrega_comite_*.ipynb` | o caderno do Comitê: 11 seções, **zero cálculo** (teste de AST) | B | **F-027** |
 | `pipeline/run` (CLI `run`/`verify`/`freeze`) | um comando + `MANIFEST.json` + `FROZEN.txt` | **C** | **F-029** |
-| `deliver/pacote` | pacote do Comitê — lê `publicavel` do manifesto (**D-af**) | **D** | F-031 |
+| **`analysis/entrega/montar_pacote`** (era `deliver/pacote`) | pacote do Comitê — lê `publicavel` do manifesto (**D-af**), smoke de 93 checagens, `.zip` determinístico | **D** | **F-031** |
 
 `canonical/` e `transform/` são o coração do risco: **classe C** (`AGENTS.md §2`). `apps/analysis/`
 é **classe B** — lê o canônico e **não recalcula nada** (as flags de `n` são reconferidas e a
 divergência é erro); se um número está errado na figura, o bug é da feature dona.
+`apps/analysis/entrega/` é a **única classe D** do repositório: o que sai dela pode virar decisão de
+alocação, então ela só **prepara** — o envio é ato humano (`AGENTS.md §14`).
 Nota de caminho (**D-x**): as features de cálculo moram em **`apps/pipeline/canonical/`** e as de
-apresentação em **`apps/analysis/`**, não em `load/`/`transform/`/`analysis/` como o `TODO.md`
-previa — são 7 divergências de path, registradas no Feature Contract de cada uma e tabuladas no
-`TODO.md §4`, sem efeito em CA nenhum.
+apresentação e entrega em **`apps/analysis/`**, não em `load/`/`transform/`/`analysis/`/`deliver/`
+como o `TODO.md` previa — divergências de **path**, registradas no bloco de cada feature e
+ratificadas no `TODO.md §4`, sem efeito em CA nenhum.
 
 ## 4. Fronteiras de validação (onde o pandera **tem** que estar)
 

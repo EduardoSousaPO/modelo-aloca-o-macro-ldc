@@ -6,7 +6,7 @@
 > (imutável). **Fonte de verdade do produto:** [`docs/product/PRD.md`](../product/PRD.md) (v1.0, 2026-10-10).
 > Esta página **resume** o PRD — não o duplica. Em conflito, vale o PRD; em conflito de escopo, vale o e-mail.
 
-**Última revisão:** 2026-10-11 (§8 atualizada para o **fechamento da Onda 4** — F-022..F-026, F-028, F-029 implementadas; F-027 em curso)
+**Última revisão:** 2026-10-11 (§8 e §9 atualizadas para o **fechamento final** — F-027 e F-031 implementadas, pacote montado e selado, envio bloqueado por ADR-001)
 **Versão refletida:** PRD v1.0 + SPEC v1.0 (gerados em modo autônomo; **aprovação do Edu pendente**)
 
 ---
@@ -85,16 +85,35 @@ truncamento sem aviso, filtros ignorados) · janela rolante e descontinuações 
 anti-bot (FRED pode estar bloqueado) · unidade/escala/formato mentirosos · overfitting e confusão
 descritivo × preditivo.
 
-## 8. Estado atual (2026-10-11, **Onda 4 implementada** — F-027 e F-031 pendentes)
+## 8. Estado atual (2026-10-11, **FECHAMENTO FINAL** — pacote montado, envio bloqueado)
 
-- **Fase:** **Ondas 0 a 3 completas e aprovadas; Onda 4 implementada, com o QA já rodado e as
-  mudanças aplicadas** — escopo → pesquisa → PRD v1.0 → SPEC v1.0 + Anti-SPEC → contratos → TODO →
-  PLAN → Onda 0 (F-001, F-009) → Onda 1 (F-002..F-008) → Onda 2 (F-013..F-017 + F-010) → Onda 3
-  (F-018 `asof`, F-019 V1, F-021 V3) → **Onda 4 (F-022 métricas, F-023 heatmap, F-024 ranking,
-  F-025 timeline, F-026 internacional, F-028 limitações, F-029 orquestrador)**. **Todas** com QA
-  independente: **0 × P0** em todas as ondas, e **0 divergência numérica** nas reconstruções
+> ### ⛔ O pacote está pronto e NÃO SAI.
+> `ADR-001` está em **`Proposta`** em disco ⇒ `especificacao_congelada = False` (CA-090) ⇒ **passo 2
+> dos 8 do gate reprovado** (`AGENTS.md §14`) ⇒ **nada vai ao Comitê — nem um número por WhatsApp**
+> (Anti-SPEC §10.3.18). **Nada está em implementação; os próximos 10 passos são humanos**, tabulados
+> em [`TODO.md §4`](../../TODO.md) ("O que só o Edu pode fazer"), com o roteiro de 30 minutos em
+> [`docs/product/GUIA-REVISAO-EDU.md`](../product/GUIA-REVISAO-EDU.md) e o gate executável em
+> [`runbooks/entrega-comite.md`](./runbooks/entrega-comite.md).
+
+- **Fase:** **o pacote mínimo está implementado de ponta a ponta** — escopo → pesquisa → PRD v1.0 →
+  SPEC v1.0 + Anti-SPEC → contratos → TODO → PLAN → Onda 0 (F-001, F-009) → Onda 1 (F-002..F-008) →
+  Onda 2 (F-013..F-017 + F-010) → Onda 3 (F-018 `asof`, F-019 V1, F-021 V3) → **Onda 4 (F-022
+  métricas, F-023 heatmap, F-024 ranking, F-025 timeline, F-026 internacional, F-028 limitações,
+  F-029 orquestrador)** → **F-027 (caderno de entrega)** → **F-031 (pacote ao Comitê, classe D)**.
+  Ondas 0-4 com QA independente: **0 × P0** em todas, e **0 divergência numérica** nas reconstruções
   independentes de classe C (os P1 foram sempre de **declaração** ou de **orquestração**, nunca de
-  número). **Aprovação do Edu ainda pendente** no PRD, na SPEC e nos ADRs.
+  número). **F-027 e F-031 aguardam QA independente** (Prompt 3, subagente distinto).
+  **Aprovação do Edu ainda pendente** no PRD, na SPEC e nos ADRs.
+- **A entrega, medida.** O **caderno** (F-027): 34 células em 11 seções, **zero cálculo** — teste de
+  AST reprova `def`, operador aritmético e 29 métodos de agregação do pandas; executado em cópia com
+  **19/19** células com saída e 0 erros; **3 gerações → mesmo `sha256`**. O **pacote** (F-031): **41
+  arquivos + `HASHES.txt`**, 10,9 MB soltos / **3,7 MB** no `.zip` com `sha256` **idêntico em 3
+  montagens** (CA-121), 10 tabelas em Parquet (cópia byte a byte) e CSV pt-BR, 5 figuras em PNG e
+  SVG, XLSX de **8 abas** sem uma única fórmula, e smoke de **93 checagens — 86 `OK`, 0 `FALHA`, 7
+  `INFO`, `rc 0`**. O selo de "não publicável" é **lido do ADR em disco** com falha fechada: aceitar
+  o ADR-001 derruba o selo de todo artefato com **zero linha de código**.
+  `internacional_pesos.parquet` fica **fora** do pacote por leitura do campo `publicavel` do
+  manifesto (**D-af**), não por convenção de nome.
 - **Pipeline implementado:** **9** extratores em `apps/pipeline/extract/` + job diário + infra em
   `common/` + `transform/cambio.py` + **`apps/pipeline/canonical/`** (`build_raw_series`,
   `alinhamento`, `curva`, `macro_quarterly`, `retornos`, `asof`, `regimes_v1`, `regimes_v3`,
@@ -123,14 +142,19 @@ descritivo × preditivo.
   bloqueio — `regime_v1` é `nullable=False` contra 16 trimestres `INDETERMINADO` (**D-m**), e
   alterar schema existente é pausa.
 - **Pesquisa:** concluída — fontes (`fontes-de-dados.md`) e metodologia (`metodologia-regimes-macro.md`).
-- **Decisões de fonte e convenção: D-a..D-af**, todas em
+- **Decisões de fonte e convenção: D-a..D-ag**, todas em
   [`docs/plans/DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md) e **provisórias onde mudam número**.
   As da Onda 4: **D-y** (os 5 P1 do QA da Onda 3 — contrato espelho, a correção de fato de **D-t**,
   a distribuição do Jaccard, N2/N3 no CI, a safra `revised` da V3), **D-z** (renomeação da vista,
   `SP500_USD` fora do heatmap, cromo e guarda de linguagem unificados), **D-aa** (CA-098 "V1 e V2" →
   V1 `revised` + V1 `asof` + V3), **D-ab** (D6-a..d de F-026), **D-ac** (guarda de não-nulidade nas
   flags `bool` — o pandera **não** recusava `None` sob `coerce`), **D-ad** (as 7 de F-029),
-  **D-ae** (dívidas de contrato numa lista única) e **D-af** (`publicavel` no manifesto).
+  **D-ae** (dívidas de contrato numa lista única), **D-af** (`publicavel` no manifesto) e, no
+  fechamento final, **D-ag** — o **pacote de entrega não é artefato do manifesto**
+  (`inventariar()` ignora o prefixo `entrega/pacote_comite_`: é cópia de artefato já manifestado,
+  montada depois do `freeze` e reconstruível por um comando, CA-114) **e o `DATASET_SHA256` que
+  vale é o de `MANIFEST.json`/`HASHES.txt`** — o que o HTML do caderno imprime é, por construção, o
+  da rodada anterior à inclusão do próprio HTML, porque um hash não contém a si mesmo.
   **ADR-001..006 em Proposta.**
 - **Ambiente:** `uv sync --extra dev`. **FRED bloqueado nesta máquina** → bloco internacional pelo
   plano B (Yahoo + MSCI + PTAX).
@@ -142,17 +166,23 @@ descritivo × preditivo.
   lente oficial, **D3** eixo inflação, **D5** métrica do heatmap, **D6** forma do internacional,
   **D12** setoriais/FII, **L1** IFIX 2011+, **L2** FII segmentado, **L4** ANBIMA Feed).
   **Desenvolvimento não está bloqueado; publicação está** (CA-090).
-- **Próximo passo:** **F-027** (notebook de entrega, em curso em paralelo) e **F-031** (pacote ao
-  Comitê, **classe D**: exige os 8 itens de `AGENTS.md §14` — ADR-001/002/003 **Aceitos**, revisão
-  humana registrada, dataset congelado com hash e tag, rollback). **F-020** (V2) e **F-030** foram
-  **cortadas da v1**, com justificativa escrita no `TODO.md`. Em paralelo: responder as 8 decisões e
-  ratificar D-h..D-af (as que precisam do Edu estão tabuladas em `TODO.md §4`), mais as **7 linhas de
-  path** e as **emendas de CA** (CA-078, CA-079, CA-098) que entram no aceite do ADR-001.
+- **Próximo passo: humano, não código.** Os 10 itens de `TODO.md §4` — aceitar os ADRs (o **001** é
+  o gate duro), responder as 12 decisões da §7 de `LIMITACOES-COMITE.md`, rodar o **checklist de 19
+  caixas** do runbook, conferir os **3 canários na fonte viva**, abrir o XLSX no Excel de verdade,
+  `freeze --tag` + `git tag -a`, pedir o QA independente e **só então** enviar com a linha
+  `[RELEASE]` no log. **F-020** (V2) e **F-030** foram **cortadas da v1** e estão no **backlog
+  pós-Comitê** junto com F-033..F-040, 1 linha cada em `TODO.md §2`. Entram no aceite do ADR-001: as
+  **7 + 11 linhas de path** e as **emendas de CA** (CA-078, CA-079, CA-098).
 
 ## 9. Próximo grande objetivo
 
-Dataset canônico trimestral de 20 anos com blocos A/B/C conferidos contra as fontes originais, + heatmap
-regime × ativo, **antes do Comitê de Alocação de 2026-10-14** (heatmap para revisão do Edu em 2026-10-13).
+**Antes do Comitê (2026-10-14):** o dataset e o pacote **já existem** e estão selados — falta a
+revisão humana do Edu na terça **2026-10-13** (roteiro de 30 min em
+[`GUIA-REVISAO-EDU.md`](../product/GUIA-REVISAO-EDU.md)), o aceite do ADR-001 e os **3 canários
+conferidos na fonte original** (hoje conferidos só contra `raw_series.parquet`).
+**Depois do Comitê:** o backlog pós-Comitê, com **F-035** (variância mínima, que destrava
+`internacional_pesos`) e **F-040** (atualização trimestral, que transforma o projeto em ativo
+reutilizável) como os dois de maior retorno.
 
 ---
 
@@ -169,6 +199,9 @@ regime × ativo, **antes do Comitê de Alocação de 2026-10-14** (heatmap para 
   trocas de fonte → [`docs/plans/DECISIONS_LOG.md`](../plans/DECISIONS_LOG.md)
 - Arquitetura → [`wiki/architecture.md`](./architecture.md) · Histórico → [`wiki/log.md`](./log.md) ·
   módulos → [`wiki/modules/`](./modules/) · runbooks → [`wiki/runbooks/`](./runbooks/)
+- **Entrega ao Comitê** → [`wiki/runbooks/entrega-comite.md`](./runbooks/entrega-comite.md) (o gate) ·
+  [`docs/product/GUIA-REVISAO-EDU.md`](../product/GUIA-REVISAO-EDU.md) (a revisão do Edu, 30 min) ·
+  [`docs/product/LIMITACOES-COMITE.md`](../product/LIMITACOES-COMITE.md) (o que o número sustenta)
 - Estado vivo → [`TODO.md`](../../TODO.md) · Contrato com agentes → [`AGENTS.md`](../../AGENTS.md)
 
 ---
