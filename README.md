@@ -10,7 +10,9 @@ UST, VIX, DXY, PTAX), num **dataset canônico trimestral** sobre o qual se class
 se mede como cada classe de ativo performou em momentos semelhantes.
 
 Não é SaaS, web nem serviço: é um pipeline Python que roda **local**, na máquina do Edu, sem auth,
-pagamento, deploy ou cloud. O produto é **descritivo, não preditivo** — confundir os dois é o maior risco
+pagamento, deploy ou cloud. (A premissa está **sob revisão** em
+[`ADR-008`](docs/decisions/adr/ADR-008-portal-web-interno.md), em `Proposta`: existe um portal
+interno em preparação, e ele **não está instalado** — ver "Estado atual".) O produto é **descritivo, não preditivo** — confundir os dois é o maior risco
 reputacional do projeto. O escopo de origem é o e-mail do Alexandre Kaercher, arquivado em
 [`docs/product/ESCOPO-EMAIL-ALEXANDRE.md`](docs/product/ESCOPO-EMAIL-ALEXANDRE.md): **fonte de verdade
 imutável**. Toda feature se justifica ali; o que estiver fora exige pausa e registro.
@@ -23,7 +25,7 @@ série conferidos na fonte + linha em `docs/wiki/log.md`).
 
 ## Estado atual (2026-10-11)
 
-**FECHAMENTO FINAL — o pacote mínimo está implementado de ponta a ponta.** Ondas 0 a 3 aprovadas em QA independente; Onda 4 implementada com o QA rodado e aplicado; **F-027** (caderno de entrega) e **F-031** (pacote do Comitê, classe D) implementadas e **aguardando QA independente**. **O pacote está montado, verificado e selado — e NÃO SAI:** `ADR-001` em `Proposta` ⇒ `especificacao_congelada = False` (CA-090) ⇒ passo 2 dos 8 do gate reprovado (`AGENTS.md §14`). **Nada está em implementação; os próximos 10 passos são humanos** — tabela em [`TODO.md §4`](TODO.md), roteiro de 30 minutos em [`docs/product/GUIA-REVISAO-EDU.md`](docs/product/GUIA-REVISAO-EDU.md), gate executável em [`docs/wiki/runbooks/entrega-comite.md`](docs/wiki/runbooks/entrega-comite.md).
+**FECHAMENTO FINAL — o pacote mínimo está implementado de ponta a ponta.** Ondas 0 a 3 aprovadas em QA independente; Onda 4 implementada com o QA rodado e aplicado; **F-027** (caderno de entrega) e **F-031** (pacote do Comitê, classe D) implementadas e **aguardando QA independente**, mais a **frente LDC Analytics** de 2026-10-11 (relatório executivo + exportador web + módulo do portal, **nada instalado** — ver abaixo). **O pacote está montado, verificado e selado — e NÃO SAI:** `ADR-001` em `Proposta` ⇒ `especificacao_congelada = False` (CA-090) ⇒ passo 2 dos 8 do gate reprovado (`AGENTS.md §14`). **Nada está em implementação; os próximos 10 passos são humanos** — tabela em [`TODO.md §4`](TODO.md), roteiro de 30 minutos em [`docs/product/GUIA-REVISAO-EDU.md`](docs/product/GUIA-REVISAO-EDU.md), gate executável em [`docs/wiki/runbooks/entrega-comite.md`](docs/wiki/runbooks/entrega-comite.md).
 
 > ⛔ **Enquanto ADR-001 estiver em `Proposta`, nada sai — nem um número por WhatsApp.** Não existe
 > classe A/B para publicação (Anti-SPEC §10.3.18).
@@ -88,11 +90,31 @@ série conferidos na fonte + linha em `docs/wiki/log.md`).
   python -m apps.analysis.entrega.montar_pacote --so-smoke  # confere o pacote em disco
   ```
 
-  **O pacote não é artefato do manifesto** (**D-ag**): `inventariar()` ignora o prefixo
-  `entrega/pacote_comite_`, porque ele é cópia de artefato já manifestado, montado **depois** do
-  `freeze` e reconstruível por um comando (CA-114) — conferido: `verify` com o pacote em disco dá
-  **`VERIFY OK`**, agregado inalterado. **A ordem do gate continua** `run --offline` → `verify` →
-  `freeze --tag` → `montar_pacote --smoke`, porque o pacote **copia** o `MANIFEST.json`.
+  **O pacote não é artefato do manifesto** (**D-ag**, generalizada por **D-ah**): `inventariar()`
+  ignora **os entregáveis derivados de `entrega/`** — cópia ou leitura de artefato já manifestado,
+  montados **depois** do `freeze` e reconstruíveis por um comando (CA-114); as 2 saídas do caderno
+  de F-027 são a exceção nomeada e continuam conferidas. Conferido: `verify` com o pacote **e** o
+  relatório executivo em disco dá **`VERIFY OK`, 48 artefatos, agregado `fc233118…`**. **A ordem do
+  gate continua** `run --offline` → `verify` → `freeze --tag` → `montar_pacote --smoke`, porque o
+  pacote **copia** o `MANIFEST.json`.
+
+- **Existe um portal em preparação — e ele NÃO está instalado.** Três entregas de 2026-10-11 que
+  apresentam o mesmo dataset congelado de formas novas, nenhuma delas publicando nada:
+  **(1)** o **relatório executivo**, `apps/analysis/entrega/relatorio_executivo.py` → **um** HTML de
+  776 KB em `data/canonical/entrega/RELATORIO-ALEXANDRE-2026-10-14.html`, que abre no celular sem
+  servidor, sem rede e sem JavaScript;
+  **(2)** o **exportador web** (F-W001), `apps/web_export/` → `data/web/<tag>/` com `meta.json`, as
+  **6** views, o `schema.d.ts` **gerado** dos modelos pydantic e o `current.json` no pai; contrato
+  em `packages/shared/schemas/web_views.py`, espelho em `docs/contracts/CONTRACTS.md §10`;
+  **(3)** o **módulo `/admin/analytics-macro`**, `apps/web_export/modulo-site/` → 4 telas prontas
+  para colar no app da LDC, com guia de instalação em
+  [`docs/product/MODULO-ANALYTICS-MACRO.md`](docs/product/MODULO-ANALYTICS-MACRO.md).
+
+  **O que falta:** o `ADR-008` (o portal interno) está em **`Proposta`**, as 5 decisões `DW-1..DW-5`
+  do PRD seguem abertas (`TODO.md §4`), o repositório do site **não foi tocado** e o `npm run build`
+  dele **não foi rodado**. Instalar é **classe D**, com uma correção de auth anterior e independente
+  (`user_metadata → app_metadata`) como pré-requisito. O gate do ADR-001 vale igual aqui: as 6 views
+  nascem com `publicavel: false`.
 - **Um comando reconstrói a camada canônica inteira** (F-029):
 
   ```bash
@@ -182,13 +204,16 @@ internacional usa Yahoo + MSCI + PTAX (S-09 no `DECISIONS_LOG`).
 AGENTS.md · CLAUDE.md · TODO.md · README.md · pyproject.toml · .gitignore
 .github/workflows/ci.yml        ← CI N1 ativo; N2/N3 comentados
 apps/pipeline/                  ← common/ · extract/ · canonical/ · transform/ · jobs/
-apps/analysis/                  ← notebooks, regimes, figuras           (vazio)
+apps/analysis/                  ← figuras · tabelas · notebooks · entrega/ (pacote + relatório)
+apps/web_export/                ← a ponte dataset -> portal (F-W001) + modulo-site/ (NAO instalado)
 packages/shared/schemas/        ← FONTE DE VERDADE dos contratos (pandera + pydantic, 138 séries)
 data/raw/<fonte>/               ← resposta crua da fonte, imutável      (não versionado)
 data/processed/                 ← 69 Parquets, frequência nativa        (não versionado)
                                   (inclui curva/ — 11 séries de F-016 — e focus/ — 5 de F-010)
 data/canonical/                 ← raw_series · series_catalog · alinhado_trimestral
                                   macro_quarterly (+ _provenance) · asset_returns_quarterly · ldc.duckdb
+                                  entrega/ ← os entregáveis derivados (fora do manifesto, D-ah)
+data/web/                       ← JSON do portal, por tag              (não versionado)
 tests/unit|integration|contract|e2e/
 infra/                          ← scripts auxiliares de ambiente
 docs/product/                   ← ESCOPO-EMAIL-ALEXANDRE.md (imutável) + PRD.md
@@ -198,7 +223,7 @@ docs/contracts/CONTRACTS.md     ← espelho legível dos schemas
 docs/plans/                     ← PLAN.md · DECISIONS_LOG.md · skills-manifest.md ·
                                   risk-classification.md · infra-ops.md · prompts-cheatsheet.md ·
                                   checklists/ · feature-contracts/ · _templates/
-docs/decisions/adr/             ← ADR-001..006 (em Proposta) + ADR-007 (Aceita)
+docs/decisions/adr/             ← ADR-001..006 e ADR-008 (em Proposta) + ADR-007 (Aceita)
 docs/wiki/                      ← index · log · overview · architecture + modules/ features/
                                   runbooks/ context/   (memória sintetizada entre sessões)
 ```

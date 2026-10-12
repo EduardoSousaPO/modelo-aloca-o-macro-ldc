@@ -4,7 +4,8 @@
 > (`pandera` para DataFrame, `pydantic` para catálogo e config de extrator). Este arquivo descreve —
 > nunca duplica a definição e nunca a contradiz.
 >
-> **Versão:** 1.2 (2026-10-11, Onda 2: `raw_series`/`series_catalog` materializados por F-013,
+> **Versão:** 1.3 (2026-10-11, acréscimo do §10 — as views web de F-W001, com a tabela de
+> apresentação e o eixo de cor do acerto com o módulo do portal) · 1.2 (2026-10-11, Onda 2: `raw_series`/`series_catalog` materializados por F-013,
 > tabela `alinhado_trimestral` de F-014, catálogo 134 → **138** por D-i/F-016) — **Referência:**
 > `docs/specs/SPEC.md` v1.0 (RF-019..RF-032), `docs/research/metodologia-regimes-macro.md §6`.
 >
@@ -33,7 +34,9 @@ packages/shared/schemas/
 │                                  RegimesV1Schema, RegimeNeighborsV3Schema, enums  (pandera)
 ├── internacional.py            ← InternacionalPorRegimeSchema,
 │                                  InternacionalPesosSchema (F-026, §6a)            (pandera)
-└── calendario.py               ← CalendarioDiasUteisSchema (grade de dias úteis)   (pandera)
+├── calendario.py               ← CalendarioDiasUteisSchema (grade de dias úteis)   (pandera)
+└── web_views.py                ← MetaWeb, PonteiroCurrent, as 6 views do portal,
+                                   unidades + apresentação, VIEWS (F-W001, §10)     (pydantic)
 ```
 
 Fronteiras onde a validação é **obrigatória** (`wiki/architecture.md §4`):
@@ -48,6 +51,7 @@ Fronteiras onde a validação é **obrigatória** (`wiki/architecture.md §4`):
 | entrada e saída de `data/canonical/` | `MacroQuarterlySchema`, `MacroQuarterlyProvenanceSchema`, `MacroQuarterlyAsofProvenanceSchema`, `AssetReturnsQuarterlySchema`, `RegimesSchema`, `RegimesV1Schema`, `RegimeNeighborsSchema`, `RegimeNeighborsV3Schema`, `SeriesCatalogSchema` |
 | config de extrator / parâmetros de janela | `ExtractorConfig` (pydantic) |
 | catálogo de séries | `SeriesCatalogEntry` (pydantic) |
+| `data/canonical/` → JSON do portal (`<destino>/<tag>/*.json`) | `MetaWeb`, `PonteiroCurrent`, as 6 views de `VIEWS` (§10) |
 
 ---
 
@@ -945,6 +949,109 @@ chama `alinhar_series` sobre o seu próprio resultado. O motivo está no dado
 7. Revisão numérica independente (quem calculou não confere) + 1 linha em `docs/wiki/log.md`.
 8. Se houve trade-off arquitetural → ADR. Se houve troca de fonte → `DECISIONS_LOG.md`.
 
+---
+
+## 10. `web_views` — as views do portal (F-W001) · **classe C**
+
+> **Fonte de verdade:** `packages/shared/schemas/web_views.py` (pydantic). **Derivado:**
+> `schema.d.ts`, gerado por `apps/web_export/tipos_ts.py` no mesmo comando que escreve o JSON —
+> **46 interfaces**, nunca escritas à mão. Este bloco é espelho legível dos dois.
+>
+> Contrato entre **dois repositórios**: este pipeline (produtor) e o portal LDC Analytics
+> (consumidor, o módulo `/admin/analytics-macro` em `apps/web_export/modulo-site/`). Quem muda um
+> campo aqui muda o `.d.ts` e o `tsc` do outro lado aponta o que quebrou — é a trava desenhada no
+> lugar do acordo verbal.
+
+```
+packages/shared/schemas/
+└── web_views.py                ← MetaWeb, PonteiroCurrent, as 6 views + 38 modelos de apoio,
+                                   UNIDADE_POR_CAMPO, CASAS_POR_UNIDADE,
+                                   APRESENTACAO_POR_UNIDADE, VIEWS, SCHEMA_VERSAO   (pydantic)
+```
+
+### 10.1 Arquivo → modelo → tela
+
+Um comando (`python -m apps.web_export exportar --tag <tag> --destino <dir>`) escreve
+`<destino>/<tag>/` + `current.json` **no pai**:
+
+| Arquivo | Modelo | Tela | O que carrega |
+|---|---|---|---|
+| `meta.json` | `MetaWeb` | todas (rodapé) | tag, `DATASET_SHA256`, `versao_build` das 10 etapas, data **do dado**, gate, `sha256` + bytes de cada view, contagens, limitações, as tabelas de unidade e de apresentação, reduções, orçamento, artefatos não publicáveis |
+| `ranking_atual.json` | `RankingAtualView` | T-01 | as **3** respostas de regime (nenhuma escolhida), os 3 rankings, a concordância como distribuição, os vizinhos do trimestre, a interseção dos top-5 |
+| `heatmap_regime_ativo.json` | `HeatmapView` | T-02 | as células como plotadas, os eixos `(vista, regime)`, os **eixos de cor** por vista, os ativos na ordem declarada, os 2 limiares de `n`, as exclusões da figura |
+| `vizinhos.json` | `VizinhosView` | T-03 | a lente canônica campo a campo, as referências, o ranking em T+1 com erro-padrão, o quadrante por trimestre |
+| `regimes_timeline.json` | `TimelineView` | T-04 | trimestre × materialização, o estilo por rótulo de faixa, IBOV e Selic por trimestre, as divergências nomeadas |
+| `internacional.json` | `InternacionalView` | T-06 | o internacional em BRL, as correlações **com `n`**, a faixa de D6, os não avaliáveis — **sem** variância mínima nem peso |
+| `catalogo.json` | `CatalogoView` | T-07 | as séries com cobertura declarada × observada, os artefatos, as limitações, as decisões, os ADRs |
+| `schema.d.ts` | — | — | os tipos TypeScript dos modelos acima |
+| `current.json` (no **pai**) | `PonteiroCurrent` | — | o **único** ponteiro: tag, hash, `arquivos` view → caminho. `no-cache`, gravado **por último** |
+
+T-05 (Ativo em foco) **não tem view**: é v2 no PRD §10 e a omissão está declarada em
+`meta.reducoes`. `catalogo` ocupa o slot `macro_series` de `[arq §1.1]` (ADR-008).
+
+### 10.2 O envelope comum — `EnvelopeDaView`
+
+Herdado por **todas** as 6 views, nunca copiado:
+
+| Campo | O que é |
+|---|---|
+| `view` | o nome do arquivo sem extensão |
+| `tela` | a tela do PRD §4 que consome (T-01..T-07) |
+| `pergunta` | a frase de abertura da tela (P7 / RF-W035) — pergunta, não conclusão |
+| `tag` | a tag exportada; a tela recusa se divergir do ponteiro |
+| `dataset_sha256` | o agregado do `MANIFEST.json`, repetido em cada arquivo de propósito |
+| `gate` | `GateDaView`: `especificacao_congelada`, `status_adr_001`, `veredito_publicacao`, `marca`, `publicavel` |
+| `fontes` | os artefatos do `MANIFEST.json` lidos para montar a view |
+
+### 10.3 As cinco regras que o módulo faz valer
+
+1. **`extra="forbid"` em todo modelo.** É a forma executável de "nenhuma view carrega coluna que
+   não esteja no contrato" (RF-W015): campo a mais ⇒ `ValidationError` nomeando campo e view, nunca
+   um JSON publicado com coluna que o portal não sabe ler. O teste de contrato fecha o triângulo
+   nos dois outros sentidos: toda chave emitida existe no `.d.ts`, e o topo de cada arquivo **é** a
+   interface dele, campo a campo.
+2. **Nullable explícito.** Ausência sai `null`, **nunca `0`** e nunca interpolada
+   (Anti-SPEC §10.1.1 / RNF-W010): `NaN`, `inf` e `NaT` viram `null` no único lugar onde valor vira
+   JSON (`views.escalar`), e o tipo gerado é `number | null` — então a tela é obrigada pelo `tsc` a
+   decidir o que desenhar na ausência. `-0.0` é normalizado para `0.0`, porque o sinal do zero muda
+   o byte sem mudar o número.
+3. **Unidade por campo, e apresentação declarada.** `UNIDADE_POR_CAMPO` dá a unidade **nativa** de
+   cada campo numérico e `CASAS_POR_UNIDADE` as casas com que ele é arredondado — campo numérico
+   novo sem unidade **reprova** no CI. O exportador não converte valor (D-W4): `excesso_cdi` e os
+   `ret_*` saem em **fração** e `selic_meta_pct` em **% a.a.**, que é o erro de 100× barato deste
+   dado (`LIMITACOES-COMITE.md §4.9`). Desde 2026-10-11 o `meta` declara também **como apresentar**,
+   campo a campo — `unidade_de_apresentacao`, `fator_de_apresentacao` e `casas_de_apresentacao` —
+   para que a conversão da tela (`0,0504` → `+5,04%`) seja leitura de tabela e o fator `100` esteja
+   escrito de um lado só.
+4. **Gate em toda view, decidido no exportador.** `GateDaView` é lido do **ADR-001 em disco** e
+   viaja nas 6 views e no `meta`; com o ADR em `Proposta`, `especificacao_congelada = false` e toda
+   tela nasce com a faixa de material de discussão. O gate vive no produtor, não no front
+   (`[arq §7.1]`), porque o bundle que desce ao browser é texto baixável: filtro no front seria
+   decoração. **Falha fechada** — ADR ausente ou ilegível ⇒ `DESCONHECIDO` e gate fechado. E a
+   lista de inclusão **não vence o manifesto**: artefato `publicavel: false` lido ⇒ a exportação
+   **recusa** (hoje `internacional_pesos.parquet`, **D-af**).
+5. **`n` em toda célula, e `n < 5` sai com o valor E com a flag.** `alerta_n_baixo` em `n < 8` e
+   `conclusao_suprimida` em `n < 5` — as duas vindas de `regimes_v1`, **importadas**, nunca
+   reimplementadas; se o Parquet trouxer a flag errada para o `n`, a exportação **para**. A
+   supressão não esvazia a célula: o número continua no JSON porque a tela mostra "sem conclusão
+   (n = 4)", e é a flag que proíbe a conclusão, não a ausência do número (P10 / RNF-W010). Cor
+   nunca é o único canal: `hachura` e `conclusao_suprimida` são canais **sem** cor (CA-109).
+
+### 10.4 Cor e eixo de cor
+
+A view publica o **eixo** da escala, não a cor: `eixos_de_cor` traz `extremo_simetrico` =
+`max(|valor|)` por `(vista, campo)` sobre a **vista inteira** — extensão de eixo, não estatística —
+em unidade nativa, para que `-x` e `+x` caiam no mesmo passo e o neutro do meio signifique
+"empatou". Extremo que dependesse do recorte filtrado repintaria as outras classes quando alguém
+marcasse uma. Hex **não** é emitido (**D-ai**): a paleta é decisão de apresentação e vive em quem
+desenha.
+
+### 10.5 Como evoluir
+
+O §9 vale integralmente, com dois acréscimos: (a) o `schema.d.ts` é **regerado** pelo próprio
+comando de exportação — nunca editado —, e a cópia que o módulo do portal carrega em
+`_lib/schema.d.ts` tem de voltar byte-idêntica à gerada; (b) **remover** campo sobe
+`SCHEMA_VERSAO` (hoje **2**), acrescentar não.
 ---
 
 *Divergência entre este arquivo e `packages/shared/schemas/` é bug deste arquivo. Corrija aqui, não lá.*

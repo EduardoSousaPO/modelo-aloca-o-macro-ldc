@@ -26,12 +26,13 @@ import pytest
 
 from apps.pipeline.common.errors import ErroDeExtracao
 from apps.pipeline.run import (
+    ARTEFATOS_DE_ENTREGA,
     ARTEFATOS_NAO_PUBLICAVEIS,
     MOTIVO_ILEGIVEL,
     NAO_DETERMINISTICOS,
     NOME_FROZEN,
     NOME_MANIFESTO,
-    PREFIXO_PACOTE_DE_ENTREGA,
+    PREFIXO_DE_ENTREGAVEL_DERIVADO,
     Contexto,
     ErroDeOrquestracao,
     Etapa,
@@ -39,6 +40,7 @@ from apps.pipeline.run import (
     FalhaDeEtapa,
     Fase,
     congelar,
+    e_entregavel_derivado,
     executar,
     gravar_manifesto,
     hash_agregado,
@@ -428,7 +430,7 @@ def test_verify_ignora_o_pacote_de_entrega_e_mantem_o_agregado(tmp_path: Path) -
     (pasta / "entrega" / "pacote_comite_2026-10-14.zip").write_bytes(b"PK\x03\x04zip")
 
     nomes = {a.arquivo for a in inventariar(raiz=tmp_path)}
-    assert not any(n.startswith(PREFIXO_PACOTE_DE_ENTREGA) for n in nomes)
+    assert not any(n.startswith("entrega/pacote_comite_") for n in nomes)
     assert hash_agregado(inventariar(raiz=tmp_path)) == agregado_antes
 
     resultado = verificar(raiz=tmp_path)
@@ -437,17 +439,79 @@ def test_verify_ignora_o_pacote_de_entrega_e_mantem_o_agregado(tmp_path: Path) -
     assert main(["verify", "--raiz", str(tmp_path)]) == 0
 
 
-def test_o_html_executado_do_caderno_continua_artefato(tmp_path: Path) -> None:
-    """A exclusão é do **prefixo do pacote**, não da pasta `entrega/`.
+def test_verify_ignora_entregavel_derivado_novo_em_entrega(tmp_path: Path) -> None:
+    """**D-ah:** entregável derivado que o `freeze` não conhecia ⇒ `verify` rc 0, agregado igual.
 
-    `entrega/entrega_comite_*.html` é o HTML executado de F-027: insumo do pacote, publicado em
-    `data/canonical/` e protegido pelo `verify` como qualquer outro artefato.
+    É o caso medido em 2026-10-11 com `entrega/RELATORIO-ALEXANDRE-2026-10-14.html` (F-032): o
+    relatório executivo é gerado **depois** do `freeze`, **imprime** o `DATASET_SHA256` e por isso
+    não pode estar dentro dele — incluí-lo faria o `freeze` seguinte mudar o hash que a própria
+    página mostra. D-ag já tinha resolvido isto para o pacote; aqui a regra vale para a pasta.
+
+    O teste usa um nome **inventado** de propósito: a regra tem de valer para o terceiro
+    entregável também, sem ninguém editar `run.py`.
     """
     pasta = _canonical_de_teste(tmp_path)
-    (pasta / "entrega").mkdir()
-    (pasta / "entrega" / "entrega_comite_2026-10-14.html").write_text("<html/>", encoding="utf-8")
+    gravar_manifesto(montar_manifesto(raiz=tmp_path), destino=pasta / NOME_MANIFESTO)
+    agregado_antes = hash_agregado(inventariar(raiz=tmp_path))
+
+    entrega = pasta / "entrega"
+    entrega.mkdir(exist_ok=True)
+    (entrega / "RELATORIO-ALEXANDRE-2026-10-14.html").write_text("<html/>", encoding="utf-8")
+    (entrega / "RESUMO-QUALQUER-OUTRO.html").write_text("<html/>", encoding="utf-8")
+    (entrega / "sumario.pdf").write_bytes(b"%PDF-1.7")
+
+    nomes = {a.arquivo for a in inventariar(raiz=tmp_path)}
+    assert not any(n.startswith(PREFIXO_DE_ENTREGAVEL_DERIVADO) for n in nomes)
+    assert hash_agregado(inventariar(raiz=tmp_path)) == agregado_antes
+
+    resultado = verificar(raiz=tmp_path)
+    assert resultado.ok, [(d.arquivo, d.situacao) for d in resultado.graves]
+    assert resultado.agregado_esperado == resultado.agregado_obtido == agregado_antes
+    assert main(["verify", "--raiz", str(tmp_path)]) == 0
+
+
+def test_as_saidas_do_caderno_continuam_artefato_conferido(tmp_path: Path) -> None:
+    """O outro sentido de **D-ah**: a exclusão não é a pasta inteira, tem exceção nomeada.
+
+    `entrega/entrega_comite_*.html` e `entrega/_executado.ipynb` são as duas saídas da execução do
+    caderno de F-027: nascem **antes** do `freeze`, estão no `MANIFEST.json` desde F-029 e são
+    insumo do pacote, não cópia dele. Continuam entrando no agregado e o `verify` continua
+    reprovando byte alterado neles — o que prova que D-ah não virou "o `verify` para de olhar
+    `entrega/`".
+    """
+    pasta = _canonical_de_teste(tmp_path)
+    entrega = pasta / "entrega"
+    entrega.mkdir(exist_ok=True)
+    (entrega / "entrega_comite_2026-10-14.html").write_text("<html/>", encoding="utf-8")
+    (entrega / "_executado.ipynb").write_text('{"cells": []}\n', encoding="utf-8")
+
     nomes = {a.arquivo for a in inventariar(raiz=tmp_path)}
     assert "entrega/entrega_comite_2026-10-14.html" in nomes
+    assert "entrega/_executado.ipynb" in nomes
+
+    # o manifesto nasce com os dois dentro; alterar um byte tem de reprovar
+    gravar_manifesto(montar_manifesto(raiz=tmp_path), destino=pasta / NOME_MANIFESTO)
+    assert verificar(raiz=tmp_path).ok
+    (entrega / "entrega_comite_2026-10-14.html").write_text("<html>!</html>", encoding="utf-8")
+    resultado = verificar(raiz=tmp_path)
+    assert not resultado.ok
+    assert any(d.arquivo == "entrega/entrega_comite_2026-10-14.html" for d in resultado.graves)
+    assert main(["verify", "--raiz", str(tmp_path)]) == 1
+
+
+def test_a_regra_de_entregavel_derivado_e_interrogavel_sozinha() -> None:
+    """A regra de **D-ah** nos dois sentidos, sem disco: fora de `entrega/` nada é excluído."""
+    assert e_entregavel_derivado("entrega/RELATORIO-ALEXANDRE-2026-10-14.html")
+    assert e_entregavel_derivado("entrega/pacote_comite_2026-10-14/HASHES.txt")
+    assert e_entregavel_derivado("entrega/pacote_comite_2026-10-14.zip")
+    assert not e_entregavel_derivado("entrega/entrega_comite_2026-10-14.html")
+    assert not e_entregavel_derivado("entrega/_executado.ipynb")
+    # nada **fora** de entrega/ é tocado por D-ah, nem um nome parecido
+    assert not e_entregavel_derivado("macro_quarterly.parquet")
+    assert not e_entregavel_derivado("figuras/timeline_regimes_dados.parquet")
+    assert not e_entregavel_derivado("entregavel/RELATORIO.html")
+    # e toda exceção declarada vive dentro do prefixo que ela excetua
+    assert all(p.startswith(PREFIXO_DE_ENTREGAVEL_DERIVADO) for p in ARTEFATOS_DE_ENTREGA)
 
 
 def test_verify_nao_reprova_o_derivado_nao_deterministico(tmp_path: Path) -> None:

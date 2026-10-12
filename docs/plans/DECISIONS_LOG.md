@@ -935,6 +935,107 @@ S-09, S-10, S-11, S-12**) são operacionais e podem ser aceitas por e-mail, sem 
   — ref: F-031 §5 e §6, F-027 §9, `run.py` (`PREFIXO_PACOTE_DE_ENTREGA`),
   `runbooks/entrega-comite.md §1/§5`, CA-114, CA-121, D-ad (c), D-af
 
+### 2.3 (parte 6) — frente LDC Analytics: o exportador web, o módulo e o `verify` (2026-10-11)
+
+> As **9** decisões desta frente. Nenhuma mexe em célula de dado: `DATASET_SHA256` segue
+> `fc233118…`. **D-W1..D-W6** nasceram no `ADR-008` (que está em `Proposta`) e sobem para cá porque
+> o ADR pode ser recusado e as decisões, se o exportador continuar existindo, continuam valendo.
+
+- [2026-10-11] [entrega/reprodutibilidade] **D-ah · entregável derivado de `entrega/` não é
+  artefato do manifesto — generaliza D-ag. ACEITA pelo orquestrador.**
+  **O medido:** com `entrega/RELATORIO-ALEXANDRE-2026-10-14.html` (o relatório executivo) em disco,
+  `python -m apps.pipeline verify` reprovava — `rc 1`, o HTML como *"nao listado no manifesto"* e
+  agregado `7634bf18…` contra `fc233118…` esperado. É **a mesma família de D-ag**, com o mesmo
+  motivo e o mesmo remédio: o entregável é montado **depois** do `freeze`, **imprime** o
+  `DATASET_SHA256` e por isso não pode estar dentro dele — incluí-lo faria o `freeze` seguinte mudar
+  o hash que a própria página mostra.
+  **A regra:** `inventariar()` passou a excluir `PREFIXO_DE_ENTREGAVEL_DERIVADO = "entrega/"`
+  **inteiro**, com uma lista nomeada de exceções, `ARTEFATOS_DE_ENTREGA` — hoje
+  `entrega/_executado.ipynb` e `entrega/entrega_comite_*.html`, as duas saídas da execução do
+  caderno de F-027 (`apps/analysis/notebooks/README.md`). As exceções **continuam** artefato
+  conferido: nascem antes do `freeze`, são **insumo** do pacote (não cópia dele), não citam o
+  agregado e estão no `MANIFEST.json` desde F-029. `PREFIXO_PACOTE_DE_ENTREGA` deixou de existir —
+  virou caso particular desta regra.
+  **Por que a lista de exceções, e não excluir `entrega/` inteiro:** tirar as 2 saídas do caderno
+  mudaria o `DATASET_SHA256` que o pacote do Comitê **já imprime** em `README-COMITE.md`,
+  `HASHES.txt` e no XLSX — custo alto, e por um ganho de forma. A alternativa estava autorizada e
+  foi **recusada por isso**.
+  **Por que não excluir por nome de arquivo:** uma exclusão por nome cresce a cada entregável novo,
+  e o terceiro entregável reproduziria o bug até alguém editar `run.py`. O teste de regressão usa um
+  nome **inventado** (`RESUMO-QUALQUER-OUTRO.html`, `sumario.pdf`) exatamente para provar isso.
+  **Conferido:** `verify` → **`VERIFY OK`, 48 artefatos conferidos, agregado `fc233118…`, `rc 0`**.
+  Travado por 4 testes nos dois sentidos: `test_verify_ignora_entregavel_derivado_novo_em_entrega`,
+  `test_as_saidas_do_caderno_continuam_artefato_conferido` (que **exige** `rc 1` com byte alterado
+  no HTML do caderno), `test_a_regra_de_entregavel_derivado_e_interrogavel_sozinha` e o de D-ag
+  — ref: `run.py` (`e_entregavel_derivado`), D-ag, D-af, CA-114, CA-121, F-032 (relatório
+  executivo), ADR-008 §D-W6
+
+- [2026-10-11] [apresentação] **D-ai · o exportador não emite cor. ACEITA pelo orquestrador.**
+  `cor_hex` saiu de `CelulaDoHeatmap` e de `EstiloDaFaixa` (as duas views que o traziam). Era o hex
+  da figura **matplotlib**, derivado da paleta *placeholder* da skill `dataviz`; o módulo do portal
+  já pintava com a rampa da LDC e **tinha teste provando que ignorava o campo**. Era, portanto, uma
+  segunda verdade de cor sem nenhum consumidor. **Cor é decisão de apresentação** e fica com quem
+  desenha; do dado vem o que tem significado e **não** é cor: `hachura` e `conclusao_suprimida`,
+  que são os canais sem cor de CA-109, mais o **eixo** da escala (abaixo). **Consequência de
+  contrato:** é remoção de campo, logo `SCHEMA_VERSAO` subiu **1 → 2** (acréscimo não sobe).
+  **Alternativa recusada:** manter e documentar que o front ignora — manter campo que ninguém lê é
+  manter a próxima pessoa adivinhando qual das duas cores vale
+  — ref: `views.CAMPOS_DA_CELULA`/`CAMPOS_DO_ESTILO`, `web_views.SCHEMA_VERSAO`,
+  `modulo-site/_lib/formato.ts`, CONTRACTS §10.4, CA-109
+
+- [2026-10-11] [apresentação] **D-aj · o `meta.json` declara a apresentação campo a campo, e o
+  heatmap declara o eixo de cor por vista. ACEITA pelo orquestrador.** Os dois primeiros itens de
+  acerto de `MODULO-ANALYTICS-MACRO.md §2`, aplicados juntos porque são o mesmo princípio: *o que a
+  tela precisa decidir, o contrato declara*.
+  **(a) `unidade_de_apresentacao`, `fator_de_apresentacao` e `casas_de_apresentacao`, por campo.**
+  O valor emitido continua **nativo** — **D-W4 segue intacta**, o exportador não converte número.
+  O que passou a existir é a *instrução*: `fracao → percentual`, fator **100**, 2 casas. Antes, o
+  fator `100` vivia numa tabela dentro de `_lib/formato.ts`, no outro repositório — a divergência de
+  RF-W014 que o módulo declarou na entrega. Agora está escrito **de um lado só** e a tela lê a
+  tabela. O caso que justifica tudo: `selic_meta_pct` sai com fator **1**, porque já é `% a.a.` —
+  aplicar 100 nele é o erro de 100× de `LIMITACOES-COMITE.md §4.9`, e agora há teste dos dois lados.
+  **(b) `heatmap_regime_ativo.eixos_de_cor`**, com `extremo_simetrico` por `(vista, campo)` —
+  `max(|valor|)` da **vista inteira**, em unidade nativa, com `limite_inferior`/`limite_superior`
+  e as duas contagens. Declarado como **eixo, não estatística**: nenhum valor é combinado com outro,
+  é o `ylim` da grade de cor, não vai a texto nenhum e não entra em conclusão. Vem do produtor por
+  duas razões: extremo calculado no front depende de quem varre, e extremo sobre o **recorte
+  filtrado** repintaria as outras classes quando alguém marcasse uma — duas leituras da mesma tag
+  deixariam de ser comparáveis. Só os campos divergentes em torno do zero têm eixo (`excesso_cdi`,
+  `ret_medio`, `ret_mediana`, `pior_tri`): forçar simetria em `hit_ratio_cdi` (0 a 1) ou em
+  `erro_padrao_media` (≥ 0) daria um eixo cujo meio não significa nada
+  — ref: `web_views.APRESENTACAO_POR_UNIDADE`/`EixoDeCorDaVista`, `views.eixos_de_cor`,
+  CONTRACTS §10.3/§10.4, RF-W014, D-W4, D-W5
+
+- [2026-10-11] [contrato web] **D-W1 · o manifesto da tag chama-se `meta.json`** e ocupa o slot
+  `manifest.json` de RF-W009/W011. Um só manifesto por tag, e `current.json` **nomeia o arquivo** —
+  o front não adivinha nome. Trocar é uma constante (`NOME_META`) — ref: ADR-008, RF-W009/W011
+- [2026-10-11] [contrato web] **D-W2 · a 6ª view chama-se `catalogo.json`** e ocupa o slot
+  `macro_series`. A tela que o MVP precisa é a **T-07** (condição para qualquer número ser
+  publicável); as séries macro que alguma tela do MVP consome — Selic e IBOV por trimestre — viajam
+  em `regimes_timeline`, onde a T-04 as usa — ref: ADR-008, `[arq §1.1]`
+- [2026-10-11] [contrato web] **D-W3 · a view de vizinhos traz UMA lente** (Mahalanobis ·
+  `somente_passado` · janela cheia) e **um** ranking por referência (`k = 12`), com os `k` menores
+  declarados como **prefixo** dele. As 9.692 linhas das 4 lentes × 2 métricas não cabem em 400 KB. O
+  prefixo é **conferido a cada exportação** (58/58 referências, zero divergência), não suposto — e
+  truncar não é recalcular — ref: ADR-008, RNF-W001, `views.exigir_prefixo_entre_ks`
+- [2026-10-11] [contrato web] **D-W4 · nenhuma conversão de unidade no valor.** Cada campo publica a
+  unidade **nativa**, declarada em `meta.unidade_por_campo`: zero conversão é zero chance do erro de
+  100× entre `%/pp` e fração. A conversão que o PRD previa em `unidades.py` **não existe porque não
+  é necessária**. Desde **D-aj** o `meta` declara *como apresentar* — o que não reabre esta decisão:
+  o número emitido segue nativo — ref: ADR-008, RF-W014, D-aj
+- [2026-10-11] [contrato web] **D-W5 · precisão declarada: 4 casas em fração** (= 2 casas em pp, a
+  precisão que as telas exibem), 6 em correlação e distância, 2 em índice. É a redução que o
+  orçamento de 400 KB exigiu, declarada em `meta.casas_por_unidade`; quem precisa de mais casas lê o
+  Parquet, que é a fonte. Sem casas fixas o `repr` do float vazaria para o JSON e duas exportações
+  da mesma tag poderiam divergir no byte, que é o que CA-121 proíbe — ref: ADR-008, RNF-W001, CA-121
+- [2026-10-11] [contrato web] **D-W6 · o destino padrão do exportador é `data/web/`**, fora de
+  `data/canonical/`. `inventariar()` varre `data/canonical/` **recursivamente**: cada JSON escrito
+  ali apareceria no `verify` como "não listado no manifesto" e um `freeze` novo passaria a incluir o
+  JSON no `DATASET_SHA256` — **que o próprio JSON cita**. É a colisão de D-ag/D-ah, pela terceira
+  vez. **Demonstrado** pelo teste que exporta para dentro do canônico e mede 9 divergências graves +
+  agregado divergente. `data/web/*` entrou no `.gitignore` (com `!data/web/.gitkeep`) neste
+  fechamento: dado derivado fora do git, RF-W043 — ref: ADR-008, D-ag, D-ah, RNF-009 do pipeline
+
 ---
 
 ## 3. Regras deste log
@@ -959,6 +1060,6 @@ S-09, S-10, S-11, S-12**) são operacionais e podem ser aceitas por e-mail, sem 
 ---
 
 *Documento vivo e deliberadamente pequeno — a §2.2 (achados de fonte) é a parte que mais cresce e a
-primeira a enxugar. Quando o Edu avaliar D-a..D-ag, o que virar permanente sobe para `CONTRACTS.md` /
+primeira a enxugar. Quando o Edu avaliar D-a..D-aj e D-W1..D-W6, o que virar permanente sobe para `CONTRACTS.md` /
 ADR e sai daqui; o que virar óbvio se apaga. Nunca apague a linha original de uma decisão avaliada:
 troque o marcador por `ACEITA — <quem> em <data>`.*

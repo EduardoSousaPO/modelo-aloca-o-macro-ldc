@@ -3,7 +3,9 @@
 > Verdade: `apps/analysis/**` + `docs/specs/SPEC.md` RF-033..RF-037 e RF-041..RF-045 + **ADR-002**
 > + a skill `dataviz`. **Estado (2026-10-11): a camada está COMPLETA** — F-023 (heatmap), F-024
 > (ranking + concordância), F-025 (timeline), **F-027 (caderno de entrega)** e **F-031 (pacote ao
-> Comitê, classe D)** implementadas e materializadas. F-027 e F-031 aguardam QA independente.
+> Comitê, classe D)** implementadas e materializadas, mais a **frente web** de 2026-10-11 (o
+> relatório executivo, o exportador `apps/web_export/` e o módulo do portal — seção própria no fim
+> desta página). F-027, F-031 e as 3 entregas da frente web aguardam QA independente.
 > **Gate FECHADO:** ADR-001 em `Proposta` ⇒ `especificacao_congelada = False` ⇒ **toda figura e toda
 > tabela nasce com a marca `ESPECIFICAÇÃO NÃO CONGELADA — não publicável`** (CA-090). Desenvolver é
 > liberado; publicar, não.
@@ -237,12 +239,74 @@ manifesto, e **a lista não vence o manifesto**. Também fora, por omissão: `ra
 os `relatorio_*.json`.
 
 **O pacote não é artefato do manifesto (`D-ag`).** Ele vive dentro de `data/canonical/`, que o
-`verify` cobre recursivamente, mas `inventariar()` ignora o prefixo `entrega/pacote_comite_`: o
-pacote é **cópia** de artefato já manifestado, montado depois do `freeze` e reconstruível por um
-comando (CA-114). **A ordem do gate continua** `run --offline` -> `verify` -> `freeze --tag` ->
+`verify` cobre recursivamente, mas `inventariar()` ignora **os entregáveis derivados de `entrega/`**
+(era só o prefixo `entrega/pacote_comite_` quando D-ag foi escrita; **D-ah** generalizou): eles são
+**cópia ou leitura** de artefato já manifestado, montados depois do `freeze` e reconstruíveis por um
+comando (CA-114). As 2 saídas do caderno de F-027 são a exceção nomeada e **continuam** artefato. **A ordem do gate continua** `run --offline` -> `verify` -> `freeze --tag` ->
 `montar_pacote --smoke`, porque o pacote **copia** o `MANIFEST.json` e precisa dele já congelado. E
 o `DATASET_SHA256` que o HTML do caderno imprime é, por construção, o da rodada **anterior** à
 inclusão do próprio HTML — **a versão que vale é a de `MANIFEST.json`/`HASHES.txt`**.
+
+## A frente web — o relatório executivo, o exportador e o módulo (2026-10-11)
+
+Três entregas que apresentam **o mesmo** dataset congelado de três formas novas. Nenhuma recalcula
+nada (a regra do topo desta página vale para as três) e **nenhuma publica**: a terceira nem está
+instalada.
+
+| O que | Onde | Escreve |
+|---|---|---|
+| **Relatório executivo** (o HTML que o Alexandre abre) | `apps/analysis/entrega/relatorio_executivo.py` | `entrega/RELATORIO-ALEXANDRE-2026-10-14.html` — **776 KB**, 11 seções, **um** arquivo |
+| **Exportador web** (F-W001) | `apps/web_export/{exportar,views,tipos_ts}.py` + o contrato em `packages/shared/schemas/web_views.py` | `data/web/<tag>/{meta.json, 6 views, schema.d.ts}` + `data/web/current.json` |
+| **Módulo do portal** | `apps/web_export/modulo-site/` (23 arquivos, TypeScript) | nada — é **pacote para colar** no `site-ldc`, e **não está instalado** |
+
+```bash
+uv run python -m apps.analysis.entrega.relatorio_executivo            # o HTML do Alexandre
+uv run python -m apps.web_export exportar --tag dev-2026-10-11 --destino data/web
+uv run python -m apps.web_export exportar --tag comite-2026-10-14 --destino <pasta do site>
+```
+
+**O relatório executivo é desta camada, e segue as mesmas regras.** Um arquivo, sem CDN, sem JS
+externo, sem fonte baixada: as abas são `input[type=radio]` + CSS (`:checked`), o acordeão é
+`<details>` nativo e o JS embutido é **enriquecimento** — nenhuma das 11 seções depende dele. As 2
+figuras entram **inline** como SVG, há folha de impressão A4 e `<meta viewport>`, porque o
+destinatário pode abrir no celular. Todo número vem de um dos 6 `relatorio_*.json` (nunca do
+Parquet, nunca de "pack" de contexto) e cita a fonte `[1]`..`[6]`; **toda célula de desempenho
+carrega o seu `n`**, inclusive as com alerta e as sem conclusão. A guarda de linguagem roda **dentro
+do gerador** e a montagem **falha** se um bloco de prosa reprovar — como nas figuras. Nada
+`publicavel: false` é nomeado ou tabulado (a entrega de D6 é a **faixa**, nunca o peso). Determinismo:
+nenhuma data de execução, nenhum `uuid`, nenhum dicionário fora de ordem ⇒ duas gerações, mesmo
+`sha256`. E **sem travessão**: `DESIGN.md` bane *em dash* no produto, e a montagem falha se um
+escapar.
+
+**Por que ele exigiu D-ah.** É gerado **depois** do `freeze` e **imprime** o `DATASET_SHA256`, então
+não pode estar dentro dele: `inventariar()` passou a ignorar a pasta `entrega/` inteira, com duas
+exceções nomeadas — as 2 saídas do caderno de F-027, que nascem **antes** do `freeze` e seguem
+conferidas pelo `verify`. É a generalização de D-ag, com o mesmo argumento: *um hash não contém a si
+mesmo*.
+
+**O exportador é a única fronteira entre o dataset e o browser.** Ele lê `data/canonical/`, **aplica
+o gate** e escreve JSON de apresentação; o `current.json` vai **no diretório pai e por último**, que
+é o que dá rollback por um arquivo. Quatro travas **recusam** a exportação inteira: artefato
+`publicavel: false` lido (a lista de inclusão não vence o manifesto), artefato proibido, `sha256`
+divergente do manifesto e gate sem o ADR em disco. O gate vive aqui, **não no front**: o bundle que
+desce ao navegador é texto baixável por quem passar do auth, então filtro na tela seria decoração. O
+contrato é pydantic e o `schema.d.ts` do outro repositório é **gerado** dele no mesmo comando —
+espelho legível em `CONTRACTS.md §10`. Zero conversão de unidade no valor (**D-W4**); desde o acerto
+de 2026-10-11 o `meta` declara *como apresentar* campo a campo, e o heatmap declara o **eixo** da
+escala por vista (`eixos_de_cor`), mas **nenhuma cor** (**D-ai**).
+
+**O módulo está pronto e não instalado — e isto é o estado seguro.** 4 telas (T-01, T-02, T-03,
+T-07) em Server Components, dataset servido **fora de `public/`** atrás do `checkAdminAuth()` que já
+existe, SVG escrito à mão no idioma do kit da casa (zero dependência nova), filtro na URL em vez de
+estado. O `site-ldc` **não foi tocado** — nem branch, nem commit, nem `npm install`, nem build —, e
+instalar é copiar a árvore mais 3 mudanças fora dela, o que é **classe D** com duas pré-condições
+anteriores: `ADR-008` aceito e a correção `user_metadata → app_metadata`. Guia completo em
+`docs/product/MODULO-ANALYTICS-MACRO.md`; o que falta medir está em `TODO.md §6` (o `next build` é
+o item que mais importa).
+
+**O gate está FECHADO nas três.** O HTML abre com "MATERIAL DE DISCUSSÃO" e as 6 views saem com
+`gate.publicavel = false`, porque o ADR-001 está em `Proposta` **em disco**. Aceitar o ADR tira a
+faixa das três com **zero linha de código** — é uma regeração e uma reexportação.
 
 ## Publicar é classe D, e o gate está FECHADO
 
@@ -252,8 +316,11 @@ existe classe A/B para publicação** (Anti-SPEC §10.3.18). O gate executável 
 `docs/wiki/runbooks/entrega-comite.md`; o roteiro humano de 30 minutos é
 `docs/product/GUIA-REVISAO-EDU.md`.
 
-**Features:** **F-023** · **F-024** · **F-025** · **F-027** · **F-031** — todas implementadas;
-F-027 e F-031 **aguardam QA independente**.
+**Features:** **F-023** · **F-024** · **F-025** · **F-027** · **F-031** · o **relatório
+executivo** · **F-W001** (`apps/web_export/`) · o **módulo do portal** — todas implementadas;
+F-027, F-031 e as 3 da frente web **aguardam QA independente**.
 **Ver também:** `modules/regimes.md` (as métricas e as lentes) · `modules/canonical.md` (o comando
 único e o `MANIFEST.json`) · `modules/internacional.md` (F-026) · `ADR-002` (métrica do heatmap) ·
+`ADR-008` (o portal interno, em `Proposta`) · `CONTRACTS.md §10` (as views web) ·
+`docs/product/MODULO-ANALYTICS-MACRO.md` (instalar o módulo) ·
 `runbooks/entrega-comite.md` (o gate) · `docs/product/GUIA-REVISAO-EDU.md` (a revisão do Edu).

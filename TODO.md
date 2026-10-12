@@ -156,10 +156,12 @@ Os **10** `relatorio_*.json` carregam `versao_build` conferido contra o código 
 **D-ag** (fechamento final) — todas em `DECISIONS_LOG §2.1/§2.3`, provisórias onde mudam número,
 com o que precisa de ratificação do Edu tabulado em **§4**.
 
-**O pacote de entrega não entra no manifesto (`D-ag`, aplicada neste fechamento).**
-`inventariar()` ignora o prefixo `entrega/pacote_comite_` (diretório e `.zip`), na mesma classe de
-`NAO_SAO_ARTEFATO`: o pacote é **cópia byte a byte** de artefato já manifestado, montada depois do
-`freeze` e reconstruível por um comando (CA-114). Antes disso, `verify` com o pacote em disco
+**O pacote de entrega não entra no manifesto (`D-ag`, aplicada neste fechamento; generalizada por
+`D-ah` na mesma noite — ver a frente LDC Analytics abaixo).** `inventariar()` ignora **a pasta
+`entrega/`**, exceto as 2 saídas do caderno de F-027; quando D-ag foi escrita a exclusão era só o
+prefixo `entrega/pacote_comite_` (diretório e `.zip`). A classe é a de `NAO_SAO_ARTEFATO`: o pacote
+é **cópia byte a byte** de artefato já manifestado, montada depois do `freeze` e reconstruível por
+um comando (CA-114). Antes disso, `verify` com o pacote em disco
 reprovava 42 arquivos e acusava agregado divergente, e um `freeze` novo incluiria o próprio pacote
 no `DATASET_SHA256` — circular. **Conferido:** `montar_pacote` → `verify` → **`VERIFY OK`, 48
 artefatos, agregado `fc233118…` inalterado, `rc 0`**. O HTML executado do caderno
@@ -178,6 +180,69 @@ rodadas com hash idêntico nos 53 Parquets e as duas reconciliações que virara
 (`test_contract_sgs_sidra.py`, `test_processed_layer_conventions.py`, `max |dif| = 0` nos dois) estão
 em `DECISIONS_LOG §2.1`, em `§3 Concluído` e em `wiki/log-archive-2026-10.md`. Saíram de §1 neste
 fechamento: **§1 é "em andamento"**, e não há mais nada em andamento.
+
+### FRENTE LDC ANALYTICS (2026-10-11, noite) — 3 ENTREGAS · **NADA INSTALADO** · QA PENDENTE
+
+> **O que esta frente é, em uma frase.** O mesmo dataset congelado, apresentado de três formas
+> novas — um HTML que o Alexandre abre no celular, uma ponte que escreve JSON de apresentação, e um
+> módulo de 4 telas pronto para colar no app LDC. **Nenhuma delas publica nada**: a terceira nem
+> está instalada, e as duas primeiras obedecem ao mesmo gate do ADR-001 que trava o pacote.
+>
+> **Esta frente não mexeu em uma única célula de dado.** `DATASET_SHA256` segue
+> **`fc233118…`** e o `verify` segue `rc 0` — ver **D-ah** abaixo, que é o único arquivo de
+> pipeline que ela tocou.
+
+| # | Entrega | O que é | Estado |
+|---|---|---|---|
+| 1 | **Relatório executivo** (`apps/analysis/entrega/relatorio_executivo.py`, 2.225 linhas) | **um** arquivo HTML de **776 KB**, 11 seções, abas em `input[type=radio]` + CSS e acordeão `<details>`: abre **sem servidor, sem rede e sem JavaScript**, com folha de impressão A4 e as 2 figuras inline em SVG. Todo número cita uma das 6 fontes `relatorio_*.json`; toda célula de desempenho carrega o seu `n`; a guarda de linguagem roda **dentro** do gerador e a montagem **falha** se um texto reprovar | **entregue — QA pendente** · 60 testes · gerado em `data/canonical/entrega/RELATORIO-ALEXANDRE-2026-10-14.html` · se identifica como `F-032`, **id já ocupado** (dívida em §6) |
+| 2 | **F-W001 — `apps/web_export/`** | a ponte do dataset congelado para o portal: lê `data/canonical/`, **aplica o gate**, escreve `<tag>/{meta,6 views}.json` + `schema.d.ts` **gerado** dos modelos pydantic + `current.json` **no pai, por último**. Contrato em `packages/shared/schemas/web_views.py`, espelho em **`CONTRACTS.md §10`** | **entregue — QA pendente** · 44 testes de unidade + 17 de contrato · tag `dev-2026-10-11` reexportada, **367.184 / 400.000 bytes** · 2 rodadas byte-idênticas |
+| 3 | **Módulo `/admin/analytics-macro`** (`apps/web_export/modulo-site/`) | 4 telas (T-01, T-02, T-03, T-07) como **pacote pronto para colar**, reproduzindo a árvore de destino arquivo por arquivo. Server Components, dataset **fora de `public/`** atrás de `checkAdminAuth()`, SVG próprio sem dependência nova. Guia: `docs/product/MODULO-ANALYTICS-MACRO.md` | **pronto e NÃO INSTALADO** · o `site-ldc` **não foi tocado** · `tsc --strict` 0 erros e 51 testes `vitest` **na rodada do autor**; **`next build` não rodado** (dívida em §6) |
+
+**O gate está corretamente FECHADO nas três.** O ADR-001 está em `Proposta` em disco ⇒
+`especificacao_congelada = false` ⇒ o HTML abre com "MATERIAL DE DISCUSSÃO" e as **6** views saem
+com `gate.publicavel = false`. **Isto é o comportamento certo, não um defeito**: o dia em que o Edu
+virar o `Status` para `Aceita`, uma reexportação tira a faixa — zero linha de código (teste
+`test_gate_abre_sozinho_quando_o_adr_vira_aceita`). **Falha fechada**: ADR ausente ou ilegível
+devolve `DESCONHECIDO`, que não congela nada.
+
+**`D-ah` — o `verify` e os entregáveis derivados de `entrega/`.** Era o bloqueio desta frente:
+`entrega/RELATORIO-ALEXANDRE-2026-10-14.html` não estava no manifesto, e com ele em disco o `verify`
+reprovava (`rc 1`, agregado `7634bf18…` contra `fc233118…` esperado). É a **mesma família de
+D-ag**: entregável montado *depois* do `freeze`, que **imprime** o `DATASET_SHA256` e portanto não
+pode estar dentro dele — incluí-lo faria o `freeze` seguinte mudar o hash que a própria página
+mostra. A exclusão de `inventariar()` deixou de ser o prefixo `entrega/pacote_comite_` e passou a
+ser **a pasta `entrega/` inteira, com duas exceções nomeadas** (`ARTEFATOS_DE_ENTREGA`): as saídas
+da execução do caderno de F-027, `entrega/entrega_comite_*.html` e `entrega/_executado.ipynb`, que
+nascem **antes** do `freeze`, são insumo do pacote e seguem no agregado — tirá-las mudaria o
+`DATASET_SHA256` que o pacote do Comitê já imprime. **Conferido:** `verify` → **`VERIFY OK`, 48
+artefatos, agregado `fc233118…`, `rc 0`**, com 4 testes de regressão nos dois sentidos (o
+entregável novo não quebra; byte alterado no HTML do caderno continua reprovando).
+
+**O acerto de contrato com o módulo (os 3 itens de `MODULO-ANALYTICS-MACRO.md §2`), aplicado:**
+
+1. **Unidade de apresentação.** O `meta.json` ganhou `unidade_de_apresentacao`,
+   `fator_de_apresentacao` e `casas_de_apresentacao` **por campo**. O valor emitido continua
+   **nativo** (D-W4 intacta): o que muda é que o fator `100` de `0,0504 → +5,04%` está escrito **de
+   um lado só**, e `_lib/formato.ts` virou leitura de tabela — a tabela `APRESENTACAO` que ele
+   carregava **não existe mais**.
+2. **`extremo_simetrico` por vista**, em `heatmap_regime_ativo.eixos_de_cor`, declarado como
+   **eixo** e não como estatística: `max(|valor|)` da **vista inteira** por campo pintável, em
+   unidade nativa, com `limite_inferior`/`limite_superior` e as duas contagens. Extremo que
+   dependesse do recorte repintaria as outras classes quando alguém marcasse uma.
+3. **`cor_hex` deixou de ser emitido** (**D-ai**): era o hex da figura matplotlib (paleta
+   *placeholder* da skill `dataviz`), o módulo já pintava com a rampa da LDC e tinha teste provando
+   que o ignorava. Saiu da célula do heatmap **e** do estilo da faixa da timeline; ficou o que tem
+   significado e **não** é cor (`hachura`, `conclusao_suprimida`). É **remoção** de campo, então
+   `SCHEMA_VERSAO` subiu **1 → 2**.
+
+**QA leve desta frente, rodado no fechamento** (não substitui o Prompt 3): guarda de linguagem
+`apps/analysis/_linguagem` sobre as 129.431 letras de texto do HTML → **limpo**, e sobre todo
+`.ts`/`.tsx`/`.md` do módulo → **limpo** (o único arquivo com termos é a própria guarda do lado do
+front, que os escreve como caso de teste e está fora da varredura dela, de propósito) · o único
+artefato `publicavel: false` (`internacional_pesos.parquet`, **D-af**) aparece nas views **só** em
+bloco de omissão declarada (`omitido_pelo_gate`, `reducoes`, `artefatos_nao_publicaveis`) e **não**
+aparece no HTML · `data/web/` ignorado pelo git (só o `.gitkeep` visível) · `schema.d.ts` do pacote
+do módulo **byte-idêntico** ao reexportado (`92ca7e733eb6…`, 21.833 B).
 
 ---
 
@@ -1647,6 +1712,28 @@ permanente em `docs/wiki/modules/canonical.md` e `modules/focus.md`.
 
 **Marcou as 19 do item 4?** O gate está cumprido e o envio é seu. **Falta uma?** Não envia.
 
+### ⛔ Frente LDC Analytics — as 6 decisões do Edu (2026-10-11)
+
+> **Nenhuma é código, e nenhuma é urgente antes do Comitê.** O próprio PRD responde **DW-5** com
+> "depois, sem exceção": o caminho crítico de 2026-10-14 é a tabela acima. O que está pronto aqui
+> espera — e espera **desinstalado**, que é o estado seguro.
+>
+> Fonte: `docs/product/LDC-ANALYTICS-PRD.md §12` (DW-1..DW-5) ·
+> `docs/decisions/adr/ADR-008-portal-web-interno.md` · `docs/product/MODULO-ANALYTICS-MACRO.md §1`.
+
+| # | A decisão | Recomendação já escrita | Por que só o Edu decide |
+|---|---|---|---|
+| **DW-1** | **Nome e identidade** do produto (`LDC Analytics`, em subdomínio interno ou dentro do app) | `LDC Analytics`, **sem domínio novo e sem página pública** | entra no shell, no cabeçalho de todo export e no manifesto; trocar depois é renomear em todo artefato. **A divergência de identidade está resolvida na prática:** o manual que vale é o `site-ldc/DESIGN.md` (navy/slate/lime/alerta, Ivy Mode + Public Sans), e é o que o módulo usa |
+| **DW-2** | **Proteção de acesso** | **o auth que já existe**: o módulo nasce em `/admin/analytics-macro` atrás de `checkAdminAuth()`, mais restritivo que o resto de `/admin` (o `EDITOR` não vê o grupo e a URL o redireciona). Vercel Authentication / Cloudflare Access só fazem sentido se o portal virar *deployment* separado | credencial ⇒ **classe D** (`AGENTS.md §2`). A escolha de instalar dentro do app já **é** a resposta de DW-2 — por isso ela e o item "instalar" abaixo são a mesma decisão |
+| **DW-3** | **Onde o dataset mora** | **JSON por tag no repositório do app** (o CI não tem rede, quem congela é o humano, a Vercel lê do repo e o rollback é `git revert`). Se o Edu preferir **não** versionar o dado — que é o que RF-W043 pede —, a linha do `.gitignore` vira `analytics-macro/*/` e o módulo mostra "Dataset não instalado" até existir outro caminho de entrega | define arquitetura de publicação, custo e rollback. **As duas opções estão escritas em `MODULO-ANALYTICS-MACRO.md §1.4`, com a consequência de cada uma** |
+| **DW-4** | **Quem mais acessa** | **Edu + Alexandre na v1**; o Comitê entra depois do primeiro ciclo de uso real | define o mecanismo, a lista nomeada (RF-W045) e se "leitor passivo" é persona de verdade |
+| **DW-5** | **O módulo entra antes ou depois do Comitê** | **DEPOIS, sem exceção** | define se o PRD é fase 2 ou caminho crítico. É a decisão que mantém esta frente fora do caminho de 2026-10-14 |
+| **+1** | **Instalar o módulo** — hoje ele está **pronto e não instalado**, e o `site-ldc` **não foi tocado** | copiar a árvore de `apps/web_export/modulo-site/` + as **3** mudanças fora dela (uma entrada em `next.config.ts`, um grupo em `AdminLayout.tsx`, as linhas do `.gitignore`), rodar `npm run build` (**a que falta**) e as 7 verificações de `MODULO-ANALYTICS-MACRO.md §5` | é **classe D** no `site-ldc`: toca navegação de `/admin` e passa a servir dado do Comitê. E tem **pré-requisito anterior e independente**: `user_metadata → app_metadata` (§6), que é a **P2** do módulo. Precisa de `ADR-008` aceito antes da primeira linha (**P3**) |
+
+**`ADR-008` está em `Proposta`** e é pré-requisito dos seis: ele é o que revisa a premissa "não é
+web, sem deploy" do `AGENTS.md`. Sem ele, a reabertura do ADR-007 (sem Supabase na v1) acontece por
+acidente.
+
 ### Estado em 2026-10-10 (noite) — execução autorizada, publicação ainda travada
 
 O **Edu autorizou abrir a Onda 0 e seguir as demais ondas em loop**, desenvolvendo sobre os **padrões
@@ -1951,6 +2038,58 @@ implementadas com o padrão provisório, mas **não publicadas** sem ADR aceito.
   `tests/unit` + `tests/contract` (F-026) e em `tests/e2e` (F-029).
 - **Tempo a frio do pipeline (RNF-008/CA-119) não medido** — exige `data/` vazio **e** rede. O
   trecho offline gasta **0,7-0,8 min** com `data/processed/` quente.
+
+### Dívidas da frente LDC Analytics (2026-10-11) — nenhuma bloqueia o Comitê
+
+- **A conversão de unidade continua acontecendo no front — agora declarada, não escondida.** O
+  acerto deste fechamento tirou daqui o pior pedaço: o fator `100` saiu do código da tela e virou
+  `meta.fator_de_apresentacao`, campo a campo, com `unidade_de_apresentacao` e
+  `casas_de_apresentacao` ao lado; `_lib/formato.ts` **lê a tabela** e não tem mais a constante.
+  **O que sobra:** RF-W014 lido ao pé da letra diz "nenhuma conversão de unidade no front", e
+  multiplicar por um fator declarado ainda é conversão. Duas saídas, nenhuma urgente: (a) reescrever
+  RF-W014 como "nenhum fator **não declarado** no front", que é o que a regra quer dizer; ou (b) o
+  exportador passar a emitir o valor **já apresentado** ao lado do nativo — o que custa bytes do
+  orçamento de 400 KB e cria dois números para a mesma coisa. **Recomendação: (a).** O risco de
+  erro de 100× hoje está travado por teste dos dois lados (`fator_de_apresentacao["selic_meta_pct"]
+  == 1` é o caso que importa).
+- **`next build` do app não foi rodado — é a verificação que mais falta no módulo.** O `site-ldc`
+  foi tratado como somente leitura: nenhuma branch, commit, `npm install` ou build. O que foi
+  rodado, pelo autor do módulo e com o compilador do app, foi `tsc --noEmit --strict` (**0 erros**)
+  e `vitest run` (**51 testes**). O build é o único que valida de verdade a fronteira
+  servidor/cliente do App Router, `searchParams` como `Promise` do Next 15 e o
+  `outputFileTracingIncludes` sem o qual o JSON **funciona em desenvolvimento e dá 404 em
+  produção**. **Risco de não fazer:** descobrir no deploy. **Custo:** um comando, depois de instalar.
+  ⚠️ **Deste fechamento:** as mudanças de hoje em `_lib/{formato,schema.d.ts}.ts`, na fixtura e no
+  teste do heatmap **não passaram por `vitest` nem pelo `tsc` do app** — não há toolchain do app
+  neste repositório. O que foi feito: `tsc --strict` com `skipLibCheck: false` sobre
+  `_lib/formato.ts` + `_lib/schema.d.ts` isolados, em diretório temporário, **0 erros**. Os `.tsx`
+  (que importam React/Next) **não** foram compilados.
+- **A rampa divergente navy ↔ alerta não foi validada por ninguém.** Foi medida em **contraste**
+  (os 10 pares estão em `modulo-site/src/app/globals.css.patch.md`, com a correção de `#c0584f` →
+  `#a94d46` para alcançar 5,3:1 na célula que carrega número), mas **não** foi vista pelo Comitê e
+  **não** foi medida em protanopia/deuteranopia — só o argumento de que os dois arcos se separam por
+  **luminância**, que é o canal que sobrevive. E a rampa da tela **não é** a da figura do PDF: desde
+  **D-ai** o exportador não manda cor nenhuma, então as duas paletas convivem sem contradizer um
+  número. **Fechar é:** adendo ao `DESIGN.md` com a escala de magnitude com sinal (que hoje não
+  existe lá: há *um* acento e *um* alerta) + uma simulação de dicromacia.
+- **`user_metadata` → `app_metadata` no `site-ldc`: item ANTERIOR e INDEPENDENTE deste módulo.**
+  Não é parte dele, não é pré-requisito do MVP dele — é pré-requisito da **P2** ("nada
+  `publicavel: false` entra enquanto o papel vier de `user_metadata`"). O papel vem de
+  `user_metadata.role`, que o próprio usuário escreve com a chave anon, e **vaza para o banco**: o
+  upsert em `public."User"` com client *service role*, depois `wp_advisors.role`, que é o que
+  `public.wp_is_admin()` consulta — a função de **todas** as políticas RLS. Um `EDITOR` se promove e
+  passa a ver a carteira de todos os advisors. Atenuante que muda severidade e não diagnóstico: não
+  há UI nem rota de cadastro, então o vetor é interno. **Classe C/D no `site-ldc`, PR próprio, 6
+  passos em ordem** (o script escreve `app_metadata` mantendo o antigo → rodar → trocar as 4
+  leituras com fallback e log → conferir ninguém no fallback → remover o fallback → corrigir
+  `ensureAdvisor` e **auditar `wp_advisors.role` no banco**, que já pode ter `admin` autodeclarado).
+  Diff conceitual completo em `docs/product/MODULO-ANALYTICS-MACRO.md §7`.
+- **Colisão de id: o relatório executivo se identifica como `F-032`, que já estava ocupado** pelo
+  item A de 2026-10-10 (`DECISIONS_LOG` inicial, §3). `F-033`..`F-040` estão reservados para o
+  backlog pós-Comitê, então renomear exige escolher a convenção — provavelmente a mesma do portal
+  (`F-W001`), algo como `F-E001` para a camada de entrega. **Nada depende do id** (o HTML gerado não
+  o imprime; só `FEATURE = "F-032"` no módulo e as duas docstrings), e por isso não foi renomeado
+  sem decisão: ficaria um terceiro significado para o mesmo rótulo.
 
 ---
 

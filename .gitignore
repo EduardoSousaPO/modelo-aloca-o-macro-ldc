@@ -55,6 +55,8 @@ data/processed/*
 !data/processed/.gitkeep
 data/canonical/*
 !data/canonical/.gitkeep
+data/web/*
+!data/web/.gitkeep
 
 # Formatos de dado (em qualquer lugar do repo)
 *.parquet

@@ -6,7 +6,7 @@
 > (imutável). **Fonte de verdade do produto:** [`docs/product/PRD.md`](../product/PRD.md) (v1.0, 2026-10-10).
 > Esta página **resume** o PRD — não o duplica. Em conflito, vale o PRD; em conflito de escopo, vale o e-mail.
 
-**Última revisão:** 2026-10-11 (§8 e §9 atualizadas para o **fechamento final** — F-027 e F-031 implementadas, pacote montado e selado, envio bloqueado por ADR-001)
+**Última revisão:** 2026-10-11, noite (§8 ganhou a **frente LDC Analytics** — relatório executivo, `apps/web_export/` e o módulo do portal, nada instalado; antes: fechamento final com F-027, F-031, pacote montado e selado, envio bloqueado por ADR-001)
 **Versão refletida:** PRD v1.0 + SPEC v1.0 (gerados em modo autônomo; **aprovação do Edu pendente**)
 
 ---
@@ -174,6 +174,22 @@ descritivo × preditivo.
   pós-Comitê** junto com F-033..F-040, 1 linha cada em `TODO.md §2`. Entram no aceite do ADR-001: as
   **7 + 11 linhas de path** e as **emendas de CA** (CA-078, CA-079, CA-098).
 
+**A frente LDC Analytics (2026-10-11, noite) — o mesmo dataset, três apresentações novas, nenhuma
+instalada.** Saíram no fechamento, sem tocar em uma célula de dado (`DATASET_SHA256` segue
+`fc233118…`, `verify` segue `rc 0`): **(1)** o **relatório executivo**, um HTML de **776 KB** em
+`data/canonical/entrega/RELATORIO-ALEXANDRE-2026-10-14.html` que abre no celular **sem servidor, sem
+rede e sem JavaScript**, com todo número citando uma das 6 fontes `relatorio_*.json` e **todo `n`**
+na célula; **(2)** o **exportador web** (**F-W001**, `apps/web_export/`), a única fronteira entre o
+dataset e um browser — aplica o gate, escreve `meta.json` + as **6** views + o `schema.d.ts`
+**gerado** dos modelos pydantic, e grava o `current.json` por último porque é o que dá rollback por
+um arquivo; **(3)** o **módulo `/admin/analytics-macro`** (`apps/web_export/modulo-site/`), 4 telas
+**prontas para colar e NÃO instaladas** — o repositório do site não foi tocado, o `next build` dele
+não foi rodado, e instalar é **classe D** com `ADR-008` (em `Proposta`) e a correção
+`user_metadata → app_metadata` como pré-requisitos. O gate do ADR-001 vale igual nas três: o HTML
+abre com "MATERIAL DE DISCUSSÃO" e as 6 views saem com `publicavel: false`. Detalhe em
+`modules/analysis.md` ("A frente web"), decisões **D-ah..D-aj** e **D-W1..D-W6** em
+`DECISIONS_LOG §2.3` (parte 6), contrato das views em `CONTRACTS.md §10`.
+
 ## 9. Próximo grande objetivo
 
 **Antes do Comitê (2026-10-14):** o dataset e o pacote **já existem** e estão selados — falta a
@@ -182,7 +198,9 @@ revisão humana do Edu na terça **2026-10-13** (roteiro de 30 min em
 conferidos na fonte original** (hoje conferidos só contra `raw_series.parquet`).
 **Depois do Comitê:** o backlog pós-Comitê, com **F-035** (variância mínima, que destrava
 `internacional_pesos`) e **F-040** (atualização trimestral, que transforma o projeto em ativo
-reutilizável) como os dois de maior retorno.
+reutilizável) como os dois de maior retorno — e a **frente LDC Analytics**, que já tem as 3 entregas
+prontas e espera 6 decisões humanas (`DW-1..DW-5` + instalar o módulo, `TODO.md §4`). O próprio PRD
+do portal responde **DW-5** com "depois do Comitê, sem exceção".
 
 ---
 
